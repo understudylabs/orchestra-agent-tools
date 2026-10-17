@@ -24,3 +24,6 @@ docs/skill-comparison-audit.md
 # local staging for external snapshots / incoming worktrees — never shipped
 _incoming/
 .trace-viewer-cache*/
+
+# TypeScript incremental build state is machine-local.
+*.tsbuildinfo
