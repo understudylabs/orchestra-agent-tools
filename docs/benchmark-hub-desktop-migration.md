@@ -1,5 +1,7 @@
 # Shipping the Benchmark Hub — `apps/benchmark-hub` → understudy-desktop
 
+Note: the desktop app this document targets was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The `understudy runs execute` queue it builds on remains current.
+
 **Status:** scoping v1 — 2026-07-22 (DOC ONLY; no migration code on this branch)
 **Prototype:** `apps/benchmark-hub` (Next 15, standalone dev server on :1421).
 **Target:** `apps/homescreen` (Tauri + Next 15 static export).

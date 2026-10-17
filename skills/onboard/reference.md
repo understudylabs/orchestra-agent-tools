@@ -69,9 +69,9 @@ agent reads when the user asks, "is my Understudy active?" or "talk to my
 Understudy." It captures live local runtime facts that do not belong in the
 profile. Never put secrets, prompts, outputs, or customer data in it.
 
-**Ownership: the Understudy desktop app is the canonical local daemon and the
-canonical writer of this card.** While the app runs, it maintains the card
-programmatically (`apps/homescreen/src-tauri/src/agent_card.rs`): it writes
+**Ownership: the Understudy desktop app (deprecated, see
+`docs/desktop-deprecation.md`) is the canonical writer of this card while it
+is installed.** While the app runs, it maintains the card programmatically: it writes
 the `app` block when its local API server starts, refreshes the warm-model
 list on every residency change (warm/cool/assign), and marks itself stopped
 on graceful shutdown. All app writes are atomic (temp file + rename), purely

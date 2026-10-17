@@ -1,5 +1,7 @@
 # Shipping "Explore Data" — Moraine viewer → understudy-desktop
 
+Note: the desktop app this document targets was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The `understudy explore scan` pipeline it builds on remains current.
+
 **Status:** plan v1 — 2026-07-20 (branch rebased onto main @ desktop 0.3.32)
 **Prototype:** `apps/moraine-viewer` (Next 16, standalone). **Target:** `apps/homescreen` (Tauri + Next 15 static export).
 

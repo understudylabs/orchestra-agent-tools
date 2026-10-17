@@ -46,7 +46,7 @@ node dist/bin.js status --json
 
 ## Product Surfaces
 
-- **Desktop app** — local control plane for chat, model serving, traces, evals, usage, account setup, and training workflows.
+- **Desktop app** (deprecated) — local control plane for chat, model serving, traces, evals, usage, account setup, and training workflows; see `docs/desktop-deprecation.md`.
 - **Local serving** — warm MLX slots for Understudy-suffixed local models, with first-run bootstrap for runtimes and model downloads.
 - **Chat harness** — the Understudy agent runtime streams answers, reasoning, guarded tool calls, tool results, and compaction evidence to the native UI.
 - **Fusion sidekick** — a smaller local model lane used for bounded read-only work while the main lane keeps planning, ambiguity, and final review.
@@ -56,24 +56,19 @@ node dist/bin.js status --json
 
 ## Getting Understudy Desktop
 
-How the app is actually distributed today (say exactly this; do not invent a
-download site):
+Understudy Desktop is deprecated (say exactly this; do not point users at a
+download):
 
-- **GitHub Releases** on `understudylabs/understudy-agent-tools`, tags
-  `desktop-vX.Y.Z-mvp`. Each release carries
-  `Understudy_<version>_aarch64.dmg` plus a signed `Understudy.app.tar.gz`
-  and the Tauri updater manifest `latest.json`.
-- **macOS Apple Silicon only** for now — no Intel-mac, Windows, or Linux
-  builds exist. Mark them "not yet available" if asked.
-- **Self-updates** via the signed Tauri v2 updater against
-  `releases/latest/download/latest.json` once installed.
-- An agent can fetch it directly:
-  `gh release download <tag> -R understudylabs/understudy-agent-tools -p '*.dmg'`.
+- The last build is GitHub release `desktop-v0.3.44-mvp` on
+  `understudylabs/understudy-agent-tools` (macOS Apple Silicon only). It no
+  longer self-updates and no further releases are planned.
+- Point users at the CLI (`understudy`) and the skills in this repo instead;
+  see `docs/desktop-deprecation.md`.
 
-What the app manages vs headless: the app owns the local daemon
+What a still-installed app manages vs headless: the app owns the local daemon
 (`~/.understudy/agent-card.json`), warm model slots, managed downloads, chat
 runs, and supervision — inspect it with `understudy daemon status` and the
-`understudy desktop ...` verbs. The trace → benchmark → review → run → rigor
+`understudy desktop ...` verbs (deprecated). The trace → benchmark → review → run → rigor
 lifecycle is fully headless via the CLI and the benchmarks MCP server
 (`understudy benchmarks mcp`); see
 [`../operate-benchmark-lab/SKILL.md`](../operate-benchmark-lab/SKILL.md).

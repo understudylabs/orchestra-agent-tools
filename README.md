@@ -209,20 +209,9 @@ understudy models runtime doctor  # verify the pinned Apple Silicon VLM engine
 `spine` prints the public workflow and points agents at
 `skills/understudy/SKILL.md`.
 
-When Understudy Desktop is running, the CLI can inspect its authenticated local
-control plane and run models without exposing ports or tokens:
-
-```bash
-understudy desktop contract --json
-understudy desktop status --json
-understudy desktop model catalog --json
-understudy desktop chat --slot <slot-id> --session my-task "Inspect this"
-```
-
-`understudy desktop contract` prints the packaged OpenAPI 3.1 contract even
-when Desktop is not running. Model downloads, supervision exports, proof
-preparation, and tool-proof commands are explicit and local-only; use
-`understudy desktop --help` for the complete surface.
+Understudy Desktop is deprecated; the remaining `understudy desktop` commands
+print a deprecation warning and will be removed in a future release. See
+[`docs/desktop-deprecation.md`](docs/desktop-deprecation.md).
 
 ## The skill tree
 
