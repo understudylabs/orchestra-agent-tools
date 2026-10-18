@@ -46,14 +46,22 @@ Cursor loads local plugins from `~/.cursor/plugins/local/<plugin-name>`.
 
 ```bash
 REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
+dest="$HOME/.cursor/plugins/local/understudy"
 ls "$REPO/.cursor-plugin/plugin.json" "$REPO/skills/understudy/SKILL.md"
-mkdir -p "$HOME/.cursor/plugins/local"
-rm -rf "$HOME/.cursor/plugins/local/understudy"
-ln -s "$REPO" "$HOME/.cursor/plugins/local/understudy"
+mkdir -p "$(dirname "$dest")"
+if [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*understudy-agent-tools) true ;; *) false ;; esac; then
+  # Refresh only a symlink Understudy created; never delete a real directory.
+  rm -f "$dest" && ln -s "$REPO" "$dest"
+elif [ -e "$dest" ] || [ -L "$dest" ]; then
+  echo "skip: existing non-Understudy path at $dest (move it aside, then rerun)"
+else
+  ln -s "$REPO" "$dest"
+fi
 ```
 
-Use `rm -rf` only for the known local plugin path above. Do not edit Cursor's
-internal settings databases.
+Only replace an Understudy-owned symlink at that exact path; leave any other
+file, directory, or symlink there unchanged and tell the developer. Do not edit
+Cursor's internal settings databases.
 
 Activation:
 

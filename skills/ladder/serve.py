@@ -26,6 +26,9 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")          # cached models only, no n
 HERE = os.path.dirname(os.path.abspath(__file__))
 VIEWER_DIR = os.path.join(HERE, "viewer")
 HOST, PORT = "127.0.0.1", 8011
+# Host names a browser may address this loopback server by. Requests carrying
+# any other Host (DNS rebinding, forwarded hosts) are refused in do_GET.
+ALLOWED_HOSTS = ("127.0.0.1", "localhost")
 
 # local model cache root -- same convention as manage-local-models: default
 # ~/.understudy/models, override with the env var.
@@ -354,6 +357,11 @@ class _Inference:
 INFER = _Inference()
 
 
+class ModelMissing(FileNotFoundError):
+    """Local model dir absent. The one exception whose text _sse_run forwards to
+    the page verbatim, so its message must stay free of filesystem paths."""
+
+
 def get_model(mid):
     """Load (once) and cache a model. Returns a lane-tagged tuple."""
     with _lock:
@@ -361,9 +369,11 @@ def get_model(mid):
             return _loaded[mid]
         lane, path = MODELS[mid][0], MODELS[mid][1]
         if lane != "gateway" and not os.path.isdir(path):   # actionable instead of a cryptic mlx load error
-            raise FileNotFoundError(
-                "model not found at %s -- pull it with the manage-local-models skill, "
-                "or point UNDERSTUDY_MODEL_HOME at your model cache." % path)
+            sys.stderr.write(f"[load] {mid}: not found at {path}\n"); sys.stderr.flush()
+            raise ModelMissing(
+                "model %s not found under UNDERSTUDY_MODEL_HOME -- pull it with the "
+                "manage-local-models skill, or point UNDERSTUDY_MODEL_HOME at your model cache."
+                % os.path.basename(path))
         sys.stderr.write(f"[load] {mid} ({lane}) ...\n"); sys.stderr.flush()
         if lane == "mlx_lm":
             from mlx_lm import load as lm_load
@@ -873,7 +883,6 @@ class Handler(BaseHTTPRequestHandler):
         b = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
@@ -883,7 +892,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
     def _sse(self, obj):
@@ -901,12 +909,36 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             return
         except Exception as e:
+            sys.stderr.write(f"[run] {type(e).__name__}: {e}\n"); sys.stderr.flush()
+            # only the allow-listed, path-free message reaches the page; mlx /
+            # urllib text and local paths stay in the server log
+            if isinstance(e, ModelMissing):
+                msg = str(e)[:300]
+            else:
+                msg = "%s (see server log)" % type(e).__name__
             try:
-                self._sse({"type": "error", "error": "%s: %s" % (type(e).__name__, str(e)[:300])})
+                self._sse({"type": "error", "error": msg})
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
+    def _same_site_request(self):
+        """Browser CSRF guard. The viewer is same-origin and curl sends neither
+        Sec-Fetch-Site nor Origin, so only cross-site browser requests (fetch,
+        EventSource, navigation) and rebound Host headers are refused."""
+        host = self.headers.get("Host", "")
+        if host.split(":")[0].lower() not in ALLOWED_HOSTS:
+            return False
+        site = self.headers.get("Sec-Fetch-Site")
+        if site is not None and site not in ("same-origin", "none"):
+            return False
+        origin = self.headers.get("Origin")
+        if origin is not None and origin.lower() != "http://" + host.lower():
+            return False
+        return True
+
     def do_GET(self):
+        if not self._same_site_request():
+            return self._json({"error": "forbidden: cross-site request"}, 403)
         u = urlparse(self.path)
         q = parse_qs(u.query)
         if u.path == "/run":
@@ -959,7 +991,7 @@ class Handler(BaseHTTPRequestHandler):
 def _cli_agent(task_id, model_id):
     """Run one agent loop and pretty-print its event stream to stderr.
     Lets us verify the loop end-to-end (BILLED gateway call) before wiring routes:
-        understudy run -- uv run python skills/ladder/serve.py --agent hard.renewal_save_route glm-5.1
+        understudy run -- uv run python skills/ladder/serve.py --agent hard.renewal_save_route glm-5.2
     """
     think = resp = 0
     run_id = new_run_id(task_id, model_id)
@@ -1003,7 +1035,8 @@ class QuietServer(ThreadingHTTPServer):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--agent":
         task_id = sys.argv[2] if len(sys.argv) > 2 else "hard.renewal_save_route"
-        model_id = sys.argv[3] if len(sys.argv) > 3 else "glm-5.1"
+        model_id = (sys.argv[3] if len(sys.argv) > 3
+                    else next((m for m, s in MODELS.items() if s[0] == "gateway"), "glm-5.2"))
         return _cli_agent(task_id, model_id)
     sys.stderr.write(f"ladder live server: http://{HOST}:{PORT}  (viewer: {VIEWER_DIR})\n")
     sys.stderr.write(f"  try: curl -N 'http://{HOST}:{PORT}/run?task=sort-email&model=gemma-4-e2b'\n")

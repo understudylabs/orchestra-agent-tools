@@ -203,17 +203,22 @@ whenever the agent itself edits a model-level file:
     "PostToolUse": [{
       "matcher": "Edit|Write",
       "hooks": [{ "type": "command",
-        "command": "scripts/detect-model-level-diff.sh" }]
+        "command": "jq -r '.tool_input.file_path // empty' | grep -qE '(prompt|playbook|route|model)' && echo 'model-level change: run simulate-before-launch before shipping' || true" }]
     }]
   }
 }
 ```
 
-The hook script only *detects and reminds* (prints "model-level change — run
-simulate-before-launch before shipping"); the gate itself stays an explicit,
-cost-disclosed run. The skill's trigger phrases cover the interactive case:
-when the developer says "swap the model", "edit the playbook", "flip traffic
-back", offer the gate unprompted.
+The hook only *detects and reminds*: it reads the edited path from the hook's
+stdin JSON, matches the same patterns as the pre-push hook, and prints the
+reminder; the gate itself stays an explicit, cost-disclosed run. `matcher`
+filters on tool name, not file path, so the path check lives inside the
+command. If you move the command into a script, point the hook at an absolute
+path you own (for example under `$CLAUDE_PROJECT_DIR`), never a relative one:
+a relative path resolves against whatever project the agent is running in.
+The skill's trigger phrases cover the interactive case: when the developer
+says "swap the model", "edit the playbook", "flip traffic back", offer the
+gate unprompted.
 
 ## First-run demo (synthetic)
 
