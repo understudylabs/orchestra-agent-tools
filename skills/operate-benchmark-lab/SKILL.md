@@ -30,7 +30,9 @@ node dist/bin.js benchmarks mcp --root <dir>
 
 MCP registration (Claude Code `~/.claude.json` → `mcpServers`):
 `{ "understudy-benchmarks": { "type": "stdio", "command": "understudy", "args": ["benchmarks", "mcp"] } }`
-— default root `~/.understudy/benchmarks`; add `--root` per extra directory.
+— or let the CLI write it: `claude mcp add --scope user understudy-benchmarks -- understudy benchmarks mcp`
+(`--scope user` matches the top-level entry above; the default `local` scope is per-project).
+Default root `~/.understudy/benchmarks`; add `--root` per extra directory.
 
 ## Safety Gates
 
@@ -48,7 +50,14 @@ MCP registration (Claude Code `~/.claude.json` → `mcpServers`):
   `confirm: true` after explicit in-chat consent stays a per-call escape
   hatch. There is NO default spend cap: the posture's
   `allow_spend_usd_per_run` is an opt-in generous stop-loss (warn at 1x with
-  a recorded `spend_warning`; hard stop only at 2x with `spend_stop`).
+  a recorded `spend_warning`; hard stop only at 2x with `spend_stop`). When
+  offering the raise, offer it with the flag: `understudy trust set
+  bounded_experiments --spend-stop-loss <usd>`, sized to roughly 2x the
+  estimated matrix cost. The stop-loss counts recorded costs only, so arms
+  that report no cost never trip it. The guard and notice run in the chat
+  tools and the benchmarks MCP server; `understudy runs queue` has neither,
+  so on that path state arms x tasks x rollouts and the rough cost yourself
+  before queueing.
 - **Local arms are machine-aware.** On predicted OOM (onboarding profile /
   memory probe) or a serve failure, the executor runs the arm on the gateway
   base model and records it — `arm_fallback` event plus `fallback_reason` on

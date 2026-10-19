@@ -1,8 +1,8 @@
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -66,8 +66,14 @@ export function writeCredentials(credentials: Credentials): void {
   CredentialsSchema.parse(credentials);
   const path = globalCredentialsPath();
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  writeFileSync(path, `${JSON.stringify(credentials, null, 2)}\n`, { encoding: "utf8" });
-  chmodSync(path, 0o600);
+  // Create at 600 and rename over the old file so the key never lands in
+  // a umask-mode or pre-existing permissive inode.
+  const temporary = `${path}.tmp-${process.pid}`;
+  writeFileSync(temporary, `${JSON.stringify(credentials, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  renameSync(temporary, path);
 }
 
 function warnIfPermissive(path: string): void {

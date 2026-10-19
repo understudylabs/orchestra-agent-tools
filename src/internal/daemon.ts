@@ -7,7 +7,7 @@
 // probe, because a crashed app (no graceful shutdown) leaves a stale card
 // behind.
 
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -37,10 +37,15 @@ export function agentCardPath(): string {
   return join(homedir(), ".understudy", "agent-card.json");
 }
 
-/** Parse the agent card; null when missing or unreadable JSON. */
+/** Parse the agent card; null when missing, a symlink, or unreadable JSON. */
 export function readAgentCard(cardPath: string): Record<string, unknown> | null {
   let raw: string;
   try {
+    // The app writes the card via rename, so a real card is never a symlink.
+    const metadata = lstatSync(cardPath);
+    if (metadata.isSymbolicLink() || !metadata.isFile()) {
+      return null;
+    }
     raw = readFileSync(cardPath, "utf8");
   } catch {
     return null;
@@ -69,6 +74,30 @@ export function pidAlive(pid: number): boolean {
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === "EPERM";
   }
+}
+
+/**
+ * True when `value` is an `http://127.0.0.1[:port]` origin with no userinfo,
+ * path, query, or hash (the only shape the desktop app ever writes). Mirrors
+ * the desktop-api.json rule so a tampered card cannot point the probe
+ * elsewhere.
+ */
+export function isLoopbackBaseUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return (
+    url.protocol === "http:" &&
+    url.hostname === "127.0.0.1" &&
+    !url.username &&
+    !url.password &&
+    url.pathname === "/" &&
+    !url.search &&
+    !url.hash
+  );
 }
 
 /** GET <baseUrl>/health with a short timeout; the route is unauthenticated. */
@@ -134,6 +163,12 @@ export async function daemonStatus(options: DaemonStatusOptions = {}): Promise<D
   }
   if (!baseUrl) {
     return notRunning("agent card has no base_url for the local server", detected);
+  }
+  if (!isLoopbackBaseUrl(baseUrl)) {
+    return notRunning(
+      `agent card base_url ${baseUrl} is not a loopback http://127.0.0.1 origin (not probed)`,
+      detected,
+    );
   }
   const healthy = await probeDaemonHealth(baseUrl, options.timeoutMs);
   if (!healthy) {

@@ -208,7 +208,9 @@ and registers that symlink, so the Hermes config entry survives checkout or
 package moves (a reinstall just re-points the link — never a copy).
 `skills.external_dirs` accepts a string or a list, expands `~` and `${VAR}`,
 `.resolve()`s symlinks, and silently skips paths that do not exist. The edit is
-idempotent and backs up the config first:
+idempotent: it skips a config that already lists the link, writes a minimal
+config when none exists, and only otherwise rewrites the file after backing it
+up (same order as `install.sh`):
 
 ```bash
 REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
@@ -217,8 +219,14 @@ LINK="$HOME/.understudy/skills"
 mkdir -p "$HOME/.understudy"
 [ -e "$LINK" ] || ln -s "$REPO/skills" "$LINK"
 CONFIG="${HERMES_HOME:-$HOME/.hermes}/config.yaml"
-[ -f "$CONFIG" ] && cp "$CONFIG" "$CONFIG.understudy.bak-$(date -u +%Y%m%dT%H%M%SZ)"
-python3 - "$CONFIG" "$LINK" <<'PY'
+if [ -f "$CONFIG" ] && grep -qF "$LINK" "$CONFIG"; then
+  echo "already registered in $CONFIG"
+elif [ ! -f "$CONFIG" ]; then
+  mkdir -p "$(dirname "$CONFIG")"
+  printf 'skills:\n  external_dirs:\n    - %s\n' "$LINK" >"$CONFIG"
+else
+  cp "$CONFIG" "$CONFIG.understudy.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+  python3 - "$CONFIG" "$LINK" <<'PY'
 import sys, os, yaml
 cfg_path, skills_dir = sys.argv[1], sys.argv[2]
 cfg = (yaml.safe_load(open(cfg_path)) or {}) if os.path.exists(cfg_path) else {}
@@ -233,7 +241,12 @@ skills["external_dirs"] = dirs
 os.makedirs(os.path.dirname(cfg_path) or ".", exist_ok=True)
 yaml.safe_dump(cfg, open(cfg_path, "w"), sort_keys=False)
 PY
+fi
 ```
+
+The PyYAML rewrite keeps keys and their order but drops YAML comments and
+anchors; the untouched original is in `config.yaml.understudy.bak-<timestamp>`.
+Tell the user that before running it on a hand-annotated config.
 
 If no YAML-capable `python3` is available, edit `~/.hermes/config.yaml` by hand
 (or run `hermes config edit`) and add `~/.understudy/skills` under
@@ -271,7 +284,10 @@ Uninstall — remove the entry from `skills.external_dirs`, then drop the symlin
 ```bash
 CONFIG="${HERMES_HOME:-$HOME/.hermes}/config.yaml"
 LINK="$HOME/.understudy/skills"
-python3 - "$CONFIG" "$LINK" <<'PY'
+# Only rewrite the config when it actually lists the link (same backup as install).
+if [ -f "$CONFIG" ] && grep -qF "$LINK" "$CONFIG"; then
+  cp "$CONFIG" "$CONFIG.understudy.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+  python3 - "$CONFIG" "$LINK" <<'PY'
 import sys, os, yaml
 cfg_path, skills_dir = sys.argv[1], sys.argv[2]
 cfg = (yaml.safe_load(open(cfg_path)) or {}) if os.path.exists(cfg_path) else {}
@@ -281,6 +297,7 @@ dirs = [dirs] if isinstance(dirs, str) else (dirs if isinstance(dirs, list) else
 skills["external_dirs"] = [x for x in dirs if x != skills_dir]
 yaml.safe_dump(cfg, open(cfg_path, "w"), sort_keys=False)
 PY
+fi
 [ -L "$LINK" ] && rm -f "$LINK"
 ```
 
