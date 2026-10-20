@@ -101,8 +101,18 @@ OSS from the first commit.
   its data, spend, destination, or production-impact envelope.
 - No customer data, private traces, secrets, private repo names, or internal
   incident notes.
+- Do not put customer or partner names, aliases, workload identifiers, metrics,
+  or derived artifacts in tracked paths or content, branch or commit names, pull
+  request metadata, or review comments. Use clearly synthetic placeholders.
+- Before a public release, an authorized maintainer must provide the private,
+  newline-delimited `UNDERSTUDY_PUBLIC_SAFETY_PRIVATE_TERMS` value while running
+  `npm run skills:validate -- --release` and
+  `npm run package:smoke -- --release`. A term may be followed on the same line
+  by tab-separated exact safe enclosing tokens. Untrusted pull-request jobs use
+  synthetic matcher tests and do not receive this private value.
 - Examples must use synthetic data or small public fixtures.
-- The desktop connects to the production remote-training control plane
+- (Historical; the desktop app was removed, see `docs/desktop-deprecation.md`.)
+  The desktop connects to the production remote-training control plane
   (`train.understudylabs.com`) as its default. This is no longer experimental:
   the connection surface has a completed security and production-readiness
   review in [`docs/reviews/train-api-desktop-connection.md`](docs/reviews/train-api-desktop-connection.md).

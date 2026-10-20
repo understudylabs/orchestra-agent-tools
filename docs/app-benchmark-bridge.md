@@ -1,5 +1,7 @@
 # Desktop app → benchmark/experiment spine bridge
 
+Note: the desktop app this document describes was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The CLI parts (`--plain-dir` experiments, `runs queue --experiment`) remain current.
+
 The desktop drag-drop training flow (CSV/JSONL → prepared dataset → local
 classification / local SFT / remote training) now feeds the same
 machine-readable spine the CLI and benchmark hub use. A self-service user gets

@@ -1,6 +1,11 @@
 ---
 name: calibrate-difficulty
 description: Measure per-band model headroom from a local, source-bound run artifact before investing in training.
+metadata:
+  understudy:
+    mode: interactive
+    safety: local-first
+    cli_required: false
 ---
 
 # Calibrate difficulty

@@ -19,8 +19,9 @@ contact channel listed on the organization profile.
   non-release material.
 - Treat the Tauri updater private key as permanent production signing material.
   Keep its durable backup in the production secrets vault and its automation
-  copy only in the protected GitHub `desktop-release` environment; never write
-  it to a checkout or repository variable, and publish only its public key.
+  copy, if retained, only in the protected GitHub `desktop-release`
+  environment; never write it to a checkout or repository variable, and
+  publish only its public key.
   Losing or rotating it strands clients that trust the embedded public key.
 - If a secret appears in output or a committed file, stop and rotate it before
   continuing.
@@ -37,13 +38,12 @@ contact channel listed on the organization profile.
 
 ## Release Automation
 
-Normal Desktop releases use the protected GitHub `desktop-release`
-environment. Apple credentials, the base64 PKCS#12 Developer ID identity, and
-the Tauri updater private key are encrypted environment secrets. The workflow
-imports both keys into runner-temporary paths, deletes them in an `always()`
-cleanup step, and publishes only after it re-downloads and verifies the draft
-release assets. Maintainers must not paste signing material into workflow
-dispatch inputs, logs, repository variables, or committed files.
+Desktop releases are retired; see [`desktop-deprecation.md`](desktop-deprecation.md).
+The protected GitHub `desktop-release` environment and its secrets (Apple
+credentials, the base64 PKCS#12 Developer ID identity, and the Tauri updater
+private key) remain production material. Maintainers must still never paste
+signing material into workflow dispatch inputs, logs, repository variables, or
+committed files.
 
 ## Local Artifact Safety
 

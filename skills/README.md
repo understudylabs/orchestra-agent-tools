@@ -46,6 +46,11 @@ group it belongs to.
   onboarding "climb"; reach for `compare-model-sweep` once you have your own eval.
   (Architecture, the tool-call dialects, adding/swapping tasks, and the demo→RL
   export path in its [`reference.md`](ladder/reference.md).)
+- [`product-knowledge`](product-knowledge/SKILL.md) explains what Understudy is
+  and how its product surfaces (Desktop app, local serving, Fusion sidekick,
+  evals, candidate results, rollout labs) work, for onboarding copy, agent-facing
+  help, and UI feature descriptions. (Company identity and the durable product
+  narrative in its [`reference.md`](product-knowledge/reference.md).)
 
 ## Understand & Capture
 
@@ -76,6 +81,10 @@ group it belongs to.
   local sanity check), and hands off to `ingest-traces`/`capture-evidence`
   once traces exist. Per-SDK env-var behavior and fallback paths in its
   [`reference.md`](instrument/reference.md).
+- [`watch-logs`](watch-logs/SKILL.md) stands up an always-on, hash-gated
+  log/event watcher: a deterministic trigger snapshots the watched sources and
+  fires a cheap model review only when they change, recording every review as
+  an eval row for a later fine-tune.
 - [`export-trace`](export-trace/SKILL.md) retrieves one supplied hosted
   `trace_id` (or an explicit private list), resolves its ordered request IDs
   through the customer trace lookup API, and reuses the request capture batch
@@ -122,6 +131,11 @@ group it belongs to.
   scored frozen-eval runs, and the route decision (ship local, local-as-router,
   hybrid, or remote). For a no-data first-run demo or local-vs-frontier feel
   test, use [`ladder`](ladder/SKILL.md).
+- [`optimize-local-model-compression`](optimize-local-model-compression/SKILL.md)
+  picks and tunes the quantization for a local model on tool-calling workloads:
+  layer-aware sensitivity-driven compression, QAT group-size matching, and
+  outcome-optimized calibration so a 4-bit model keeps emitting valid JSON and
+  tool calls.
 - [`recursive-language-model`](recursive-language-model/SKILL.md) makes a
   small/local model take over an agentic task a frontier model one-shots by
   decomposing it into bounded steps with flat context behind the incumbent's
@@ -159,6 +173,16 @@ logprobs (which tokens?), and tool-trace forensics (why did this call fail?).
   the clean warm-start trajectories the comparison yields, with small-N and
   holdout caveats. Its token-logprob lens is
   [`references/logprob-lens.md`](compare-trajectories/references/logprob-lens.md).
+- [`audit-verifier-reliability`](audit-verifier-reliability/SKILL.md) decides
+  whether a verifier reward is trustworthy for optimization: offline adversarial
+  probes plus replayed natural trajectories, with a hash-bound receipt that both
+  arms must pass.
+- [`calibrate-difficulty`](calibrate-difficulty/SKILL.md) measures per-band
+  model headroom from a local, source-bound run artifact (saturated, measurable,
+  or insufficient sample) before any training spend.
+- [`verify-serving-parity`](verify-serving-parity/SKILL.md) checks that two
+  serving lanes run identical weights from observed render fingerprints and
+  paired samples, failing closed on missing pairs or weak evidence.
 
 ## Plan Hosted Runs
 
@@ -243,7 +267,12 @@ shows headroom, no hosted RL until the local arms plateau.
   over repeated rollouts to catch intermittent failures, and emits the
   launch verdict `ramp-and-verify`'s pre-ramp gate consumes. Includes the
   proactive pre-commit-style hook recipes.
-- [`ramp-and-verify`](ramp-and-verify/SKILL.md) owns the last mile after a
+- [`ramp-and-verify`](ramp-and-verify/SKILL.md) also owns the read-only
+  [historical rollout review](ramp-and-verify/references/review-rollout.md):
+  explicit workload and before/after windows, complete indexed capture exports,
+  verified private sources, and a per-user task comparison view. The CLI owns
+  acquisition, accounting and statistics; no model call or route change occurs.
+  Its production branch owns the last mile after a
   route decision: pre-ramp repeat-replay stability gates, a staged traffic
   ladder (5% → 25% → 100%) on the gateway dial inside one activated rollout
   envelope, routed-vs-passthrough verification from captures at each step,

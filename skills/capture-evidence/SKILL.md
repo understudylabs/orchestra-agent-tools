@@ -18,6 +18,23 @@ The OSS loop does not require registration, auth, provider keys, an Understudy
 account, or hosted gateway access. Do a sufficient local pass that turns the
 workload into auditable artifacts and can answer the named decision.
 
+When the developer names a workload already captured by Understudy and the
+active credentials can read it, use the hosted-workload front door in
+[`references/hosted-workload-eval.md`](references/hosted-workload-eval.md).
+An active `understudy.eval-project.v2` is a separate, project-local branch: use
+its exact one-day raw source, author only inside that eval project, and make the
+coding agent—not the CLI—the conversational frontend. Infer the goal, metric,
+and failure taxonomy from the traces and repository before asking targeted gap
+questions. Reconcile any capture references recorded in
+`source/skipped.jsonl` before making coverage claims. Even without owner
+confirmation, continue to an explicitly
+provisional local draft and run `understudy evals check --draft`.
+Do not run the incumbent baseline, null floor, a provider model, or a hosted
+EvalWorkspace on that branch. Strict `understudy evals check`, final approval,
+and publication are later, separate steps reserved for an owner-confirmed
+release; publication still requires its own explicit upload permission. This
+hosted branch stops after `understudy evals check --draft`.
+
 ## Safety Gates
 
 Default to the evidence plan most likely to resolve the decision under the
@@ -37,7 +54,9 @@ commit, or transmit secrets; do not send data beyond the activated destination.
 
 ## Goal
 
-Create or refresh these artifacts under `.understudy/capture-evidence/`:
+For ordinary local evidence capture, create or refresh these artifacts under
+`.understudy/capture-evidence/` (the hosted v2 layout is defined in the linked
+reference):
 
 ```text
 workload-profile.md
@@ -180,6 +199,25 @@ REST/API workflows that mutate state — route the eval to
 instead of building a single-output harness; its state-mutating lens records
 reset/seed state, API schemas, policy docs, request logs, and final-state
 validators as part of the harness.
+
+For a named hosted workload, prefer:
+
+```sh
+understudy evals build \
+  --project <project> \
+  --workload <workload> \
+  --name <eval-name> \
+  --out .understudy/evals/<eval-dir> \
+  --yes
+```
+
+By default this downloads the rolling 24 hours ending when the command starts;
+add `--date YYYY-MM-DD` for one completed UTC calendar day. This is a
+local-authoring operation: the CLI mechanically transports and validates raw
+captures, while the coding agent owns lineage reconstruction, tool-call
+interpretation, task and contract proposals, verifier generation, and review.
+Do not silently substitute an older server-generated environment for the local
+source-bound result.
 
 Start from the real local workload:
 

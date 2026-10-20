@@ -8,9 +8,12 @@ import { telemetryEnabled, trackStatusChecked } from "../internal/telemetry.js";
 
 /**
  * `understudy status` — print active org, project, key suffix, and
- * gateway URL. Reads local config only; performs no I/O beyond the
- * filesystem. Safe to use on any machine, including fresh ones with
- * no config (prints a clear "not signed in" message and exits 0).
+ * gateway URL. Reads local config only, but when a credential exists
+ * and UNDERSTUDY_TELEMETRY is not "0" it also emits a bounded
+ * `cli_activation_status_checked` telemetry event to the gateway (and
+ * may create ~/.understudy/telemetry.json on first run). Safe to use
+ * on any machine, including fresh ones with no config (prints a clear
+ * "not signed in" message and exits 0).
  */
 export function registerStatusCommand(program: Command): void {
   program

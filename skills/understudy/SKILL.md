@@ -150,7 +150,11 @@ Identify the developer's current stage and load exactly one:
 - **Codebase / evidence not yet pinned down** — LLM call sites, current model/
   harness, traces, metric, splits, or incumbent baseline are missing, ambiguous,
   or stale → [`../capture-evidence/SKILL.md`](../capture-evidence/SKILL.md)
-  (also owns repo inspection + eval-harness discovery/build).
+  (also owns repo inspection + eval-harness discovery/build). For a named
+  workload already captured by Understudy, the recommended route is
+  `understudy evals build`: it downloads one raw workload day and hands that
+  source to the coding agent for local verifier authoring. Do not use the
+  legacy sampled-cohort `evals create` path for this workflow.
 - **App is running but no traces exist yet** — the developer wants capture
   flowing in minutes with no app-code changes ("instrument my app", "start
   capturing my LLM calls") → [`../instrument/SKILL.md`](../instrument/SKILL.md)
@@ -187,6 +191,10 @@ Identify the developer's current stage and load exactly one:
   verdict first: "will this work in prod", "run a simulator before I flip
   traffic", "gate model changes like a pre-commit check" →
   [`../simulate-before-launch/SKILL.md`](../simulate-before-launch/SKILL.md).
+- **Historical rollout review** — "compare this workload before and after",
+  "download all traces for this rollout", or "make a task-level rollout view"
+  → [`../ramp-and-verify/references/review-rollout.md`](../ramp-and-verify/references/review-rollout.md).
+  This branch reads captured traffic; it does not change routes or run inference.
 - **Production ramp / rollback** — a route decision exists and live traffic
   must move safely: "ramp this route", "move 25% of traffic to the new model",
   "did the route change regress anything", "roll this back", "prove the
@@ -196,6 +204,10 @@ Identify the developer's current stage and load exactly one:
   Understudy causing my errors", "which workloads are routed", "check
   provider health", "are there 500s", "what's our error rate", or wants
   self-service diagnostics without asking the team →
+  [`../check-routing-health/SKILL.md`](../check-routing-health/SKILL.md).
+- **Understudy usage, customer cost, or billing position** — the developer asks
+  for organization/project usage, the customer-priced cost of a call or
+  workload, pricing coverage, billing balance, or cost history →
   [`../check-routing-health/SKILL.md`](../check-routing-health/SKILL.md).
 - **Share savings / leaderboard receipt** — the developer wants to share how
   much money they saved, submit an anonymous lower-Anthropic-bill result, or

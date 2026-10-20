@@ -1,0 +1,42 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+    ignore:
+      # Pinned on purpose: the Pi runtime integration is validated per version.
+      - dependency-name: "@earendil-works/pi-ai"
+      - dependency-name: "@earendil-works/pi-coding-agent"
+
+  - package-ecosystem: npm
+    directory: /apps/benchmark-hub
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      all:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /apps/distributed-training
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      all:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

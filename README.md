@@ -209,20 +209,9 @@ understudy models runtime doctor  # verify the pinned Apple Silicon VLM engine
 `spine` prints the public workflow and points agents at
 `skills/understudy/SKILL.md`.
 
-When Understudy Desktop is running, the CLI can inspect its authenticated local
-control plane and run models without exposing ports or tokens:
-
-```bash
-understudy desktop contract --json
-understudy desktop status --json
-understudy desktop model catalog --json
-understudy desktop chat --slot <slot-id> --session my-task "Inspect this"
-```
-
-`understudy desktop contract` prints the packaged OpenAPI 3.1 contract even
-when Desktop is not running. Model downloads, supervision exports, proof
-preparation, and tool-proof commands are explicit and local-only; use
-`understudy desktop --help` for the complete surface.
+Understudy Desktop is deprecated; the remaining `understudy desktop` commands
+print a deprecation warning and will be removed in a future release. See
+[`docs/desktop-deprecation.md`](docs/desktop-deprecation.md).
 
 ## The skill tree
 
@@ -288,13 +277,21 @@ understudy workloads list
 understudy workloads create classify --capture
 understudy gateway probe --provider anthropic --project rehearsal --workload classify
 understudy captures list --project rehearsal --workload classify
+understudy captures list --project rehearsal --workload classify --from 2026-06-07T10:14:00Z --to 2026-06-07T10:16:00Z --json
 understudy captures export --request-ids-file request-ids.txt --project rehearsal --out .understudy/capture-batch --include-payload --yes
 understudy traces export <trace-id> --project rehearsal --out .understudy/trace-exports --include-payload --yes
 understudy traces export --trace-ids-file trace-ids.txt --project rehearsal --out .understudy/trace-exports --include-payload --yes
+understudy traces export --project rehearsal --workload classify --date 2026-08-29 --out .understudy/trace-exports/day --include-payload --yes
+understudy evals build --project rehearsal --workload classify --name classification-day --out .understudy/evals/classification-day --yes
 understudy routes set classify --project rehearsal --model-id glm-5.1 --traffic-pct 10
 understudy routes show classify --project rehearsal
 understudy routes clear classify --project rehearsal
 ```
+
+To correlate a database execution with hosted captures when no request ID was
+saved, use the timestamp search above. It returns indexed request IDs without
+downloading payloads. See [capture time search](docs/capture-time-search.md) for
+timezones, inspecting candidates, and exporting selected matches.
 
 `routes set` writes control-plane route config: your application keeps calling
 the normal gateway while a percentage of traffic goes to the selected
@@ -324,13 +321,15 @@ file-only, and requires `--include-payload --yes`. For a customer-owned batch,
 put one request id per line in a file and pass `--request-ids-file`; the CLI
 retries transient failures, resumes from completed files, and writes
 `failed-request-ids.txt`. Redacted batch files use `.summary.json`, keeping
-them distinct from full-payload `.payload.json` files. `traces export` resolves
-one explicit `trace_id` through the customer trace request-ID endpoint, then
-reuses that same bounded request exporter for every returned ID. Use a
-positional trace ID or an explicit `--trace-ids-file`; there is no unbounded
-`--all` trace scan. Each trace writes a private `trace.json` membership manifest,
-per-request summary or payload files, `failed-request-ids.txt`, and a batch-level
-`failed-trace-ids.txt`. `models list` shows public Understudy model IDs and
+them distinct from full-payload `.payload.json` files. `traces export` can
+resolve explicit trace IDs through the customer trace request-ID endpoint, or
+download exactly one raw workload day through `--workload`. Workload mode uses
+the rolling latest 24 hours by default; `--date YYYY-MM-DD` selects a completed
+UTC calendar day. There is no unbounded `--all` trace scan. Explicit traces
+write a private `trace.json` membership manifest, per-request files, and batch
+failure manifests. Workload days write only a final ordered
+`source/index.jsonl` and `source/summary.json` after success. `models list`
+shows public Understudy model IDs and
 display names only.
 
 If the coding agent has an approved native email connector, it may complete the

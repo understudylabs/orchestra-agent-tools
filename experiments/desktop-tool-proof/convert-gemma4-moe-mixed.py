@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -96,10 +97,17 @@ def main() -> None:
             skip_multimodal_module=skip_multimodal_module,
         ),
     )
+    # The manifest ships inside the output directory, so record only the
+    # source basename and a content hash, never absolute machine paths.
+    source_config = args.source / "config.json"
     manifest = {
         "format": "understudy.local_mixed_quantization.v1",
-        "source": str(args.source.resolve()),
-        "output": str(args.output.resolve()),
+        "source": args.source.resolve().name,
+        "source_config_sha256": (
+            hashlib.sha256(source_config.read_bytes()).hexdigest()
+            if source_config.is_file()
+            else None
+        ),
         "group_size": args.group_size,
         "low_bits": args.low_bits,
         "high_bits": args.high_bits,

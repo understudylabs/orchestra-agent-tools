@@ -5,10 +5,12 @@ import { serveTraceFoundry } from "../trace-foundry-server.js";
 import { authorOverview, authorTasks, compareAuthoringModels, gatewayClient, resolveDefaultModel, resolveEscalationModel, resolveGatewayAuth } from "../trace-author.js";
 import { renderTraceViewer } from "../trace-viewer.js";
 import { registerHostedTraceExportCommand } from "./trace-exports.js";
+import { registerRolloutReviewCommand } from "./rollout-review.js";
 
 export function registerTracesCommand(program: Command): void {
   const traces = program.command("traces").description("Inspect local traces, export hosted captures, and compile benchmark environments");
   registerHostedTraceExportCommand(traces);
+  registerRolloutReviewCommand(traces);
   traces.command("build-viewer")
     .description("Build a private local viewer for one trace's model calls, prompts, and tools")
     .option("--source <path>", "Local capture file or directory", ".understudy/captures")
@@ -33,8 +35,12 @@ export function registerTracesCommand(program: Command): void {
     .option("--max-age-days <days>", "Fail closed on stale captures", "3")
     .option("--workload <name>", "Compile only captures matching workload id or name")
     .option("--batch-size <count>", "Resumable processing batch size", "10")
-    .action((options: { source: string; output: string; maxAgeDays: string; workload?: string; batchSize: string }) => {
-      const result = compileTraceFoundry(resolve(options.source), resolve(options.output), Number(options.maxAgeDays), new Date(), { workload: options.workload, batchSize: Number(options.batchSize) });
+    .option("--reference-time <iso>", "Reference time for freshness (hosted evals use eval-project.json source.window.to)")
+    .option("--provable-lineage-only", "Exclude ambiguous and unlinked executions from generated tasks")
+    .option("--source-index <path>", "Frozen eval source/index.jsonl that binds every hosted capture file")
+    .action((options: { source: string; output: string; maxAgeDays: string; workload?: string; batchSize: string; referenceTime?: string; provableLineageOnly?: boolean; sourceIndex?: string }) => {
+      const referenceTime = resolveBenchmarkReferenceTime(options.referenceTime, options.provableLineageOnly === true);
+      const result = compileTraceFoundry(resolve(options.source), resolve(options.output), Number(options.maxAgeDays), referenceTime, { workload: options.workload, batchSize: Number(options.batchSize), requireProvableLineage: options.provableLineageOnly === true, sourceIndex: options.sourceIndex === undefined ? undefined : resolve(options.sourceIndex) });
       console.log(JSON.stringify(result, null, 2));
       console.error(`viewer: ${join(result.output_dir, "viewer", "index.html")}`);
     });
@@ -138,4 +144,17 @@ export function registerTracesCommand(program: Command): void {
     .action((options: { benchmark: string; port: string }) => {
       const port = Number(options.port); serveTraceFoundry(resolve(options.benchmark), port); console.error(`viewer: http://127.0.0.1:${port}`);
     });
+}
+
+export function resolveBenchmarkReferenceTime(
+  value: string | undefined,
+  requireProvableLineage: boolean,
+  fallback = new Date(),
+): Date {
+  if (requireProvableLineage && value === undefined) {
+    throw new Error("--provable-lineage-only requires --reference-time from eval-project.json source.window.to");
+  }
+  const referenceTime = value === undefined ? fallback : new Date(value);
+  if (Number.isNaN(referenceTime.valueOf())) throw new Error("--reference-time must be an ISO-8601 timestamp");
+  return referenceTime;
 }

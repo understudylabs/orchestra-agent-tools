@@ -112,7 +112,7 @@ export function registerLoginCommand(program: Command): void {
     )
     .option(
       "--api-key <key>",
-      "Non-interactive escape hatch: save this sk_* directly. Requires --org and --project.",
+      "Non-interactive escape hatch: save an sk_* directly. Prefer UNDERSTUDY_API_KEY in the environment or `--api-key -` (read from stdin) so the key stays off argv. Requires --org and --project.",
     )
     .option(
       "--org <id>",
@@ -223,12 +223,18 @@ function runManualLogin(
   opts: LoginOpts,
   gatewayUrl: string,
 ): AgentClaimResponse {
-  if (!opts.apiKey || !opts.org || !opts.project) {
+  // Resolved here, not in the mode dispatch, so a bare `understudy login`
+  // with UNDERSTUDY_API_KEY exported still gets the email-flow hint.
+  const apiKey =
+    opts.apiKey === "-"
+      ? readFileSync(0, "utf8").trim()
+      : (opts.apiKey ?? process.env.UNDERSTUDY_API_KEY);
+  if (!apiKey || !opts.org || !opts.project) {
     throw new Error(
-      "Manual login requires --api-key, --org, and --project. For normal sign-in, run `understudy login` with no flags.",
+      "Manual login requires --api-key (or UNDERSTUDY_API_KEY), --org, and --project. For normal sign-in, run `understudy login` with no flags.",
     );
   }
-  if (!opts.apiKey.startsWith("sk_")) {
+  if (!apiKey.startsWith("sk_")) {
     throw new Error("Expected a key starting with sk_.");
   }
   if (!opts.org.startsWith("org_")) {
@@ -236,7 +242,7 @@ function runManualLogin(
   }
   return {
     credential_type: "api_key",
-    credential: opts.apiKey,
+    credential: apiKey,
     org_id: opts.org,
     default_project: { slug: opts.project },
     gateway_url: gatewayUrl,
@@ -251,7 +257,12 @@ async function runAuthMdLogin(
   signupIntentId?: string,
 ): Promise<AgentClaimResponse | null> {
   const metadata = await fetchAuthMdMetadata(gatewayUrl);
-  const register = await postJson(metadata.agent_auth.register_uri, {
+  const registerUri = assertGatewayOrigin(
+    metadata.agent_auth.register_uri,
+    gatewayUrl,
+    "register_uri",
+  );
+  const register = await postJson(registerUri, {
     type: "identity_assertion",
     assertion_type: "verified_email",
     assertion: email,
@@ -262,7 +273,8 @@ async function runAuthMdLogin(
   const completeUrl = resolveClaimCompleteUrl(
     reg.claim_url,
     metadata.agent_auth.claim_uri,
-    metadata.agent_auth.register_uri,
+    registerUri,
+    gatewayUrl,
   );
 
   // Persist the claim so the sign-in survives this process: an agent
@@ -311,8 +323,13 @@ async function completePendingLogin(code: string, json: boolean): Promise<void> 
       "No pending sign-in found. Run `understudy login --email <email>` first to send a one-time code.",
     );
   }
+  const completeUrl = assertGatewayOrigin(
+    pending.complete_url,
+    pending.gateway_url,
+    "complete_url",
+  );
   try {
-    const claim = await postJson(pending.complete_url, {
+    const claim = await postJson(completeUrl, {
       claim_token: pending.claim_token,
       code: code.trim(),
     });
@@ -347,6 +364,7 @@ function writePendingLogin(pending: PendingLogin): void {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, `${JSON.stringify(pending, null, 2)}\n`, {
     encoding: "utf8",
+    mode: 0o600,
   });
   chmodSync(path, 0o600);
 }
@@ -391,7 +409,8 @@ function emitCodeSent(pending: PendingLogin, json: boolean): void {
 
 async function fetchAuthMdMetadata(gatewayUrl: string) {
   const url = `${gatewayUrl.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
-  const res = await fetch(url, { headers: { accept: "application/json" } });
+  // Discovery and credential endpoints must not redirect around origin pinning.
+  const res = await fetch(url, { headers: { accept: "application/json" }, redirect: "error" });
   if (!res.ok) {
     throw new Error(`Could not read auth.md metadata (${res.status}).`);
   }
@@ -401,6 +420,7 @@ async function fetchAuthMdMetadata(gatewayUrl: string) {
 async function postJson(url: string, body: unknown): Promise<unknown> {
   const res = await fetch(url, {
     method: "POST",
+    redirect: "error",
     headers: { accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -423,15 +443,37 @@ function resolveClaimCompleteUrl(
   claimUrl: string | undefined,
   claimUri: string | undefined,
   registerUri: string,
+  gatewayUrl: string,
 ): string {
-  if (claimUrl?.startsWith("http://") || claimUrl?.startsWith("https://")) {
-    return claimUrl;
+  // A relative claim_url resolves against the claim/register origin, which
+  // assertGatewayOrigin has already pinned to the gateway's.
+  assertGatewayOrigin(claimUri ?? registerUri, gatewayUrl, "claim_uri");
+  return assertGatewayOrigin(
+    claimUrl ?? "/agent/auth/claim/complete",
+    gatewayUrl,
+    "claim_url",
+  );
+}
+
+/**
+ * The discovery document and register response name the endpoints that
+ * receive the email, claim token and one-time code. Only URLs on the
+ * configured gateway's origin are followed, so a poisoned or downgraded
+ * document cannot redirect the credential-minting step elsewhere.
+ */
+function assertGatewayOrigin(
+  candidate: string,
+  gatewayUrl: string,
+  what: string,
+): string {
+  const origin = new URL(gatewayUrl).origin;
+  const url = new URL(candidate, `${origin}/`);
+  if (url.origin !== origin) {
+    throw new Error(
+      `Auth metadata at ${origin} points ${what} off-origin (${url.origin}); refusing to send sign-in data there.`,
+    );
   }
-  const base = new URL(claimUri ?? registerUri);
-  if (claimUrl) {
-    return new URL(claimUrl, `${base.origin}/`).toString();
-  }
-  return new URL("/agent/auth/claim/complete", base.origin).toString();
+  return url.toString();
 }
 
 function saveApiKeyResult(

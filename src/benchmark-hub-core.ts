@@ -690,7 +690,9 @@ export function submitReview(entry: AnyHubEntry | null, input: SubmitReviewInput
     decision: input.decision as ReviewDecision,
     note: typeof input.note === "string" ? input.note : undefined,
   }) as BenchmarkReview;
-  fs.appendFileSync(path.join(entry.dir, "reviews.jsonl"), serializeReviewLine(review), "utf8");
+  const reviewsPath = path.join(entry.dir, "reviews.jsonl");
+  fs.appendFileSync(reviewsPath, serializeReviewLine(review), { encoding: "utf8", mode: 0o600 });
+  fs.chmodSync(reviewsPath, 0o600);
   return { ok: true, review };
 }
 
@@ -1054,11 +1056,13 @@ export function applyAutoAccepts(entry: AnyHubEntry | null): ApplyAutoAcceptsRes
     );
   }
   if (reviews.length > 0) {
+    const reviewsPath = path.join(entry.dir, "reviews.jsonl");
     fs.appendFileSync(
-      path.join(entry.dir, "reviews.jsonl"),
+      reviewsPath,
       reviews.map((r) => serializeReviewLine(r)).join(""),
-      "utf8",
+      { encoding: "utf8", mode: 0o600 },
     );
+    fs.chmodSync(reviewsPath, 0o600);
   }
   return {
     ok: true,
@@ -1144,7 +1148,9 @@ export function submitTaskFeedback(
     task_id: input.task_id,
     feedback: input.feedback.trim(),
   });
-  fs.appendFileSync(path.join(entry.dir, "feedback.jsonl"), serializeTaskFeedbackLine(feedback), "utf8");
+  const feedbackPath = path.join(entry.dir, "feedback.jsonl");
+  fs.appendFileSync(feedbackPath, serializeTaskFeedbackLine(feedback), { encoding: "utf8", mode: 0o600 });
+  fs.chmodSync(feedbackPath, 0o600);
   return { ok: true, feedback, handoff: buildTaskFeedbackHandoff(entry.dir, input.task_id, feedback.feedback) };
 }
 

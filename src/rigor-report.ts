@@ -13,7 +13,7 @@
  * (confidence intervals — being built separately) are reported as honest
  * UNKNOWN rows, never silently omitted.
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { validateBenchmarkManifest } from "./benchmark.js";
@@ -622,20 +622,21 @@ export function renderRigorCiLines(report: RigorCiReport): string[] {
  * would match nothing and silently skip genuinely changed dirs.
  */
 export function filterChangedBenchmarkDirs(dirs: string[], baseRef?: string): { dirs: string[]; base: string | null } {
+  // The ref is a user-supplied CLI value: argv array (no shell) plus a revision
+  // syntax allowlist, and no leading '-' so git cannot read it as an option.
+  if (baseRef !== undefined && (!/^[A-Za-z0-9._/~^@{}-]+$/.test(baseRef) || baseRef.startsWith("-"))) {
+    throw new Error(`--base must be a git revision (got ${JSON.stringify(baseRef)})`);
+  }
+  const git = (args: string[]) => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   let changed: string[];
   let base: string | null = null;
   try {
-    if (!baseRef) {
-      try {
-        base = execSync("git merge-base HEAD origin/main", { encoding: "utf8" }).trim();
-      } catch {
-        base = execSync("git rev-parse HEAD~1", { encoding: "utf8" }).trim();
-      }
-    } else {
-      base = baseRef;
+    if (baseRef !== undefined) base = baseRef;
+    else {
+      try { base = git(["merge-base", "HEAD", "origin/main"]); } catch { base = git(["rev-parse", "HEAD~1"]); }
     }
-    const repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
-    changed = execSync(`git diff --name-only ${base} HEAD`, { encoding: "utf8" }).split("\n").filter(Boolean).map((file) => resolve(repoRoot, file));
+    const repoRoot = git(["rev-parse", "--show-toplevel"]);
+    changed = git(["diff", "--name-only", base, "HEAD", "--"]).split("\n").filter(Boolean).map((file) => resolve(repoRoot, file));
   } catch {
     return { dirs, base: null };
   }

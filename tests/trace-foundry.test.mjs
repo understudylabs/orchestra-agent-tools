@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,12 +7,33 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { once } from "node:events";
 import { compileTraceFoundry, createTraceReplayPlan, extractJsonPayload, importTraceReviews, requestSystemPrompt, runTraceReplays } from "../dist/trace-foundry.js";
+import { traceFoundryViewer } from "../dist/trace-foundry-viewer.js";
 import { serveTraceFoundry } from "../dist/trace-foundry-server.js";
 
 const capture = (id, ts, messages, response) => ({
   schema_version: 4, request_id: id, ts, workload_name: "synthetic-automation",
   customer_request_body: JSON.stringify({ system: "Operate a synthetic project board.", messages, tools: [{ name: "update-record", input_schema: { type: "object" } }] }),
   response_body: JSON.stringify(response), status_code: 200,
+});
+
+test("large benchmark viewers keep capture bodies out of the HTML payload", () => {
+  const overByteLimit = {
+    capture: {
+      path: "data/captures/capture.json",
+      bytes: Number.MAX_SAFE_INTEGER,
+      data: { private_marker: "must-not-be-inlined" },
+    },
+  };
+  const overCountLimit = Object.fromEntries(Array.from({ length: 251 }, (_, index) => [
+    `capture-${index}`,
+    { path: `data/captures/${index}.json`, bytes: 0, data: { private_marker: "must-not-be-inlined" } },
+  ]));
+
+  for (const captures of [overByteLimit, overCountLimit]) {
+    const viewer = traceFoundryViewer({ tasks: [], nodes: [], issues: [], captures, benchmark: {} });
+    assert.match(viewer, /understudy traces serve --benchmark/);
+    assert.doesNotMatch(viewer, /must-not-be-inlined/);
+  }
 });
 
 test("builds a fresh generic DAG, self-contained viewer, and raw/parsed inspector", () => {
@@ -58,6 +80,66 @@ test("builds a fresh generic DAG, self-contained viewer, and raw/parsed inspecto
   assert.equal(first.response.encoding, "json"); assert.equal(first.response.body.note, "data:image/png;base64,not-sse"); assert.ok(first.raw);
 });
 
+test("hosted eval lineage reports complete, ambiguous, and unlinked executions and excludes uncertainty", () => {
+  const root = mkdtempSync(join(tmpdir(), "understudy-foundry-lineage-"));
+  const project = join(root, "eval"), source = join(project, "source", "traces"), output = join(project, "benchmark");
+  mkdirSync(source, { recursive: true });
+  const traced = capture("complete", "2026-07-14T12:00:00Z", [{ role: "user", content: "Complete task" }], { content: [{ type: "text", text: "Done" }] });
+  traced.trace_id = "11111111111111111111111111111111";
+  traced.trace_context_status = "valid";
+  const ambiguousA = capture("ambiguous-a", "2026-07-20T12:00:01Z", [{ role: "user", content: "Branch A" }], { content: [{ type: "tool_use", id: "call-a", name: "update-record", input: { id: 1 } }] });
+  const ambiguousB = capture("ambiguous-b", "2026-07-20T12:00:02Z", [{ role: "user", content: "Branch B" }], { content: [{ type: "text", text: "B done" }] });
+  const ambiguousAFinal = capture("ambiguous-a-final", "2026-07-20T12:00:03Z", [
+    { role: "user", content: "Branch A" },
+    { role: "assistant", content: [{ type: "tool_use", id: "call-a", name: "update-record", input: { id: 1 } }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "call-a", content: "ok" }] },
+  ], { content: [{ type: "text", text: "A done" }] });
+  for (const row of [ambiguousA, ambiguousB, ambiguousAFinal]) {
+    row.trace_id = "22222222222222222222222222222222";
+    row.trace_context_status = "valid";
+  }
+  const unlinked = capture("unlinked", "2026-07-20T12:00:03Z", [{ role: "user", content: "No trace context" }], { content: [{ type: "text", text: "Done" }] });
+  const stale = capture("stale", "2026-07-13T11:59:59Z", [{ role: "user", content: "Outside the week" }], { content: [{ type: "text", text: "Old" }] });
+  const malformed = capture("malformed", undefined, [{ role: "user", content: "Missing time" }], { content: [{ type: "text", text: "Unknown" }] });
+  const sourceRows = [traced, ambiguousA, ambiguousB, ambiguousAFinal, unlinked, stale, malformed].map((row, index) => {
+    const body = `${JSON.stringify(row)}\n`;
+    const localPath = `source/traces/capture-${index}.jsonl`;
+    writeFileSync(join(project, localPath), body);
+    return {
+      schema_version: "understudy.eval-source-capture.v1",
+      request_id: row.request_id,
+      capture_key: `captures/test/${index}`,
+      captured_at: row.ts ?? "2026-07-20T12:00:00.000Z",
+      size_bytes: Buffer.byteLength(body),
+      content_sha256: createHash("sha256").update(body).digest("hex"),
+      local_path: localPath,
+    };
+  });
+  const sourceIndex = join(project, "source", "index.jsonl");
+  writeFileSync(sourceIndex, sourceRows.map(JSON.stringify).join("\n") + "\n");
+
+  const result = compileTraceFoundry(source, output, 7, new Date("2026-07-21T12:00:00Z"), { requireProvableLineage: true, sourceIndex });
+  assert.equal(result.freshness.cutoff_utc, "2026-07-14T12:00:00.000Z", "the exact start of the frozen seven-day window remains eligible");
+  assert.deepEqual(result.lineage.counts, { complete: 1, ambiguous: 1, unlinked: 1 });
+  assert.equal(result.counts.tasks, 1);
+  const executionIndex = readFileSync(join(output, "execution-index.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  assert.deepEqual(new Set(executionIndex.filter((row) => row.source_status === "included").map((row) => row.lineage_status)), new Set(["complete", "ambiguous", "unlinked"]));
+  assert.deepEqual(
+    new Set(executionIndex.flatMap((row) => row.source_files.map((file) => `${file.local_path}:${file.content_sha256}`))),
+    new Set(sourceRows.map((row) => `${row.local_path}:${row.content_sha256}`)),
+    "every frozen source file is bound exactly once",
+  );
+  assert.deepEqual(new Set(executionIndex.filter((row) => row.source_status === "excluded").flatMap((row) => row.exclusion_reasons)), new Set(["stale", "missing_timestamp"]));
+  assert.match(readFileSync(join(output, "analysis.md"), "utf8"), /Complete \| 1[\s\S]*Ambiguous \| 1[\s\S]*Unlinked \| 1/);
+  assert.equal(JSON.parse(readFileSync(join(output, "tasks.jsonl"), "utf8")).execution_group, executionIndex.find((row) => row.lineage_status === "complete").execution_group);
+  const offline = JSON.parse(readFileSync(join(output, "environment/offline-validation.json"), "utf8"));
+  assert.equal(offline.oracle_authority, "independent_evidence_required");
+  assert.equal(offline.tasks[0].oracle.status, "independent_evidence_required");
+  assert.equal(existsSync(join(output, "environment/gold.json")), false, "hosted provable-lineage mode never labels incumbent output as gold");
+  assert.equal(result.fixtures_split.gold_ref, null);
+  assert.match(readFileSync(join(output, "environment/README.md"), "utf8"), /No `gold\.json` is emitted/);
+});
+
 test("does not derive viewer paths from capture-controlled request IDs", () => {
   const root = mkdtempSync(join(tmpdir(), "understudy-foundry-path-"));
   const source = join(root, ".understudy", "captures"), output = join(root, ".understudy", "benchmarks", "latest"); mkdirSync(source, { recursive: true });
@@ -72,6 +154,25 @@ test("fails closed when no trace is within the requested window", () => {
   const source = join(root, ".understudy", "captures"); mkdirSync(source, { recursive: true });
   writeFileSync(join(source, "one.json"), JSON.stringify(capture("old", "2026-07-01T00:00:00Z", [{ role: "user", content: "Old" }], {})));
   assert.throws(() => compileTraceFoundry(source, join(root, ".understudy", "out"), 3, new Date("2026-07-21T00:00:00Z")), /Refusing to compile a stale benchmark/);
+});
+
+test("hosted v3 placement ids remain workload-scoped after normalization", () => {
+  const root = mkdtempSync(join(tmpdir(), "understudy-foundry-v3-scope-"));
+  const source = join(root, "captures"), output = join(root, "out");
+  mkdirSync(source, { recursive: true });
+  const legacy = capture("legacy-v3", "2026-07-20T00:00:00Z", [{ role: "user", content: "Update legacy record" }], {
+    content: [{ type: "tool_use", id: "x", name: "update-record", input: { id: 1 } }],
+  });
+  legacy.schema_version = 3;
+  legacy.placement_id = "usp_legacy";
+  delete legacy.workload_id;
+  delete legacy.workload_name;
+  writeFileSync(join(source, "legacy.json"), JSON.stringify(legacy));
+  const result = compileTraceFoundry(source, output, 3, new Date("2026-07-21T00:00:00Z"), { workload: "usp_legacy" });
+  assert.equal(result.counts.captures, 1);
+  const normalized = JSON.parse(readFileSync(join(output, "normalized-captures.jsonl"), "utf8"));
+  assert.equal(normalized.scope.workload_id, "usp_legacy");
+  assert.ok(normalized.warnings.includes("legacy_placement_id"));
 });
 
 test("scopes workloads, preserves upstream requests, emits a resumable v1 environment, and applies review decisions", () => {
@@ -807,6 +908,28 @@ test("leakage audit: clean when contract targets never surface outside the input
   assert.equal(audit.checked_tasks, 1);
 });
 
+test("build-time leakage warnings keep customer-derived excerpts off stderr", async () => {
+  const { printLeakageAudit } = await import("../dist/trace-foundry.js");
+  const customerValue = "confidential-customer-document-998877";
+  const stderr = [];
+  const originalError = console.error;
+  console.error = (...parts) => stderr.push(parts.join(" "));
+  try {
+    printLeakageAudit({
+      schema_version: "understudy.leakage_audit.v1",
+      status: "findings",
+      checked_tasks: 1,
+      findings: [{ task_id: "task-private", location: "fixtures.json", kind: "state_effect_value", excerpt: customerValue, tier: "verbatim", similarity: 1, signal: "exact" }],
+      tier_counts: { verbatim: 1, fuzzy: 0, semantic: 0 },
+      heuristic: "synthetic test fixture",
+    });
+  } finally {
+    console.error = originalError;
+  }
+  assert.doesNotMatch(stderr.join("\n"), new RegExp(customerValue));
+  assert.match(stderr.join("\n"), /details recorded only in the private manifest/);
+});
+
 test("build-benchmark records the leakage audit additively in manifest.json", () => {
   const root = mkdtempSync(join(tmpdir(), "understudy-foundry-leakage-"));
   const source = join(root, "captures"), output = join(root, "out"); mkdirSync(source, { recursive: true });
@@ -921,6 +1044,41 @@ const pythonBin = ["python3", "python3.13", "python3.12", "python3.11", "python3
   (bin) => spawnSync(bin, ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"], { encoding: "utf8" }).status === 0,
 );
 
+test("hostile observed tool names remain data in generated Python", { skip: !pythonBin }, () => {
+  const root = mkdtempSync(join(tmpdir(), "understudy-foundry-hostile-tool-"));
+  const source = join(root, "captures"), output = join(root, "out");
+  mkdirSync(source, { recursive: true });
+  const hostileName = 'update-record\"\"\"\nraise RuntimeError("trace-data-executed")\n#';
+  writeFileSync(join(source, "one.json"), JSON.stringify(capture(
+    "hostile",
+    "2026-07-20T00:00:00Z",
+    [{ role: "user", content: "Apply the update" }],
+    { content: [
+      { type: "tool_use", id: "x", name: hostileName, input: { class: 1, self: 2, "foo-bar": 3, foo_bar: 4 } },
+      { type: "tool_use", id: "y", name: "foo-bar", input: { id: 1 } },
+      { type: "tool_use", id: "z", name: "foo_bar", input: { id: 2 } },
+      { type: "tool_use", id: "dunder-init", name: "__init__", input: {} },
+      { type: "tool_use", id: "dunder-get", name: "__getattribute__", input: {} },
+      { type: "tool_use", id: "inherited", name: "run", input: {} },
+    ] },
+  )));
+  compileTraceFoundry(source, output, 3, new Date("2026-07-21T00:00:00Z"));
+  const worldPath = join(output, "environment", "understudy_trace_env", "servers", "world.py");
+  const world = readFileSync(worldPath, "utf8");
+  assert.match(world, /Execute one trace-derived transition against per-rollout state/);
+  assert.doesNotMatch(world, /Execute the trace-derived/);
+  assert.match(world, /async def tool_foo_bar\(/);
+  assert.match(world, /async def tool_foo_bar_2\(/, "colliding tool names receive distinct Python identifiers");
+  assert.match(world, /async def tool___init__\(/);
+  assert.match(world, /async def tool___getattribute__\(/);
+  assert.match(world, /async def tool_run\(/, "captured names cannot override inherited runtime methods");
+  assert.match(world, /class_: float \| None = None/);
+  assert.match(world, /self_: float \| None = None/);
+  assert.match(world, /foo_bar_2: float \| None = None/, "colliding argument names receive distinct Python identifiers");
+  const parsed = spawnSync(pythonBin, ["-m", "py_compile", worldPath], { encoding: "utf8" });
+  assert.equal(parsed.status, 0, parsed.stderr);
+});
+
 test("two sequential rollouts: rollout 2 starts from the seeded initial state, no residue from rollout 1", { skip: !pythonBin }, () => {
   const root = mkdtempSync(join(tmpdir(), "understudy-foundry-isolation-"));
   const source = join(root, "captures"), output = join(root, "out"); mkdirSync(source, { recursive: true });
@@ -974,7 +1132,7 @@ test("two sequential rollouts: rollout 2 starts from the seeded initial state, n
     "    state = world.WorldState()",
     "    ts = world.WorldToolset(state)",
     "    initial = state.model_dump()",
-    "    reply = await ts.update_record(id=7, status='active')",
+    "    reply = await ts.tool_update_record(id=7, status='active')",
     "    return initial, state.model_dump(), reply",
     "i1, f1, r1 = asyncio.run(rollout())",
     "i2, f2, r2 = asyncio.run(rollout())",

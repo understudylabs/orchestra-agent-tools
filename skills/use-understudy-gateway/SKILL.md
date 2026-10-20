@@ -141,6 +141,15 @@ node dist/bin.js status --json
    [`../../docs/background-ops.md`](../../docs/background-ops.md) for the exact
    tail/poll and exit-code patterns.
 
+## Model and endpoint compatibility
+
+Before the first remote probe or eval, read
+[`references/model-compatibility.md`](references/model-compatibility.md) when
+using OpenAI GPT-6 models, selecting Chat Completions versus Responses, or
+investigating a successful response from an unexpected model. Match the request
+parameters to the exact model and endpoint, then verify the served identity;
+HTTP 200 alone does not prove the requested model ran.
+
 ## Keyless catalog sweep
 
 Use this recipe for the fastest frontier/open-weight comparison when the
@@ -169,8 +178,11 @@ models by public id.
    `<workload-name>`. Skip create if `understudy workloads list` already shows
    that name.
 
-3. Run the frozen eval once per catalog model by changing only the request-body
-   `model` value. Send `x-understudy-project` and `x-understudy-workload` on
+3. Run the frozen eval once per catalog model. Keep the evaluation contract
+   fixed, while adapting endpoint and parameter names to each model using
+   [model compatibility](references/model-compatibility.md). Record those
+   adaptations; do not change prompts or tool permissions to make an arm pass.
+   Send `x-understudy-project` and `x-understudy-workload` on
    every request so the run does not accidentally use the org default workload.
 
 4. Record the legibility headers for every row: `x-understudy-mode`,
