@@ -35,9 +35,16 @@ export function clickhouseUrl(): string {
   return process.env.MORAINE_CLICKHOUSE_URL ?? "http://127.0.0.1:8123";
 }
 
+/** Escape a string for a single-quoted ClickHouse literal. */
+export function sqlq(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 export async function ch<T>(sql: string): Promise<T[]> {
+  // readonly=2: the server refuses writes/DDL even if an interpolation point
+  // is ever missed, while still accepting the per-query caps below.
   const params =
-    "database=moraine&default_format=JSONEachRow" +
+    "database=moraine&default_format=JSONEachRow&readonly=2" +
     "&max_memory_usage=2000000000&max_threads=4&max_execution_time=30";
   const res = await fetch(`${clickhouseUrl()}/?${params}`, {
     method: "POST",
@@ -108,6 +115,7 @@ function openScanDb(): DatabaseSync {
 }
 
 async function runScan(opts: { limit: number; concurrency: number; llmUrl: string }): Promise<void> {
+  if (!Number.isInteger(opts.limit) || opts.limit < 1) throw new Error("--limit must be a positive integer");
   const db = openScanDb();
   const done = new Set(
     (db.prepare("SELECT session_id FROM session_scan").all() as { session_id: string }[]).map((r) => r.session_id),
@@ -154,10 +162,10 @@ async function runScan(opts: { limit: number; concurrency: number; llmUrl: strin
           JSONExtractString(payload_json, 'input')
         ), 1, 500) AS t
       FROM mcp_open_events
-      WHERE session_id = '${s.session_id}' AND event_type IN ('user_input', 'assistant_response', 'tool_call')
+      WHERE session_id = '${sqlq(s.session_id)}' AND event_type IN ('user_input', 'assistant_response', 'tool_call')
         -- subagent chatter skews labels toward what the subagents were told; main stream only
         AND event_uid IN (
-          SELECT event_uid FROM events WHERE session_id = '${s.session_id}' AND is_substream = 0
+          SELECT event_uid FROM events WHERE session_id = '${sqlq(s.session_id)}' AND is_substream = 0
         )
       ORDER BY event_order ASC, slot DESC, generation DESC
       LIMIT 1 BY event_order
@@ -224,7 +232,7 @@ async function runScan(opts: { limit: number; concurrency: number; llmUrl: strin
 
   async function subEventsOf(sessionId: string): Promise<number> {
     const r = await ch<{ n: string }>(
-      `SELECT toString(countIf(is_substream = 1)) AS n FROM events WHERE session_id = '${sessionId}'`,
+      `SELECT toString(countIf(is_substream = 1)) AS n FROM events WHERE session_id = '${sqlq(sessionId)}'`,
     );
     return Number(r[0]?.n ?? 0);
   }
@@ -399,9 +407,23 @@ async function runCluster(opts: { llmUrl: string }): Promise<void> {
 // commits — git-log harvest + session attribution
 // =================================================================================
 
-function git(dir: string, args: string[]): string | null {
+// Repo-location overrides are dropped so each candidate dir is inspected on its
+// own (a GIT_DIR exported by a hook would otherwise redirect every query to one
+// repo). GIT_CONFIG_* is kept: `config user.email` must see the user's setup.
+const GIT_LOCATION_VARS = new Set([
+  "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE",
+]);
+const gitEnv = (): NodeJS.ProcessEnv => ({
+  ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !GIT_LOCATION_VARS.has(name))),
+  LC_ALL: "C",
+  GIT_OPTIONAL_LOCKS: "0",
+});
+
+function git(dir: string, args: string[], timeout = 5_000): string | null {
   try {
-    const p = spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const p = spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: gitEnv(), timeout });
+    if (p.error) console.error(`git ${args[0]} in ${dir}: ${p.error.message}`);
     if (p.status !== 0) return null;
     return (p.stdout ?? "").trim();
   } catch {
@@ -469,7 +491,7 @@ async function runCommits(): Promise<void> {
     const out = git(repo, [
       "log", "--all", "--no-merges", "--since=2026-01-01",
       "--pretty=format:%H%x09%ct%x09%ae%x09%an%x09%s",
-    ]);
+    ], 120_000);
     if (out === null) continue;
     reposScanned++;
     for (const line of out.split("\n")) {

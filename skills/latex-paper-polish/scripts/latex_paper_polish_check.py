@@ -53,7 +53,7 @@ def compile_tex(tex: Path, outdir: Path) -> tuple[str | None, str]:
             "--keep-intermediates",
             "--outdir",
             str(outdir),
-            tex.name,
+            f"./{tex.name}",
         ]
         code, output = run(cmd, tex.parent)
         return ("tectonic" if code == 0 else None), output
@@ -65,7 +65,7 @@ def compile_tex(tex: Path, outdir: Path) -> tuple[str | None, str]:
             "-interaction=nonstopmode",
             "-halt-on-error",
             f"-outdir={outdir}",
-            tex.name,
+            f"./{tex.name}",
         ]
         code, output = run(cmd, tex.parent)
         return ("latexmk" if code == 0 else None), output
@@ -76,7 +76,7 @@ def compile_tex(tex: Path, outdir: Path) -> tuple[str | None, str]:
             "-interaction=nonstopmode",
             "-halt-on-error",
             f"-output-directory={outdir}",
-            tex.name,
+            f"./{tex.name}",
         ]
         code, output = run(cmd, tex.parent)
         if code == 0:

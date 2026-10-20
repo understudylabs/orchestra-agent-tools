@@ -21,9 +21,19 @@ Use its [`reference.md`](../install-agent-adapter/reference.md#cursor) for the
 current symlink install:
 
 ```bash
-mkdir -p "$HOME/.cursor/plugins/local"
-rm -rf "$HOME/.cursor/plugins/local/understudy"
-ln -s "$REPO" "$HOME/.cursor/plugins/local/understudy"
+REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
+dest="$HOME/.cursor/plugins/local/understudy"
+mkdir -p "$(dirname "$dest")"
+if [ ! -f "$REPO/.cursor-plugin/plugin.json" ]; then
+  echo "not an Understudy checkout: $REPO"
+elif [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*understudy-agent-tools) true ;; *) false ;; esac; then
+  # Refresh only a symlink Understudy created; never delete a real directory.
+  rm -f "$dest" && ln -s "$REPO" "$dest"
+elif [ -e "$dest" ] || [ -L "$dest" ]; then
+  echo "skip: existing non-Understudy path at $dest (move it aside, then rerun)"
+else
+  ln -s "$REPO" "$dest"
+fi
 ```
 
 Activation:
@@ -44,7 +54,9 @@ Local-first and free: installing the Cursor adapter only links local skills. It
 must not authenticate, upload data, inspect secret values, download model
 weights, start hosted jobs, or make provider calls.
 
-- Only overwrite the exact `~/.cursor/plugins/local/understudy` path.
+- Only replace an Understudy-owned symlink at the exact
+  `~/.cursor/plugins/local/understudy` path; leave any other file, directory,
+  or symlink there unchanged and tell the developer.
 - Do not edit Cursor internal settings databases.
 - Do not copy private traces, keys, or `.understudy/` state into the plugin.
 

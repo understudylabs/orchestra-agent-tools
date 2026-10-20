@@ -28,10 +28,17 @@ export function discoverPrimeScorecards(root: string): ScorecardEntry[] {
   return readdirSync(resolvedRoot)
     .flatMap((slug) => {
       const directory = join(resolvedRoot, slug);
-      if (!statSync(directory).isDirectory()) return [];
-      const viewer = join(directory, "viewer", "index.html");
-      if (!existsSync(viewer)) return [];
-      const data = embeddedData(readFileSync(viewer, "utf8"));
+      let data: Record<string, unknown>;
+      let viewer: string;
+      try {
+        if (!statSync(directory).isDirectory()) return [];
+        viewer = join(directory, "viewer", "index.html");
+        if (!existsSync(viewer)) return [];
+        data = embeddedData(readFileSync(viewer, "utf8"));
+      } catch {
+        // Skip dangling symlinks and unreadable entries instead of failing the whole gallery.
+        return [];
+      }
       const benchmarkId = typeof data.benchmark_id === "string" ? data.benchmark_id : slug;
       const publicSlug = benchmarkId.replace(/-v\d+$/, "");
       return [{
@@ -59,22 +66,48 @@ export function renderScorecardGallery(entries: ScorecardEntry[]): string {
   :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#030303;color:#e8e8e6;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}main{max-width:1100px;margin:0 auto;padding:48px 24px}h1{font-size:22px;font-weight:500;margin:0 0 8px}.sub{color:#777;margin-bottom:32px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.card{display:block;border:1px solid #252525;border-radius:12px;padding:18px;color:inherit;text-decoration:none;background:#080808}.card:hover{border-color:#4de49a}.card span,.card b,.card small{display:block}.card b{margin:18px 0 5px;color:#4de49a;font-size:18px}.card small,.empty{color:#777}code{color:#bbb}</style></head><body><main><h1>Benchmark Gallery</h1><div class="sub">Private Prime-native scorecards · ${entries.length} benchmark${entries.length === 1 ? "" : "s"}</div><div class="grid">${cards}</div></main></body></html>`;
 }
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
+export function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_HOSTS.has(host.toLowerCase());
+}
+
 export function startPrimeScorecardServer(root: string, port: number, host = "127.0.0.1"): Promise<{ server: Server; url: string; entries: ScorecardEntry[] }> {
   const entries = discoverPrimeScorecards(root);
   const bySlug = new Map(entries.map((entry) => [entry.slug, entry]));
+  // On a loopback bind, only accept loopback Host headers so a DNS-rebound page cannot read private scorecards.
+  const enforceLoopbackHost = isLoopbackHost(host);
+  const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" };
   const server = createServer((request, response) => {
-    const url = new URL(request.url ?? "/", `http://${host}:${port}`);
+    if (enforceLoopbackHost) {
+      const requestHost = (request.headers.host ?? "").replace(/:\d+$/, "");
+      if (!isLoopbackHost(requestHost)) {
+        response.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
+        response.end("forbidden host");
+        return;
+      }
+    }
+    let url: URL;
+    let slug: string | undefined;
+    try {
+      url = new URL(request.url ?? "/", "http://localhost");
+      const match = /^\/b\/([^/]+)\/?(?:index\.html)?$/.exec(url.pathname);
+      // decodeURIComponent throws URIError on a malformed escape; keep it inside the 400 path
+      slug = match ? decodeURIComponent(match[1]) : undefined;
+    } catch {
+      response.writeHead(400, { "content-type": "text/plain; charset=utf-8" });
+      response.end("bad request");
+      return;
+    }
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      response.writeHead(200, headers);
       response.end(renderScorecardGallery(entries));
       return;
     }
-    const match = /^\/b\/([^/]+)\/?(?:index\.html)?$/.exec(url.pathname);
-    if (match) {
-      const slug = decodeURIComponent(match[1]);
+    if (slug !== undefined) {
       const entry = bySlug.get(slug);
       if (entry) {
-        response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+        response.writeHead(200, headers);
         response.end(readFileSync(entry.viewer));
         return;
       }
@@ -84,6 +117,11 @@ export function startPrimeScorecardServer(root: string, port: number, host = "12
   });
   return new Promise((resolvePromise, reject) => {
     server.once("error", reject);
-    server.listen(port, host, () => resolvePromise({ server, url: `http://${host}:${port}/`, entries }));
+    const urlHost = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+    server.listen(port, host, () => {
+      const address = server.address();
+      const boundPort = address && typeof address === "object" ? address.port : port;
+      resolvePromise({ server, url: `http://${urlHost}:${boundPort}/`, entries });
+    });
   });
 }

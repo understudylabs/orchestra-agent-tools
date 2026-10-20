@@ -53,7 +53,6 @@ image = (
     .env(
         {
             "HF_HOME": "/root/.cache/huggingface",
-            "TRANSFORMERS_CACHE": "/root/.cache/huggingface",
             "PYTHONPATH": "/usr/local/lib/python3.12/dist-packages",
             "VLLM_ALLOW_RUNTIME_LORA_UPDATING": "1",
         }
@@ -196,7 +195,9 @@ def _artifact_request(body: dict[str, Any]) -> dict[str, Any]:
     return body
 
 
-@app.function(image=image, gpu="H200", timeout=60 * 60)
+# No GPU until the stub does real work; the usage receipt still prices the
+# boundary at the H200 rate, so it is an upper bound rather than actual spend.
+@app.function(image=image, timeout=60 * 60)
 def execute_experiment(job_id: str, request: dict[str, Any]) -> None:
     started = time.time()
     job = dict(job_store.get(job_id, {}))

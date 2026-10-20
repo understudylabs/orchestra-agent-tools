@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import kleur from "kleur";
 import { closeSync, mkdirSync, openSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { dirname, join, resolve } from "node:path";
 
@@ -86,6 +86,24 @@ async function loadPiConversation(): Promise<
   }
 }
 
+const MAX_FIXTURE_REQUEST_BYTES = 40 * 1024 * 1024;
+
+// Same cap as the sidecar's readJson: the fixtures are loopback-only but a
+// stray local client must not be able to grow an unbounded request string.
+async function readFixtureJson(request: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of request) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += bytes.length;
+    if (total > MAX_FIXTURE_REQUEST_BYTES) {
+      throw new Error("fixture request exceeds the 40 MB limit");
+    }
+    chunks.push(bytes);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
 async function startDeterministicSupervisorFixture(): Promise<{
   target: { base_url: string; model: string };
   close(): Promise<void>;
@@ -97,9 +115,7 @@ async function startDeterministicSupervisorFixture(): Promise<{
         response.end(JSON.stringify({ error: "not found" }));
         return;
       }
-      let raw = "";
-      for await (const chunk of request) raw += chunk;
-      const body = JSON.parse(raw) as {
+      const body = (await readFixtureJson(request)) as {
         messages?: Array<{ role?: string; content?: unknown }>;
       };
       const evidence = (body.messages ?? [])
@@ -173,9 +189,7 @@ async function startDeterministicMalformedToolFixture(): Promise<{
         response.end(JSON.stringify({ error: "not found" }));
         return;
       }
-      let raw = "";
-      for await (const chunk of request) raw += chunk;
-      const body = JSON.parse(raw) as {
+      const body = (await readFixtureJson(request)) as {
         model?: string;
         messages?: Array<{ role?: string; content?: unknown }>;
       };

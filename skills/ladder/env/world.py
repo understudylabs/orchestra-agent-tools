@@ -100,7 +100,7 @@ def _err(msg):
 
 
 def _norm(s):
-    return (s or "").strip().lower()
+    return str(s or "").strip().lower()
 
 
 def _loose(s):
@@ -109,7 +109,7 @@ def _loose(s):
     needle like 'Nova Retail' still matches literally. Used by the body-contains
     checker so a correct figure isn't failed on $ / comma styling -- but a wrong
     number (e.g. the stale-FX 3570) still fails."""
-    return (s or "").replace(",", "")
+    return str(s or "").replace(",", "")
 
 
 def _latest_row(rows):
@@ -165,13 +165,15 @@ def crm_update_subscription(state, id=None, status=None, mrr=None, **_):
     # STRICT_MODE: refuse a no-field write rather than faking success.
     if STRICT_MODE and status is None and mrr is None:
         return _err("No fields to update. Provide status and/or mrr.")
+    if status is not None and not isinstance(status, str):
+        return _err("'status' must be a string, got %r." % (status,))
     if status is not None:
         sub["status"] = status
     if mrr is not None:
         # coerce numeric strings, but do not invent a value
         try:
             sub["mrr"] = int(mrr) if float(mrr) == int(float(mrr)) else float(mrr)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return _err("'mrr' must be a number, got %r." % (mrr,))
     return {"ok": True, "subscription": dict(sub)}
 
@@ -195,6 +197,8 @@ def crm_update_ticket(state, id=None, status=None, **_):
         return _err("Unknown ticket id '%s'." % id)
     if STRICT_MODE and status is None:
         return _err("No fields to update. Provide status.")
+    if status is not None and not isinstance(status, str):
+        return _err("'status' must be a string, got %r." % (status,))
     if status is not None:
         tix["status"] = status
     return {"ok": True, "ticket": dict(tix)}
@@ -221,6 +225,8 @@ def update_invoice(state, id=None, status=None, **_):
         return _err("Unknown invoice id '%s'." % id)
     if STRICT_MODE and status is None:
         return _err("No fields to update. Provide status.")
+    if status is not None and not isinstance(status, str):
+        return _err("'status' must be a string, got %r." % (status,))
     if status is not None:
         inv["status"] = status
     return {"ok": True, "invoice": dict(inv)}
@@ -252,6 +258,9 @@ def mail_get(state, id=None, **_):
 def mail_send(state, to=None, subject=None, body=None, **_):
     if not to:
         return _err("Missing 'to' address.")
+    for field, value in (("to", to), ("subject", subject), ("body", body)):
+        if value is not None and not isinstance(value, str):
+            return _err("'%s' must be a string, got %r." % (field, value))
     if STRICT_MODE and not (subject or body):
         return _err("Missing 'subject' and 'body'. An empty message is not sent.")
     state._sent_seq += 1
@@ -297,8 +306,8 @@ def call_tool(state, name, args):
         return _err("Tool args must be an object, got %r." % (args,))
     try:
         return fn(state, **args)
-    except TypeError as e:
-        # an unexpected kwarg or bad shape -> recoverable, not a crash
+    except (TypeError, AttributeError, ValueError) as e:
+        # an unexpected kwarg or bad shape/type -> recoverable, not a crash
         return _err("Bad arguments for '%s': %s" % (name, e))
 
 

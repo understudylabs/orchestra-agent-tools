@@ -1,6 +1,11 @@
 ---
 name: audit-verifier-reliability
 description: Use when deciding whether a verifier reward is trustworthy for optimization.
+metadata:
+  understudy:
+    mode: interactive
+    safety: local-first
+    cli_required: false
 ---
 # Audit verifier reliability
 
