@@ -5,14 +5,14 @@ completion token: chosen logprob, argmax logprob, the paper's surprise gap
 d_t = logπ(a_max) − logπ(τ_t), and the score_table "top-2 gap" (top1 − top2).
 Feeds a small standalone `G_spike` proxy for public smoke testing.
 
-This is the missing executor behind `fullcast_pedagogical_forced_likelihood.py`'s
+This is the missing executor behind a pedagogical forced-likelihood runner's
 `forced_token_logprobs_ref`. Pure-local, no provider calls.
 
 Validation (run as __main__): full-pass gather == incremental teacher-forced
 logp (proves no off-by-one), then prints d_t / top-2 gap / G_spike.
 """
 from __future__ import annotations
-import math, sys, time
+import math, os, sys, time
 import mlx.core as mx
 import mlx.nn as nn
 from mlx_lm import load
@@ -72,7 +72,11 @@ def _incremental_logp(model, prompt_ids, completion_ids) -> list[float]:
 
 
 if __name__ == "__main__":
-    model_id = sys.argv[1] if len(sys.argv) > 1 else "mlx-community/gemma-3-1b-it-4bit"
+    model_id = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("UNDERSTUDY_MODEL")
+    if not model_id:
+        print("usage: python forced_likelihood.py /path/to/mlx-lm-model")
+        print("or set UNDERSTUDY_MODEL=/path/to/mlx-lm-model")
+        raise SystemExit(2)
     print(f"loading {model_id} ...")
     model, tok = load(model_id)
 

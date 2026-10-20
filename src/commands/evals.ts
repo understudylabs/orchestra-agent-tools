@@ -1,63 +1,44 @@
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { confirm } from "@inquirer/prompts";
 import { Command } from "commander";
 import kleur from "kleur";
-import { z } from "zod";
 
+import { buildWorkloadEvalProject, type WorkloadEvalProjectBuildResult } from "../eval-project.js";
+import { runEvalCheck } from "../evals/check.js";
+import { previewEvalPublication, publishEvalRelease } from "../evals/publish.js";
+import {
+  acquireEvalBuildLease,
+  createPrivateDirectory,
+  ensureUnderstudyGitExcluded,
+  pathExists,
+} from "../evals/build-state.js";
+import {
+  CatalogItemSchema,
+  CatalogResponseSchema,
+  CohortExportSchema,
+  CohortSchema,
+  type CatalogItem,
+} from "../evals/contracts.js";
+import {
+  assertEquivalentExport,
+  assertExportLineage,
+  downloadExport,
+  EXPORT_EXPIRES_SECONDS,
+} from "../evals/materialize.js";
 import { request } from "../internal/http.js";
 import { isJsonMode, runAction } from "../internal/output.js";
 import { resolveProject, type ProjectResolutionOptions } from "../internal/projects.js";
 import { resolveWorkload } from "../internal/workloads.js";
-
-const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
-const CatalogItemSchema = z.object({
-  capture_key: z.string(),
-  request_id: z.string(),
-  content_sha256: Sha256Schema,
-  captured_at: z.string(),
-  provider: z.string(),
-  requested_model: z.string(),
-  served_model: z.string(),
-  status_code: z.number().int(),
-  latency_ms: z.number().nonnegative(),
-  has_tools: z.boolean(),
-  has_structured_output: z.boolean(),
-});
-const CatalogResponseSchema = z.object({
-  captures: z.array(CatalogItemSchema),
-  selection: z.object({
-    from: z.string(),
-    to: z.string(),
-    limit: z.number().int().positive(),
-    sample_seed: z.string(),
-    requested_model: z.string().nullable(),
-    served_model: z.string().nullable(),
-    status_code: z.number().int().nullable(),
-    requires_tools: z.boolean(),
-    requires_structured_output: z.boolean(),
-  }),
-});
-const CohortSchema = z.object({
-  id: z.string(),
-  workload_id: z.string(),
-  name: z.string(),
-  capture_count: z.number().int().positive(),
-  cohort_sha256: Sha256Schema,
-  created_at: z.string(),
-}).passthrough();
-const CohortExportSchema = z.object({
-  export_id: z.string(),
-  cohort_id: z.string(),
-  cohort_sha256: Sha256Schema,
-  expires_at: z.string(),
-  captures: z.array(z.object({
-    request_id: z.string(),
-    content_sha256: Sha256Schema,
-    url: z.string().url(),
-  })).min(1).max(500),
-});
+import {
+  DEFAULT_WORKLOAD_TRACE_CONCURRENCY,
+  DEFAULT_WORKLOAD_TRACE_RETRIES,
+  exportWorkloadTraceWindow,
+  MAX_WORKLOAD_TRACE_CONCURRENCY,
+  MAX_WORKLOAD_TRACE_RETRIES,
+  resolveWorkloadTraceWindow,
+  type WorkloadTraceWindow,
+} from "../workload-trace-export.js";
 
 interface WorkloadOpts extends ProjectResolutionOptions {
   workload: string;
@@ -98,28 +79,68 @@ interface GuidedCreateOpts extends WorkloadOpts {
   download: boolean;
   yes?: boolean;
 }
+interface BuildOpts extends WorkloadOpts {
+  name: string;
+  last?: string;
+  date?: string;
+  out?: string;
+  yes?: boolean;
+  concurrency: string;
+  retries: string;
+}
+interface CheckOpts {
+  project: string;
+  draft?: boolean;
+}
+interface PublishOpts {
+  project: string;
+  preview?: boolean;
+  expectReleaseId?: string;
+}
 
 export function registerEvalsCommand(program: Command): void {
   const evals = program.command("evals")
-    .description("Select, freeze, and materialize workload-scoped evaluation cohorts.");
+    .description("Build, check, publish, and manage workload-scoped evaluations for coding agents.");
 
-  addWorkloadOptions(evals.command("create")
-    .description("Create a frozen eval set from a recent workload window.")
-    .requiredOption("--name <name>", "Cohort name.")
-    .option("--description <text>", "Why these captures were selected.")
-    .option("--last <duration>", "Recent window, such as 14d or 12h (max 31d).", "14d")
-    .option("--limit <n>", "Candidate limit, max 100.", "50")
-    .option("--seed <seed>", "Deterministic sample seed.", "understudy-eval-catalog-v1")
-    .option("--requested-model <id>", "Filter by requested model.")
-    .option("--served-model <id>", "Filter by served model.")
-    .option("--status-code <code>", "Filter by HTTP status code.")
-    .option("--requires-tools", "Require a trace containing tools.")
-    .option("--requires-structured-output", "Require structured output.")
+  addWorkloadOptions(evals.command("build")
+    .description("Recommended: download one raw workload day for a coding agent to turn into an eval.")
+    .requiredOption("--name <name>", "Local eval project name.")
+    .option("--last <duration>", "Rolling workload window (currently exactly 1d).")
+    .option("--date <YYYY-MM-DD>", "Use one complete UTC calendar day instead of the latest 24 hours.")
+    .option("--out <directory>", "Destination directory (default: .understudy/evals/<safe-name>).")
+    .option("--concurrency <count>", `Raw capture download concurrency, max ${MAX_WORKLOAD_TRACE_CONCURRENCY}.`, String(DEFAULT_WORKLOAD_TRACE_CONCURRENCY))
+    .option("--retries <count>", `Retries for transient page or capture failures, max ${MAX_WORKLOAD_TRACE_RETRIES}.`, String(DEFAULT_WORKLOAD_TRACE_RETRIES))
+    .option("--yes", "Approve downloading payload-bearing traces without prompting."))
+    .action(async function (this: Command, opts: BuildOpts) {
+      await runAction(this, () => runBuild(this, opts));
+    });
+
+  addWorkloadOptions(addRecentSelectionOptions(
+    evals.command("create").description("Legacy: create a sampled hosted cohort; use `evals build` for coding-agent eval authoring."),
+    "Cohort name.",
+  )
     .option("--out <directory>", "Destination directory (default: .understudy/evals/<name>).")
     .option("--no-download", "Freeze the cohort without downloading trace bodies.")
     .option("--yes", "Approve freezing and local trace download without prompting."))
     .action(async function (this: Command, opts: GuidedCreateOpts) {
       await runAction(this, () => runGuidedCreate(this, opts));
+    });
+
+  evals.command("check")
+    .description("Check a locally authored eval, its verifier fixtures, and artifact hashes without a model call.")
+    .option("--project <directory>", "Eval project directory containing eval-project.json.", ".")
+    .option("--draft", "Validate a provisional agent-authored draft without requiring owner approval.")
+    .action(async function (this: Command, opts: CheckOpts) {
+      await runAction(this, () => runCheck(this, opts));
+    });
+
+  evals.command("publish")
+    .description("Publish a final owner-approved eval release without uploading its raw source traces.")
+    .option("--project <directory>", "Eval project directory containing eval-project.json.", ".")
+    .option("--preview", "Prepare and print the exact manifest and bundle inventory without uploading.")
+    .option("--expect-release-id <id>", "Upload only when the prepared release still matches this preview identity.")
+    .action(async function (this: Command, opts: PublishOpts) {
+      await runAction(this, () => runPublish(this, opts));
     });
 
   addWorkloadOptions(evals.command("catalog")
@@ -157,12 +178,98 @@ export function registerEvalsCommand(program: Command): void {
     });
 }
 
+async function runCheck(cmd: Command, opts: CheckOpts): Promise<void> {
+  const result = await runEvalCheck(resolve(opts.project), { draft: opts.draft === true });
+  if (isJsonMode(cmd)) {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return;
+  }
+  if (result.mode === "draft") {
+    process.stdout.write(`${kleur.green("✓")} Draft schemas, source hashes, deterministic fixture replays, and verifier behavior passed.\n`);
+    process.stdout.write(`Draft report: ${result.report_file}\n`);
+    process.stdout.write(`Lineage: ${result.coverage.lineage.complete} complete, ${result.coverage.lineage.ambiguous} ambiguous, ${result.coverage.lineage.unlinked} unlinked.\n`);
+    const proposedGaps = [...result.coverage.execution_modes, ...result.coverage.failure_classes]
+      .filter((entry) => entry.disposition === "agent_proposed_uncovered")
+      .map((entry) => `${entry.name} (${entry.observed_count})`);
+    process.stdout.write(`Agent-proposed coverage gaps: ${proposedGaps.length > 0 ? proposedGaps.join(", ") : "none"}.\n`);
+    process.stdout.write(`Verifier feedback: representative — ${result.report.representative_replay.feedback}; proposed good — ${result.report.oracle_fixture.feedback}; proposed wrong — ${result.report.wrong_fixture.feedback}.\n`);
+    process.stdout.write("Semantic assumptions needing owner confirmation:\n");
+    for (const assumption of result.semantic_assumptions) {
+      process.stdout.write(`  - ${assumption.kind}: ${assumption.statement} (${assumption.reference})\n`);
+    }
+    process.stdout.write("Draft artifact hashes (not valid for publication approval):\n");
+    for (const [name, value] of Object.entries(result.hashes)) process.stdout.write(`  ${name}: ${value}\n`);
+    process.stdout.write(`${kleur.yellow("next")}: ask the workload owner to correct or confirm these assumptions, replace provisional evidence, then run the strict eval check.\n`);
+    return;
+  }
+  process.stdout.write(`${kleur.green("✓")} Eval schemas, source hashes, representative replay, oracle, and wrong-answer rejection passed.\n`);
+  process.stdout.write(`Check report: ${result.report_file}\n`);
+  process.stdout.write(`Lineage: ${result.coverage.lineage.complete} complete, ${result.coverage.lineage.ambiguous} ambiguous, ${result.coverage.lineage.unlinked} unlinked.\n`);
+  const acceptedGaps = [...result.coverage.execution_modes, ...result.coverage.failure_classes]
+    .filter((entry) => entry.disposition === "owner_accepted_uncovered")
+    .map((entry) => `${entry.name} (${entry.observed_count})`);
+  process.stdout.write(`Owner-accepted coverage gaps: ${acceptedGaps.length > 0 ? acceptedGaps.join(", ") : "none"}.\n`);
+  process.stdout.write(`Verifier feedback: representative — ${result.report.representative_replay.feedback}; oracle — ${result.report.oracle_fixture.feedback}; wrong answer — ${result.report.wrong_fixture.feedback}.\n`);
+  process.stdout.write("Approval hashes:\n");
+  for (const [name, value] of Object.entries(result.hashes)) process.stdout.write(`  ${name}: ${value}\n`);
+  process.stdout.write(result.publishable
+    ? `${kleur.green("✓")} Final owner approval matches the checked artifact hashes.\n`
+    : `${kleur.yellow("next")}: review coverage and these artifact hashes, then record the owner's final approval in approval.json.\n`);
+}
+
+async function runPublish(cmd: Command, opts: PublishOpts): Promise<void> {
+  const project = resolve(opts.project);
+  if (opts.preview) {
+    const preview = await previewEvalPublication(project);
+    if (isJsonMode(cmd)) {
+      process.stdout.write(`${JSON.stringify(preview)}\n`);
+      return;
+    }
+    process.stdout.write(`${kleur.green("✓")} Prepared exact eval release preview. Nothing was uploaded.\n`);
+    process.stdout.write(`Expected release ID: ${preview.expected_release_id}\n`);
+    process.stdout.write(`Manifest SHA-256: ${preview.manifest_sha256} (${preview.manifest_size_bytes} bytes)\n`);
+    process.stdout.write(`Bundle SHA-256: ${preview.bundle.sha256} (${preview.bundle.size_bytes} bytes)\n`);
+    process.stdout.write(`Bundle destination: ${preview.bundle.r2_key}\n`);
+    process.stdout.write(`Outgoing manifest and ordered ${preview.bundle.files.length}-file inventory:\n`);
+    process.stdout.write(`${JSON.stringify(preview.manifest, null, 2)}\n`);
+    process.stdout.write(`Local-only rule: ${preview.local_only.policy}\n`);
+    for (const path of preview.local_only.explicitly_excluded) process.stdout.write(`  - ${path}\n`);
+    process.stdout.write(`Next: obtain upload permission for this exact preview, then rerun with --expect-release-id ${preview.expected_release_id}.\n`);
+    return;
+  }
+  if (opts.expectReleaseId === undefined) {
+    throw new Error("Run `understudy evals publish --preview` first, review its exact contents, then rerun with `--expect-release-id <expected_release_id>`.");
+  }
+  const release = await publishEvalRelease(project, { expectedReleaseId: opts.expectReleaseId });
+  if (isJsonMode(cmd)) {
+    process.stdout.write(`${JSON.stringify(release)}\n`);
+    return;
+  }
+  process.stdout.write(`${kleur.green("✓")} Published eval release ${release.release_id} (release ${release.release_number}).\n`);
+  process.stdout.write(`Bundle: ${release.artifacts.bundle_r2_key}\n`);
+  process.stdout.write("Live workload routing and prompts were not changed.\n");
+}
+
 function addWorkloadOptions(command: Command): Command {
   return command
     .requiredOption("--workload <name-or-id>", "Workload name or id.")
     .option("--project-id <id>", "Project id from `understudy projects list --json`.")
     .option("--project <slug>", "Project slug to resolve to an id.")
     .option("--org <id>", "Org id (default: local config or only credential org).");
+}
+
+function addRecentSelectionOptions(command: Command, nameDescription: string): Command {
+  return command
+    .requiredOption("--name <name>", nameDescription)
+    .option("--description <text>", "Why these captures were selected.")
+    .option("--last <duration>", "Recent window, such as 14d or 12h (max 31d).", "14d")
+    .option("--limit <n>", "Candidate limit, max 100.", "50")
+    .option("--seed <seed>", "Deterministic sample seed.", "understudy-eval-catalog-v1")
+    .option("--requested-model <id>", "Filter by requested model.")
+    .option("--served-model <id>", "Filter by served model.")
+    .option("--status-code <code>", "Filter by HTTP status code.")
+    .option("--requires-tools", "Require a trace containing tools.")
+    .option("--requires-structured-output", "Require structured output.");
 }
 
 async function resolveContext(opts: WorkloadOpts) {
@@ -207,7 +314,13 @@ async function runGuidedCreate(cmd: Command, opts: GuidedCreateOpts): Promise<vo
     }
   }
   if (shouldDownload) {
-    materialized = await materializeCohort(catalog, cohort.id, opts.out ?? join(".understudy", "evals", safeFileStem(opts.name)));
+    materialized = await materializeCohort(
+      catalog,
+      cohort.id,
+      cohort.cohort_sha256,
+      opts.out ?? join(".understudy", "evals", safeFileStem(opts.name)),
+      cohort.capture_count,
+    );
   }
 
   const payload = {
@@ -228,6 +341,118 @@ async function runGuidedCreate(cmd: Command, opts: GuidedCreateOpts): Promise<vo
   }
 }
 
+async function runBuild(cmd: Command, opts: BuildOpts): Promise<void> {
+  const window = resolveWorkloadTraceWindow({ date: opts.date, last: opts.last });
+  if (isJsonMode(cmd) && !opts.yes) {
+    throw new Error("JSON mode cannot prompt. Re-run with --yes to approve the complete local trace download.");
+  }
+  if (!opts.yes && !process.stdin.isTTY) {
+    throw new Error("Non-interactive eval builds cannot prompt. Re-run with --yes to approve the complete local trace download.");
+  }
+  const output = resolve(opts.out ?? join(".understudy", "evals", safeFileStem(opts.name)));
+  if (pathExists(output)) {
+    throw new Error(`Eval build destination already exists: ${output}. Choose a fresh --out directory.`);
+  }
+  ensureUnderstudyGitExcluded(output);
+  const releaseLease = acquireEvalBuildLease(output);
+  try {
+    await runBuildWithLease(cmd, opts, {
+      output,
+      window,
+      concurrency: parseBoundedInteger(
+        "--concurrency",
+        opts.concurrency,
+        1,
+        MAX_WORKLOAD_TRACE_CONCURRENCY,
+      ),
+      retries: parseBoundedInteger("--retries", opts.retries, 0, MAX_WORKLOAD_TRACE_RETRIES),
+    });
+  } finally {
+    releaseLease();
+  }
+}
+
+async function runBuildWithLease(
+  cmd: Command,
+  opts: BuildOpts,
+  build: {
+    output: string;
+    window: WorkloadTraceWindow;
+    concurrency: number;
+    retries: number;
+  },
+): Promise<void> {
+  const { output, window, concurrency, retries } = build;
+  if (pathExists(output)) {
+    throw new Error(`Eval build destination already exists: ${output}. Choose a fresh --out directory.`);
+  }
+  const staging = join(dirname(output), `.${basename(output)}.eval-build`);
+  if (pathExists(staging)) createPrivateDirectory(staging);
+  const context = await resolveContext(opts);
+  const currentIdentity = identityFromContext(context);
+  if (!opts.yes) {
+    const approved = await confirm({
+      message: `${pathExists(staging) ? "Resume" : "Download"} every retrievable capture in this one-day window for local eval “${opts.name}”? Files may contain prompts, completions, and tool payloads.`,
+      default: false,
+    });
+    if (!approved) throw new Error("Eval build cancelled before payload download.");
+  }
+  const source = await exportWorkloadTraceWindow({
+    orgId: currentIdentity.org_id,
+    projectId: currentIdentity.project_id,
+    workloadId: currentIdentity.workload_id,
+    outputDirectory: staging,
+    gatewayUrl: context.project.auth.gatewayUrl,
+    concurrency,
+    retries,
+    reuseStoredWindow: opts.date === undefined,
+    ...window,
+    onProgress: isJsonMode(cmd)
+      ? undefined
+      : (completed) => {
+          if (completed % 100 === 0) process.stderr.write(`Exported ${completed} raw captures...\n`);
+        },
+  });
+  const project = buildWorkloadEvalProject({
+    output: staging,
+    name: opts.name,
+    identity: currentIdentity,
+    source,
+    now: new Date(),
+  });
+  renameSync(staging, output);
+  project.project_file = join(output, "eval-project.json");
+  emitWorkloadBuildResult(cmd, output, project);
+}
+
+function emitWorkloadBuildResult(cmd: Command, output: string, project: WorkloadEvalProjectBuildResult): void {
+  const checkArgs = ["--json", "evals", "check", "--draft", "--project", output];
+  const skippedPath = join(output, project.source.skipped_index);
+  const nextAction = {
+    kind: "coding_agent_prompt" as const,
+    command: { executable: "understudy", args: checkArgs },
+    prompt: [
+      `Use the Understudy capture-evidence skill to build a provisional eval from the one-day raw traces at ${output}.`,
+      `Reconcile ${project.source.skipped_count} skipped captures recorded at ${skippedPath} before making coverage claims.`,
+      "Infer the workload goal, output contract, success criteria, execution modes, and failure taxonomy from these traces and the current repository.",
+      "Explain your evidence and ask only targeted questions whose answers would materially change the metric, environment, or case selection.",
+      "Author the project-local eval artifacts and mark unconfirmed semantics as provisional.",
+      `Run the draft check by invoking “understudy” with this exact argument array: ${JSON.stringify(checkArgs)}.`,
+      "Do not publish the eval.",
+    ].join(" "),
+  };
+  if (isJsonMode(cmd)) {
+    process.stdout.write(`${JSON.stringify({ ...project, next_action: nextAction })}\n`);
+  } else {
+    process.stdout.write(`${kleur.green("✓")} Materialized the one-day raw source at ${output}\n`);
+    process.stdout.write(`Project manifest: ${project.project_file}\n`);
+    process.stdout.write(`Source: ${project.source.requested_count} requested, ${project.source.materialized_count} materialized, ${project.source.skipped_count} skipped (${project.source.skipped_index})\n`);
+    process.stdout.write(`${kleur.yellow("warning")}: local files contain prompts, completions, or tool payloads; nothing was uploaded and no model provider was called\n`);
+    process.stdout.write("Next, give this prompt to your coding agent:\n\n");
+    process.stdout.write(`${nextAction.prompt}\n`);
+  }
+}
+
 async function fetchCatalog(opts: Omit<CatalogOpts, "from" | "to">, from: string, to: string) {
   const limit = parseLimit(opts.limit);
   validateStatusCode(opts.statusCode);
@@ -239,7 +464,7 @@ async function fetchCatalog(opts: Omit<CatalogOpts, "from" | "to">, from: string
   if (opts.requiresTools) params.set("requires_tools", "true");
   if (opts.requiresStructuredOutput) params.set("requires_structured_output", "true");
   const response = await request(
-    { url: `${base}/eval-capture-catalog?${params}`, orgId: project.auth.orgId },
+    { url: `${base}/eval-capture-catalog?${params}`, orgId: project.auth.orgId, signal: AbortSignal.timeout(60_000) },
     CatalogResponseSchema,
   );
   return { project, workload, base, response: response.data };
@@ -252,6 +477,7 @@ async function createCohort(
 ) {
   const response = await request({
     url: `${context.base}/eval-cohorts`, method: "POST", orgId: context.project.auth.orgId,
+    signal: AbortSignal.timeout(60_000),
     body: {
       name,
       selection: { source: "explicit_capture_references", description, sampling_seed: context.response.selection.sample_seed },
@@ -262,18 +488,34 @@ async function createCohort(
 }
 
 async function materializeCohort(
-  context: Awaited<ReturnType<typeof fetchCatalog>>,
+  context: Awaited<ReturnType<typeof resolveContext>>,
   cohortId: string,
+  expectedCohortSha256: string,
   out: string,
+  expectedCaptureCount: number,
 ) {
-  const response = await request(
-    { url: `${context.base}/eval-cohorts/${encodeURIComponent(cohortId)}/export`, method: "POST", body: {}, orgId: context.project.auth.orgId },
-    CohortExportSchema,
-  );
-  return downloadExport(response.data, context.workload.id, out);
+  const createExport = async () => {
+    const response = await request(
+      {
+        url: `${context.base}/eval-cohorts/${encodeURIComponent(cohortId)}/export`,
+        method: "POST",
+        body: { expires_seconds: EXPORT_EXPIRES_SECONDS },
+        orgId: context.project.auth.orgId,
+        signal: AbortSignal.timeout(60_000),
+      },
+      CohortExportSchema,
+    );
+    assertExportLineage(response.data, cohortId, expectedCohortSha256);
+    if (response.data.captures.length !== expectedCaptureCount) {
+      throw new Error(`Cohort export count ${response.data.captures.length} does not match frozen cohort count ${expectedCaptureCount}.`);
+    }
+    return response.data;
+  };
+  const exportData = await createExport();
+  return downloadExport(exportData, context.workload.id, out, context.project.auth.gatewayUrl, createExport);
 }
 
-function printCatalogSummary(workloadName: string, captures: z.infer<typeof CatalogItemSchema>[]): void {
+function printCatalogSummary(workloadName: string, captures: CatalogItem[]): void {
   const models = new Set(captures.map((capture) => capture.served_model));
   const errors = captures.filter((capture) => capture.status_code >= 400).length;
   const tools = captures.filter((capture) => capture.has_tools).length;
@@ -337,11 +579,26 @@ async function runCohortExport(cmd: Command, cohortId: string, opts: CohortExpor
     throw new Error("Cohort files may contain prompts/completions. Re-run with --yes to download them locally.");
   }
   const { project, workload, base } = await resolveContext(opts);
-  const response = await request(
-    { url: `${base}/eval-cohorts/${encodeURIComponent(cohortId)}/export`, method: "POST", body: {}, orgId: project.auth.orgId },
-    CohortExportSchema,
-  );
-  const payload = await downloadExport(response.data, workload.id, opts.out);
+  const createExport = async () => {
+    const response = await request(
+      {
+        url: `${base}/eval-cohorts/${encodeURIComponent(cohortId)}/export`,
+        method: "POST",
+        body: { expires_seconds: EXPORT_EXPIRES_SECONDS },
+        orgId: project.auth.orgId,
+        signal: AbortSignal.timeout(60_000),
+      },
+      CohortExportSchema,
+    );
+    if (response.data.cohort_id !== cohortId) throw new Error(`Cohort export lineage does not match requested cohort ${cohortId}.`);
+    return response.data;
+  };
+  const firstExport = await createExport();
+  const payload = await downloadExport(firstExport, workload.id, opts.out, project.auth.gatewayUrl, async () => {
+    const refreshed = await createExport();
+    assertEquivalentExport(firstExport, refreshed);
+    return refreshed;
+  });
   if (isJsonMode(cmd)) process.stdout.write(`${JSON.stringify({ ok: true, ...payload })}\n`);
   else {
     process.stdout.write(`${kleur.green("✓")} Materialized ${payload.count} frozen captures at ${payload.output}\n`);
@@ -349,42 +606,20 @@ async function runCohortExport(cmd: Command, cohortId: string, opts: CohortExpor
   }
 }
 
-async function downloadExport(exportData: z.infer<typeof CohortExportSchema>, workloadId: string, out: string) {
-  const outputDir = resolve(out);
-  mkdirSync(outputDir, { recursive: true });
-  const files: Array<{ request_id: string; path: string; content_sha256: string }> = [];
-  const fileNames = new Set<string>();
-  for (const capture of exportData.captures) {
-    const download = await fetch(capture.url, { headers: { Accept: "application/x-ndjson" } });
-    if (!download.ok) throw new Error(`Capture ${capture.request_id} download failed with status ${download.status}.`);
-    const bytes = new Uint8Array(await download.arrayBuffer());
-    const digest = createHash("sha256").update(bytes).digest("hex");
-    if (digest !== capture.content_sha256) throw new Error(`Capture ${capture.request_id} failed SHA-256 verification.`);
-    const stem = safeFileStem(capture.request_id);
-    let fileName = `${stem}.jsonl`;
-    if (fileNames.has(fileName)) fileName = `${stem}-${capture.content_sha256.slice(0, 12)}.jsonl`;
-    if (fileNames.has(fileName)) throw new Error(`Capture ${capture.request_id} collides with another local filename.`);
-    fileNames.add(fileName);
-    writeFileSync(join(outputDir, fileName), bytes);
-    files.push({ request_id: capture.request_id, path: fileName, content_sha256: digest });
-  }
-  const localManifest = join(outputDir, "cohort-manifest.json");
-  writeJson(localManifest, {
-    schema_version: "understudy.eval-cohort-materialization.v1",
-    cohort_id: exportData.cohort_id,
-    cohort_sha256: exportData.cohort_sha256,
-    workload_id: workloadId,
-    capture_count: files.length,
-    privacy: { local_only: true, upload_performed: false },
-    captures: files,
-  });
-  return { output: outputDir, manifest: localManifest, count: files.length, cohort_sha256: exportData.cohort_sha256 };
-}
-
 function writeJson(path: string, value: unknown): void {
   const absolute = resolve(path);
-  mkdirSync(dirname(absolute), { recursive: true });
-  writeFileSync(absolute, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  mkdirSync(dirname(absolute), { recursive: true, mode: 0o700 });
+  writeFileSync(absolute, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodSync(absolute, 0o600);
+}
+
+function identityFromContext(context: Awaited<ReturnType<typeof resolveContext>>) {
+  return {
+    org_id: context.project.auth.orgId,
+    project_id: context.project.projectId,
+    workload_id: context.workload.id,
+    workload_name: context.workload.name,
+  };
 }
 
 function parseIsoOption(name: string, value: string): string {
@@ -418,6 +653,14 @@ function parseDuration(value: string): number {
     throw new Error("--last must be between 1h and 31d.");
   }
   return durationMs;
+}
+
+function parseBoundedInteger(name: string, value: string, minimum: number, maximum: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${name} must be between ${minimum} and ${maximum}.`);
+  }
+  return parsed;
 }
 
 function safeFileStem(value: string): string {

@@ -1,8 +1,9 @@
 import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { join, resolve } from "node:path";
-import { homedir } from "node:os";
 import { canonMask, finalResponseText, refreshOfflineValidation, semanticArgumentsMatch, stampTaskVersions, valueTokensPresent } from "./trace-foundry.js";
+import { CredentialsSchema, readCredentials, type Credentials } from "./config/credentials.js";
+import { readProjectConfig } from "./config/index.js";
 import { createHash } from "node:crypto";
 
 type Obj = Record<string, any>;
@@ -496,14 +497,31 @@ export function mergeAuthoredObligations(task: Obj, authored: Obj, model: string
 export function resolveGatewayAuth(env: NodeJS.ProcessEnv = process.env, credentialsPath?: string): { baseUrl: string; apiKey: string } {
   const baseUrl = (env.UNDERSTUDY_GATEWAY_URL ?? "https://api.understudylabs.com").replace(/\/$/, "") + "/v1";
   if (env.UNDERSTUDY_API_KEY) return { baseUrl, apiKey: env.UNDERSTUDY_API_KEY };
-  const path = credentialsPath ?? join(homedir(), ".understudy", "credentials.json");
-  if (existsSync(path)) {
-    const credentials = asObject(JSON.parse(readFileSync(path, "utf8")));
-    const org = Object.values(asObject(credentials.orgs)).map(asObject).find((entry) => entry.api_key);
-    const apiKey = credentials.api_key ?? org?.api_key;
-    if (apiKey) return { baseUrl: (credentials.gateway_url ?? org?.gateway_url ?? "https://api.understudylabs.com").replace(/\/$/, "") + "/v1", apiKey: String(apiKey) };
+  // Same reader/schema as every other command (credentialsPath is a test seam).
+  const credentials = credentialsPath === undefined ? readCredentials() : readCredentialsFile(credentialsPath);
+  if (credentials) {
+    const orgIds = Object.keys(credentials.orgs);
+    const configOrgId = safeProjectOrgId();
+    const orgId = configOrgId ?? (orgIds.length === 1 ? orgIds[0] : undefined);
+    const org = orgId ? credentials.orgs[orgId] : undefined;
+    const apiKey = org?.api_key ?? credentials.api_key;
+    if (apiKey) return { baseUrl: (org?.gateway_url ?? credentials.gateway_url ?? "https://api.understudylabs.com").replace(/\/$/, "") + "/v1", apiKey };
+    if (orgIds.length > 1) throw new Error(`Multiple orgs in credentials (${orgIds.join(", ")}) and no .understudy/config.json selects one. Run \`understudy login\` in this repo.`);
   }
   throw new Error("No Understudy gateway key found. Task authoring only calls the Understudy gateway (https://api.understudylabs.com/v1); set UNDERSTUDY_API_KEY or run `understudy login` to write ~/.understudy/credentials.json. Refusing to use any other provider.");
+}
+
+function readCredentialsFile(path: string): Credentials | null {
+  if (!existsSync(path)) return null;
+  return CredentialsSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+}
+
+function safeProjectOrgId(): string | undefined {
+  try {
+    return readProjectConfig()?.org_id;
+  } catch {
+    return undefined;
+  }
 }
 
 export function gatewayClient(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch): AuthorClient {

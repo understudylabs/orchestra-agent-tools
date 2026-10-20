@@ -1,0 +1,63 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so new advisories against unchanged lockfiles still surface.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan the working tree
+        run: gitleaks dir --no-banner --redact=90 --config .gitleaks.toml .
+
+      - name: Scan the commits in this pull request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          gitleaks git --no-banner --redact=90 --config .gitleaks.toml \
+            --log-opts="${BASE_SHA}..${HEAD_SHA}" .
+
+  dependencies:
+    name: dependency-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+
+      - name: Audit shipped (production) dependencies
+        # What the published package pulls in for users must be clean at high
+        # or above. Dev-only advisories are surfaced as a warning, not a gate.
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --audit-level=high || echo "::warning::dev-dependency advisories present; see the log above"

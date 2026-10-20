@@ -48,6 +48,8 @@ export type AppHarness = {
   env?: Record<string, string>;
   /** How the task input reaches the app (UNDERSTUDY_TASK_* env vars are set in every mode). */
   input_mode: AppHarnessInputMode;
+  /** input_mode "argv" only, opt-in: put "--" before the prompt so a prompt starting with "-" is never parsed as an option. */
+  argv_separator?: boolean;
   /**
    * input_mode "http" only: where to POST the task once the app is up.
    * `{prompt}` / `{task_id}` placeholders in url_template/body_template are
@@ -85,6 +87,7 @@ export function validateAppHarness(value: unknown): string[] {
     }
   }
   if (!APP_HARNESS_INPUT_MODES.includes(harness.input_mode)) errors.push(`input_mode must be one of ${APP_HARNESS_INPUT_MODES.join(", ")}`);
+  if (harness.argv_separator !== undefined && typeof harness.argv_separator !== "boolean") errors.push("argv_separator must be a boolean when present");
   if (harness.input_mode === "http") {
     const http = asObject(harness.http);
     if (typeof http.url_template !== "string" || http.url_template.trim().length === 0) errors.push("http.url_template is required when input_mode is http");
@@ -224,7 +227,7 @@ export function appReplayRunner(parentEnv: NodeJS.ProcessEnv = process.env): Arm
     const timeoutSeconds = Math.min(harness.per_task_timeout_seconds ?? DEFAULT_APP_TASK_TIMEOUT_SECONDS, rolloutTimeoutSeconds ?? Number.POSITIVE_INFINITY);
     const budgetMs = Math.max(1, Math.round(timeoutSeconds * 1000));
     const journalOffset = journalLineCount(journalPath);
-    const argv = harness.input_mode === "argv" ? [...harness.command.slice(1), prompt] : harness.command.slice(1);
+    const argv = harness.input_mode === "argv" ? [...harness.command.slice(1), ...(harness.argv_separator ? ["--"] : []), prompt] : harness.command.slice(1);
     const started = Date.now();
     const child = spawnSync(harness.command[0], argv, {
       cwd,

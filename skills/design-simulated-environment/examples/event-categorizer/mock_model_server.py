@@ -53,9 +53,28 @@ def _loose_json(text):
 
 
 class _Handler(BaseHTTPRequestHandler):
+    MAX_BODY = 1 << 20
+
     def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        request = json.loads(self.rfile.read(length) or b"{}")
+        if not self.path.split("?", 1)[0].endswith("/chat/completions"):
+            self.send_error(404)
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self.send_error(400)
+            return
+        if length < 0 or length > self.MAX_BODY:
+            self.send_error(413)
+            return
+        try:
+            request = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            self.send_error(400)
+            return
+        if not isinstance(request, dict):
+            self.send_error(400)
+            return
         reply = self._policy(request.get("messages", []), bool(request.get("tools")))
         body = json.dumps(
             {

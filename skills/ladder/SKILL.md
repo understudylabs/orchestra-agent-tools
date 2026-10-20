@@ -102,6 +102,10 @@ The stream ends with a `done` event carrying the result (`correct`, `response`,
 
 - **Local-first, $0 on the local lane.** The mlx model runs on the developer's
   machine, the server binds `127.0.0.1` only, and nothing is uploaded.
+- **No cross-site access.** The server sends no CORS header and answers 403 to
+  requests whose `Host` is not `127.0.0.1`/`localhost` or that a browser marks
+  cross-site (`Sec-Fetch-Site`/`Origin`), so a web page open in your browser
+  cannot start billed runs. The viewer and `curl` are unaffected.
 - **Gateway runs are billed.** Remote lanes go through the Understudy gateway and
   cost money. The picker marks them and every such run is disclosed in the UI —
   do not route to one without the developer understanding it bills.

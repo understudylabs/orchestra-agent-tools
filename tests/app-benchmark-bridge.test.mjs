@@ -5,25 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 
-// The desktop app → benchmark spine bridge:
-// 1. the CLI's additive `--plain-dir` experiment mode (lineage next to a
-//    prepared dataset, before any benchmark exists) and the additive
-//    `runs queue --experiment` cross-link;
-// 2. the app-side pure logic in apps/homescreen/app/lib/experiment-bridge.mjs.
-import {
-  PROVIDER_TRAINING_SPEND_GATE,
-  abandonedPatch,
-  benchmarkLinkageState,
-  classificationVerdict,
-  concludedPatch,
-  draftHypothesis,
-  lineageSummary,
-  providerSpendApproval,
-  relevantRunRequest,
-  remoteVerdict,
-  sftVerdict,
-  trainingExperimentInput,
-} from "../apps/homescreen/app/lib/experiment-bridge.mjs";
+// The app → benchmark spine bridge: the CLI's additive `--plain-dir`
+// experiment mode (lineage next to a prepared dataset, before any benchmark
+// exists) and the additive `runs queue --experiment` cross-link. The input
+// shapes below mirror what the (since removed) desktop app sent.
 
 const bin = path.resolve("dist/bin.js");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "app-benchmark-bridge-"));
@@ -40,14 +25,31 @@ const dataSelection = {
   splits_sha256: "b".repeat(64),
 };
 
-const createInput = () =>
-  trainingExperimentInput({
+const createInput = () => ({
+  hypothesis:
+    "sft training of answerdotai/ModernBERT-base on this Mac on dataset support-tickets.csv " +
+    "beats its measured baseline on the frozen held-out split",
+  status: "training",
+  data_selection: dataSelection,
+  training: {
     method: "sft",
-    baseModel: "answerdotai/ModernBERT-base",
+    base_model: "answerdotai/ModernBERT-base",
     provider: "local",
-    dataSelection,
     config: { task: "text_classification" },
-  });
+    approvals: [],
+  },
+});
+
+const providerSpendApproval = (approvedBy, at) => ({
+  gate: "provider_training_spend",
+  approved_by: approvedBy,
+  at,
+});
+
+const concludedPatch = (verdict) => ({
+  status: "concluded",
+  verdict: { ...verdict, decided_at: new Date().toISOString() },
+});
 
 describe("CLI --plain-dir experiment lineage (dataset dir, no benchmark.json)", () => {
   const datasetDir = path.join(tmp, "dataset");
@@ -164,84 +166,5 @@ describe("runs queue --experiment cross-link", () => {
     // The request landed in the file queue the executor watches.
     const queue = fs.readdirSync(path.join(benchDir, "runs", "queue"));
     assert.equal(queue.length, 1);
-  });
-});
-
-describe("experiment-bridge app logic", () => {
-  it("drafts a falsifiable hypothesis from the training config", () => {
-    const local = draftHypothesis({ method: "sft", baseModel: "m", provider: "local", source: "ds" });
-    assert.match(local, /on this Mac/);
-    assert.match(local, /dataset ds/);
-    assert.match(
-      draftHypothesis({ method: "sft", baseModel: "m", provider: "managed", source: "ds" }),
-      /on managed/,
-    );
-  });
-
-  it("builds a create input and refuses a missing selection hash", () => {
-    const input = createInput();
-    assert.equal(input.status, "training");
-    assert.deepEqual(input.training.approvals, []);
-    assert.throws(() =>
-      trainingExperimentInput({ method: "sft", baseModel: "m", provider: "local", dataSelection: {} }),
-    );
-  });
-
-  it("providerSpendApproval demands an identity", () => {
-    assert.equal(providerSpendApproval("me", "t").gate, PROVIDER_TRAINING_SPEND_GATE);
-    assert.throws(() => providerSpendApproval(""));
-    assert.throws(() => providerSpendApproval("   "));
-  });
-
-  it("maps outcomes conservatively (never auto-promote)", () => {
-    assert.equal(classificationVerdict({ verdict: { status: "promising", reason: "r" } }).decision, "shadow");
-    assert.equal(classificationVerdict({ verdict: { status: "improved_not_ready" } }).decision, "collect");
-    assert.equal(classificationVerdict({ verdict: { status: "not_better" } }).decision, "stop");
-    assert.equal(sftVerdict({ promotion: { status: "promoted" }, improvement: { improved: true } }).decision, "shadow");
-    assert.equal(sftVerdict({ promotion: { status: "needs_work" }, improvement: { improved: true } }).decision, "collect");
-    assert.equal(sftVerdict({ promotion: { status: "needs_work" }, improvement: { improved: false } }).decision, "stop");
-    assert.equal(remoteVerdict({ outcome: "promoted", spend_usd: 3 }).decision, "shadow");
-    assert.equal(remoteVerdict({ outcome: "needs_work", spend_usd: 3 }).decision, "collect");
-    assert.equal(remoteVerdict({ outcome: "failed", spend_usd: 0 }).decision, "stop");
-    assert.equal(abandonedPatch("why").verdict.decision, "stop");
-  });
-
-  it("summarizes a record compactly for the lineage card", () => {
-    const summary = lineageSummary({
-      experiment_id: "exp-1",
-      status: "concluded",
-      data_selection: { selection_hash: "c".repeat(64) },
-      training: { provider: "local", approvals: [{ gate: "provider_training_spend" }] },
-      verdict: { decision: "shadow", summary: "s" },
-    });
-    assert.equal(summary.dataHash, `${"c".repeat(12)}…`);
-    assert.deepEqual(summary.approvals, ["provider_training_spend"]);
-    assert.match(summary.verdict, /^shadow — /);
-    assert.equal(lineageSummary(null), null);
-  });
-
-  it("derives the four honest benchmark linkage states", () => {
-    const bridge = (exists, verb) => ({
-      benchmark_dir: "/x/benchmark",
-      benchmark_exists: exists,
-      from_dataset_available: verb,
-    });
-    assert.equal(benchmarkLinkageState(bridge(true, false), { ref: "/a" }).kind, "ready");
-    assert.equal(benchmarkLinkageState(bridge(true, true), null).kind, "no_artifact");
-    assert.equal(benchmarkLinkageState(bridge(false, true), { ref: "/a" }).kind, "buildable");
-    assert.equal(benchmarkLinkageState(bridge(false, false), { ref: "/a" }).kind, "landing");
-    assert.equal(benchmarkLinkageState(null, null).kind, "landing");
-  });
-
-  it("picks the newest run request for the experiment", () => {
-    const rows = [
-      { run_id: "r1", created_at: "2026-01-01", experiment_id: "e1" },
-      { run_id: "r2", created_at: "2026-01-03", experiment_id: "e2" },
-      { run_id: "r3", created_at: "2026-01-02", experiment_id: "e1" },
-    ];
-    assert.equal(relevantRunRequest(rows, "e1").run_id, "r3");
-    assert.equal(relevantRunRequest(rows, "missing").run_id, "r2");
-    assert.equal(relevantRunRequest([], "e1"), null);
-    assert.equal(relevantRunRequest(undefined, null), null);
   });
 });

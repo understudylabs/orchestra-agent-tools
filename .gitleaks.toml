@@ -1,0 +1,46 @@
+# gitleaks configuration for understudy-agent-tools.
+#
+# Extends the built-in rules. The allowlist below covers values that look like
+# credentials to entropy-based rules but are not: content hashes, idempotency
+# keys, synthetic benchmark task ids, and one deliberately key-shaped test
+# fixture that exercises the tiebreaker's redaction. Keep this list short and
+# specific; a new entry should name why the match is not a secret.
+
+title = "understudy-agent-tools"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets"
+# Match the regexes below against the whole line, so structured ids can be
+# recognised by their JSON key rather than by the value alone.
+regexTarget = "line"
+
+paths = [
+  # Raw AutomationBench eval exports: synthetic task payloads (Jira/Asana ids,
+  # fake API keys embedded in task text). Nothing here authenticates anywhere.
+  '''experiments/benchmark-hub-demo/automationbench-import/raw/.*\.json$''',
+  '''experiments/benchmark-hub-demo/.*/results\.jsonl$''',
+  # Lockfiles carry integrity hashes, not secrets.
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)bun\.lock$''',
+  '''(^|/)Cargo\.lock$''',
+  # Vendored and generated trees are never scanned.
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.next/''',
+  '''(^|/)target/''',
+]
+
+regexes = [
+  # Test fixture: the supervision tiebreaker must redact sk_-shaped values.
+  '''sk_test_tiebreaker''',
+  # Deterministic hex ids written by the capture and run pipeline.
+  '''"(capture_key|idempotency_key|capture_run_id|trace_id)"\s*:\s*"[0-9a-f]{32,64}"''',
+  # Synthetic curriculum / churn task ids.
+  '''hard-api-churn-cascade-\d+''',
+  '''conv_[a-z_]+_\d+''',
+  # Env var names being cleared in the installer, e.g. `ANTHROPIC_API_KEY= `.
+  '''[A-Z_]+_API_KEY=(\s|$|")''',
+]

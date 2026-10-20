@@ -69,9 +69,9 @@ agent reads when the user asks, "is my Understudy active?" or "talk to my
 Understudy." It captures live local runtime facts that do not belong in the
 profile. Never put secrets, prompts, outputs, or customer data in it.
 
-**Ownership: the Understudy desktop app is the canonical local daemon and the
-canonical writer of this card.** While the app runs, it maintains the card
-programmatically (`apps/homescreen/src-tauri/src/agent_card.rs`): it writes
+**Ownership: the Understudy desktop app (deprecated, see
+`docs/desktop-deprecation.md`) is the canonical writer of this card while it
+is installed.** While the app runs, it maintains the card programmatically: it writes
 the `app` block when its local API server starts, refreshes the warm-model
 list on every residency change (warm/cool/assign), and marks itself stopped
 on graceful shutdown. All app writes are atomic (temp file + rename), purely
@@ -206,9 +206,7 @@ through MLX on Apple Silicon (see
 - **Apple Silicon first rung** — Understudy-verified QAT-derived
   `gemma-4-e2b-it-qat-mlx-vlm-understudy` (`google/gemma-4-E2B-it` QAT weights,
   MLX 4-bit at `group_size=32`), served with `mlx_vlm.server`. Snapshot:
-  `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`
-  (R2 source:
-  `r2://understudy-model-snapshots/models/google/gemma-4-e2b-it/mlx-vlm-0.6.2/qat-understudy-4bit-g32/`).
+  `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`.
   It is about 3.6 GB on disk, ~3.9 GB peak memory in testing, generated
   locally at about 218 tok/s, and exposes logprobs/top-logprobs through the
   OpenAI-compatible server.

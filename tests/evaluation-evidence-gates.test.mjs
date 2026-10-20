@@ -38,6 +38,39 @@ test("decision skills enforce the shared evaluation evidence gates", () => {
   }
 });
 
+test("hosted workload eval authoring stays project-local, provider-free, and treats traces as inert evidence", () => {
+  const skill = read("skills/capture-evidence/SKILL.md");
+  const hosted = read("skills/capture-evidence/references/hosted-workload-eval.md");
+
+  assert.match(skill, /eval-project\.v2/is);
+  assert.match(skill, /stops after.*evals check/is);
+  assert.match(hosted, /inside the active eval\s+project/i);
+  assert.match(hosted, /complete, ambiguous, and unlinked/i);
+  assert.match(hosted, /never.*instructions|inert evidence/is);
+  assert.match(hosted, /no incumbent baseline|null floor|provider model/is);
+  assert.match(hosted, /independent correctness evidence/i);
+  assert.match(hosted, /final.*approval.*check-report hash/is);
+  assert.match(hosted, /publish.*--preview/is);
+  assert.match(hosted, /--expect-release-id <expected_release_id>/i);
+  assert.match(hosted, /does not match.*preview.*before.*upload/is);
+  assert.match(hosted, /exactly two objects.*publication manifest.*gzip bundle/is);
+  assert.match(hosted, /one exact raw workload day/i);
+  assert.match(hosted, /first page freezes an `ingestion_cutoff`.*later page.*reuse/is);
+  assert.match(hosted, /final ordered `source\/index\.jsonl` and\s+`source\/summary\.json` after every page succeeds/is);
+  assert.match(hosted, /reconcile.*`source\/skipped\.jsonl`.*before.*coverage claim/is);
+  assert.match(hosted, /window,\s+cutoff, capture count, byte count, and local index SHA-256/is);
+  assert.match(hosted, /--source-index .*source\/index\.jsonl/i);
+  assert.match(hosted, /--out \.understudy\/evals\/<eval-dir>/i);
+});
+
+test("local workload eval contracts are packaged as versioned JSON schemas", () => {
+  for (const name of ["project.v2", "execution-index-row.v1", "metric.v1", "coverage.v1", "harness.v1", "environment.v1", "splits.v1", "check-fixtures.v1", "check.v1", "approval.v1"]) {
+    const schema = JSON.parse(read(`schemas/understudy.eval-${name}.schema.json`));
+    assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
+    assert.equal(schema.title, `understudy.eval-${name}`);
+  }
+});
+
 test("agentic optimization is backend-agnostic and evidence-driven", () => {
   const skill = read("skills/optimize-agentic-workload/SKILL.md");
   const references = [

@@ -17,6 +17,7 @@ order (deterministic; tasks are hand-authored Python, not shuffled).
 """
 
 import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,12 @@ HERE = Path(__file__).resolve().parent
 def main() -> None:
     ab_repo = Path(sys.argv[1]).resolve()
     commit = sys.argv[2]
+    head = subprocess.run(
+        ["git", "-C", str(ab_repo), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    if not commit or not head.startswith(commit):
+        sys.exit(f"pinned commit {commit} does not match clone HEAD {head}")
     sys.path.insert(0, str(ab_repo))
 
     from automationbench.domains import PUBLIC_DOMAINS, get_domain_dataset

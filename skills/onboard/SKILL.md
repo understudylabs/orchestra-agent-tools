@@ -56,9 +56,7 @@ and build an opportunity ledger before any code edits or provider calls.
    `google/gemma-4-E2B-it` QAT weights converted by Understudy to MLX 4-bit at
    `group_size=32` (matching Q4_0's block structure). The verified snapshot is
    stored at
-   `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`
-   (R2 source:
-   `r2://understudy-model-snapshots/models/google/gemma-4-e2b-it/mlx-vlm-0.6.2/qat-understudy-4bit-g32/`).
+   `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`.
    It is about 3.6 GB on disk, runs at ~3.9 GB peak memory (~2.6x less than
    BF16), and is 4/4 certified (generation, OpenAI-compatible serving,
    logprobs, tool calls) at the prescribed decode. Announce the model, quantization, size,

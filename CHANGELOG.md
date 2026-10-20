@@ -15,6 +15,21 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Removed
+
+- **Understudy Desktop.** The Tauri app in `apps/homescreen`, its
+  `desktop-release` workflow, the `desktop:*` and `runtime:desktop-readiness`
+  npm scripts, the release tooling under `scripts/`, and the tests that covered
+  only the app are removed. The last release is `desktop-v0.3.44-mvp`; the
+  updater pointer no longer advances, so installed apps will not receive
+  updates. See `docs/desktop-deprecation.md`.
+
+### Deprecated
+
+- **`understudy desktop ...` commands.** The command group still works against
+  an already-installed app but now prints a one-line deprecation warning to
+  stderr and will be removed in a future release. stdout is unchanged.
+
 ### Added
 
 - **Trace-level hosted capture exports.** `understudy traces export <trace-id>`

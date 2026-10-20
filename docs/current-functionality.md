@@ -38,12 +38,22 @@ understudy workloads route <workload-id> --project-id <project-id> --model-id gl
 understudy workloads route <workload-id> --project-id <project-id> --clear
 understudy gateway health
 understudy gateway probe --provider anthropic --project rehearsal --workload classify
+understudy reporting summary --window 7d --group-by workload
+understudy reporting usage --project rehearsal --window 7d --group-by workload,day
+understudy reporting workload-status --project rehearsal --window 24h
+understudy reporting cost <request-or-upstream-id>
+understudy reporting cost-breakdown --project rehearsal --window 7d
+understudy billing balance
+understudy billing summary --from 2026-08-01T00:00:00Z --to 2026-09-01T00:00:00Z
+understudy billing trend --from 2026-08-01T00:00:00Z --to 2026-09-01T00:00:00Z
 understudy captures list --project rehearsal --workload classify
 understudy captures get <request-id> --project rehearsal --workload classify
 understudy captures export <request-id> --out .understudy/captures/<request-id>.json
 understudy captures export --request-ids-file request-ids.txt --project rehearsal --out .understudy/capture-batch --include-payload --yes
 understudy traces export <trace-id> --project rehearsal --out .understudy/trace-exports --include-payload --yes
 understudy traces export --trace-ids-file trace-ids.txt --project rehearsal --out .understudy/trace-exports --include-payload --yes
+understudy traces export --project rehearsal --workload classify --date 2026-08-29 --out .understudy/trace-exports/day --include-payload --yes
+understudy evals build --project rehearsal --workload classify --name classification-day --out .understudy/evals/classification-day --yes
 understudy routes show classify --project rehearsal
 understudy routes set classify --project rehearsal --model-id glm-5.1 --traffic-pct 10
 understudy routes clear classify --project rehearsal
@@ -97,6 +107,12 @@ traces, or secret values.
 .understudy/capture-import/workload-card.json
 ```
 
+The reporting and billing commands are authenticated, read-only hosted calls.
+They expose customer-safe usage and customer pricing, plus the authoritative
+billing ledger balance; they do not expose provider cost or margin. Call-cost
+lookups preserve `unpriced` as `null`, and cost breakdowns surface the API's
+coverage and known-gap fields instead of presenting incomplete data as final.
+
 ## What Is Skill-Led Now
 
 The public workflow now lives in the skill tree. The authoritative,
@@ -133,14 +149,40 @@ clear or roll back that route. Application code still calls the normal gateway
 path; the control plane decides what percentage goes to the selected Understudy
 model and what remains passthrough/frontier.
 
-Hosted capture commands are metadata-first. `captures list` and `captures get`
+Hosted capture commands are metadata-first. `captures list --from <timestamp>
+--to <timestamp> --workload <name-or-id>` searches indexed capture references by
+request-start time and follows index pages automatically. Timezones are
+required, the start is inclusive, the end is exclusive, and the requested span
+must be no longer than 24 hours. Time searches omit `--limit` and `--cursor`;
+ordinary listings keep their existing pagination. See
+[capture time search](capture-time-search.md) for correlation and export steps.
+
+`captures list` without timestamps and `captures get`
 redact prompt/completion-bearing fields into presence booleans. Full capture
 export is opt-in with `--include-payload --yes`, writes only to a file, and never
-prints raw payloads to stdout. `traces export` calls the customer trace
-request-ID lookup for one explicit `trace_id`, then passes the returned IDs to
-the existing request capture batch exporter. It never walks the project capture
-catalog. Full per-request captures require the same explicit payload opt-in;
-there is no unbounded all-traces operation.
+prints raw payloads to stdout. `traces export` either resolves explicit trace
+IDs through the customer trace request-ID endpoint or downloads one exact raw
+workload day. Workload mode defaults to the rolling latest 24 hours and accepts
+`--date YYYY-MM-DD` for a completed UTC calendar day. It requires the same
+explicit payload opt-in, writes owner-private files, and emits only counts,
+paths, and hashes; there is no unbounded all-traces operation. `evals build`
+uses the same one-day primitive before handing semantic authoring to the coding
+agent.
+
+`traces review-rollout --spec <private-spec.json> --out <private-directory>`
+builds an offline before/after task review from verified local sources.
+Adding `--download --include-payload --yes` first acquires all indexed production
+captures within the explicit windows through customer-scoped APIs. The strict
+spec fixes organization/project, both workload names/IDs, UTC windows, and JSON
+pointers for execution ID, user ID and application environment. Exports retain
+frozen request inventories and local byte hashes; incomplete or mismatched
+sources fail instead of producing a complete-looking report. Task comparisons
+require explicit execution identities. Missing identities stay visible and are
+not replaced with guessed trace/time-based groups. Metrics are observational:
+requests/task, captured terminal/error evidence, and optional request-duration
+sums with a declared basis. They do not score business correctness, establish
+causal model effects, or change traffic. See the
+[rollout review procedure](../skills/ramp-and-verify/references/review-rollout.md).
 
 `optimize-workload check` reads `.understudy/capture-evidence/`
 artifacts, fails closed on missing files, invalid JSON, stale baseline hashes,

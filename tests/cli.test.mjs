@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 
 const cli = ["node", resolve("dist/bin.js")];
@@ -171,6 +171,20 @@ async function withHostedFixture(fn) {
     transientCaptureFailures: new Map([["req_retry", 1]]),
     unavailableCaptureIds: new Set(),
     captureAuthorizationFailure: false,
+    evalCaptureFailures: 0,
+    evalCaptureDelayMs: 0,
+    evalCohortDropResponses: 0,
+    evalCohorts: [],
+    evalCaptureUrl: null,
+    evalCaptureDeclaredLength: null,
+    evalExportCohortSha: "a".repeat(64),
+    evalExportExpiries: [],
+    rawExportPages: new Map(),
+    rawCaptureFailures: 0,
+    rawCaptureUnavailableIndexes: new Set(),
+    rawCaptureDelayMs: 0,
+    rawCaptureActive: 0,
+    rawCaptureMaxActive: 0,
   };
 
   const server = createServer(async (req, res) => {
@@ -193,6 +207,230 @@ async function withHostedFixture(fn) {
     if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/projects") return send(200, { projects: state.projects, cursor: null });
     if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/api_keys") return send(200, { keys: [{ id: "key_1", name: "default", obfuscated_value: "sk_...test", last_used_at: null, permissions: [], created_at: "2026-06-01T00:00:00Z" }] });
     if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/models") return send(200, { models: [{ id: "glm-5.1", display_name: "GLM 5.1", capabilities: ["chat"], context_window: 128000 }] });
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/reporting") {
+      return send(200, {
+        org_id: "org_1",
+        window: url.searchParams.has("from") ? "custom" : (url.searchParams.get("window") ?? "7d"),
+        window_start: "2026-08-19T00:00:00.000Z",
+        window_end: "2026-08-26T00:00:00.000Z",
+        granularity: url.searchParams.get("granularity") ?? "day",
+        group_by: url.searchParams.get("group_by") ?? "project",
+        filters: {
+          project_id: url.searchParams.get("project_id"),
+          workload_id: url.searchParams.get("workload_id"),
+          exclude_project_ids: url.searchParams.getAll("exclude_project_id"),
+        },
+        totals: {
+          requests: 120,
+          input_tokens: 12000,
+          cache_read_input_tokens: 4000,
+          cache_creation_input_tokens: 1000,
+          output_tokens: 3000,
+          total_tokens: 20000,
+          customer_cost_usd: 4.25,
+          future_total: "preserved",
+        },
+        series: [{
+          bucket: "2026-08-25",
+          project_id: "proj_1",
+          project: "Rehearsal",
+          workload_id: "usp_classify",
+          workload: "classify",
+          model: null,
+          requests: 120,
+          input_tokens: 12000,
+          cache_read_input_tokens: 4000,
+          cache_creation_input_tokens: 1000,
+          output_tokens: 3000,
+          total_tokens: 20000,
+          customer_cost_usd: 4.25,
+        }],
+        generated_at: "2026-08-26T00:00:01.000Z",
+        future_field: "preserved",
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/projects/proj_1/usage-summary") {
+      const groups = url.searchParams.get("window") === "29d"
+        ? Array.from({ length: 5_000 }, (_, index) => ({
+          workload_id: `usp_${index}`,
+          workload: `workload-${index}`,
+          model: null,
+          day: null,
+          requests: 1,
+          input_tokens: 1,
+          output_tokens: 1,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_read_pct: 0,
+          customer_cost_usd: 0,
+          error_rate: 0,
+        }))
+        : [{
+          workload_id: "usp_classify",
+          workload: "classify",
+          model: null,
+          day: null,
+          requests: 120,
+          input_tokens: 12000,
+          output_tokens: 3000,
+          cache_read_input_tokens: 4000,
+          cache_creation_input_tokens: 1000,
+          cache_read_pct: 0.2353,
+          customer_cost_usd: 4.25,
+          error_rate: 0.01,
+        }];
+      return send(200, {
+        project_id: "proj_1",
+        window: url.searchParams.get("window") ?? "7d",
+        window_start: "2026-08-19T00:00:00.000Z",
+        window_end: "2026-08-26T00:00:00.000Z",
+        group_by: (url.searchParams.get("group_by") ?? "workload").split(","),
+        groups,
+        generated_at: "2026-08-26T00:00:01.000Z",
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/projects/proj_1/workload-status") {
+      return send(200, {
+        project_id: "proj_1",
+        window: url.searchParams.get("window") ?? "24h",
+        window_start: "2026-08-25T00:00:00.000Z",
+        window_end: "2026-08-26T00:00:00.000Z",
+        workloads: [{
+          workload_id: "usp_classify",
+          display_name: "classify",
+          status: "healthy",
+          mode: "managed",
+          declared: { routed: "pin", split_pct: 10 },
+          requests: 120,
+          route_shares: { primary: 0.89, understudy: 0.1, fallback: 0.01 },
+          error_rate: 0.01,
+          last_error_at: "2026-08-25T12:00:00.000Z",
+          example_request_ids: ["req_123"],
+          served_models: [{ model: "glm-5.1", provider_label: "managed", requests: 12, share: 0.1 }],
+          rerouted_pct: 0.1,
+        }],
+        workload_count: 1,
+        generated_at: "2026-08-26T00:00:01.000Z",
+      });
+    }
+    const callCost = url.pathname.match(/^\/admin\/v1\/orgs\/org_1\/calls\/([^/]+)\/cost$/);
+    if (req.method === "GET" && callCost) {
+      const correlationId = decodeURIComponent(callCost[1]);
+      const priced = correlationId !== "req_pending" && correlationId !== "req_unpriced_with_cost";
+      const customerCost = correlationId === "req_pending" || correlationId === "req_priced_without_cost"
+        ? null
+        : correlationId === "req_tiny" ? 0.0000001 : 0.012345;
+      return send(200, {
+        org_id: "org_1",
+        request_id: priced ? "req_123" : "req_pending",
+        ts: "2026-08-25T12:00:00.000Z",
+        project_id: "proj_1",
+        workload_id: "usp_classify",
+        provider: "managed",
+        served_model: "glm-5.1",
+        tokens: {
+          input_tokens: 100,
+          cache_creation_input_tokens: 10,
+          cache_read_input_tokens: 20,
+          output_tokens: 30,
+          reasoning_output_tokens: 0,
+        },
+        pricing_status: priced ? "priced" : "unpriced",
+        unpriced_reason: priced ? null : "pricing_pending",
+        customer_cost_usd: customerCost,
+        cost_categories: priced ? {
+          uncached_input_usd: 0.004,
+          cache_write_usd: 0.001,
+          cache_read_usd: 0.000345,
+          output_usd: 0.007,
+        } : null,
+        coverage: {
+          source_timestamp: "2026-08-25T12:00:00.000Z",
+          data_completeness: priced ? 1 : 0,
+          known_gaps: priced ? [] : ["Pricing is still pending for this call."],
+        },
+        generated_at: "2026-08-26T00:00:01.000Z",
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/projects/proj_1/cost-breakdown") {
+      const cost = {
+        uncached_input_usd: 2,
+        cache_write_usd: 0.5,
+        cache_read_usd: 0.25,
+        output_usd: 1.5,
+        total_usd: 4.25,
+      };
+      return send(200, {
+        project_id: "proj_1",
+        window: url.searchParams.get("window") ?? "7d",
+        window_start: "2026-08-19T00:00:00.000Z",
+        window_end: "2026-08-26T00:00:00.000Z",
+        workload_id: url.searchParams.get("workload_id"),
+        workloads: [{ workload_id: "usp_classify", workload: "classify", requests: 120, priced_requests: 118, cost }],
+        totals: { ...cost, requests: 120, priced_requests: 118 },
+        coverage: {
+          source_timestamp: "2026-08-25T23:59:00.000Z",
+          data_completeness: 0.9833,
+          known_gaps: ["2 requests are awaiting pricing.\nforged\u001b]8;;https://example.com\u0007"],
+        },
+        generated_at: "2026-08-26T00:00:01.000Z",
+        future_field: "preserved",
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/billing/balance") {
+      return send(200, {
+        balance: {
+          org_id: "org_1",
+          billing_mode: "prepaid",
+          status: "active",
+          balance_usd: 95.75,
+          currency: "USD",
+          low_balance_threshold_usd: 10,
+          grants: {
+            total_granted_usd: 100,
+            total_remaining_usd: 95.75,
+            soonest_expiry: null,
+          },
+        },
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/billing/summary") {
+      return send(200, {
+        summary: {
+          org_id: "org_1",
+          from: url.searchParams.get("from"),
+          to: url.searchParams.get("to"),
+          tokens: {
+            input_tokens: 12000,
+            cache_read_input_tokens: 4000,
+            cache_creation_input_tokens: 1000,
+            output_tokens: 3000,
+            reasoning_output_tokens: 0,
+            total_tokens: 20000,
+          },
+          metered_requests: 120,
+          priced_events: 118,
+          estimated_cost_usd: 4.25,
+          blended_price_per_mtok: 212.5,
+        },
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/billing/trend") {
+      return send(200, {
+        points: [{
+          day: "2026-08-25",
+          tokens: {
+            input_tokens: 12000,
+            cache_read_input_tokens: 4000,
+            cache_creation_input_tokens: 1000,
+            output_tokens: 3000,
+            reasoning_output_tokens: 0,
+            total_tokens: 20000,
+          },
+          cost_usd: 4.25,
+        }],
+      });
+    }
     if (req.method === "GET" && url.pathname === "/admin/v1/orgs/org_1/projects/proj_1/workloads") return send(200, { workloads: state.workloads, cursor: null });
     if (req.method === "POST" && url.pathname === "/admin/v1/orgs/org_1/projects/proj_1/workloads") {
       const workload = { id: `usp_${body.name}`, project_id: "proj_1", name: body.name, capture_enabled: Boolean(body.capture_enabled), route_model_id: null, route_traffic_pct: null, is_default: false, created_at: "2026-06-07T00:00:00Z" };
@@ -288,6 +526,66 @@ async function withHostedFixture(fn) {
     const evalBase = "/admin/v1/orgs/org_1/projects/proj_1/workloads/usp_classify";
     const rawCapture = `${JSON.stringify(state.captures[0])}\n`;
     const rawCaptureSha = createHash("sha256").update(rawCapture).digest("hex");
+    if (req.method === "POST" && url.pathname === `${evalBase}/captures/export`) {
+      const page = body.cursor === undefined ? 0 : 1;
+      const cutoff = state.rawExportPages.get(`${body.from}|${body.to}`)?.cutoff ??
+        new Date(Math.max(Date.parse(body.to), Date.now() - 1_000)).toISOString();
+      if (
+        (page === 0 && (body.cursor !== undefined || body.ingestion_cutoff !== undefined)) ||
+        (page === 1 && (body.cursor !== "raw_cursor_1" || body.ingestion_cutoff !== cutoff))
+      ) return send(400, { message: "synthetic raw export cursor mismatch" });
+      state.rawExportPages.set(`${body.from}|${body.to}`, { cutoff });
+      const capture = state.captures[page];
+      const capturedAt = new Date(Date.parse(body.from) + (page + 1) * 1_000).toISOString();
+      return send(200, {
+        canonical_scope: {
+          schema_version: "understudy.export-scope.v1",
+          selector: "workload-window",
+          org_id: "org_1",
+          project_id: "proj_1",
+          workload_id: "usp_classify",
+          from: body.from,
+          to: body.to,
+          ingestion_cutoff: cutoff,
+        },
+        captures: [{
+          request_id: capture.request_id,
+          capture_key: `org_1/proj_1/key_raw/2026/08/29/${capture.request_id}.jsonl`,
+          captured_at: capturedAt,
+          url: `${gatewayUrl}/raw-workload-capture-${page}`,
+        }],
+        next_cursor: page === 0 ? "raw_cursor_1" : null,
+      });
+    }
+    const rawWorkloadCapture = url.pathname.match(/^\/raw-workload-capture-(\d)$/);
+    if (req.method === "GET" && rawWorkloadCapture) {
+      state.rawCaptureActive += 1;
+      state.rawCaptureMaxActive = Math.max(state.rawCaptureMaxActive, state.rawCaptureActive);
+      try {
+        if (state.rawCaptureDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, state.rawCaptureDelayMs));
+        if (state.rawCaptureFailures > 0) {
+          state.rawCaptureFailures -= 1;
+          return send(503, { message: "synthetic raw capture failure" });
+        }
+        const index = Number(rawWorkloadCapture[1]);
+        if (state.rawCaptureUnavailableIndexes.has(index)) {
+          return send(404, { message: "synthetic raw capture is no longer available" });
+        }
+        const capture = state.captures[index];
+        return sendBytes(200, `${JSON.stringify({
+          schema_version: 4,
+          request_id: capture.request_id,
+          ts: capture.ts,
+          workos_org_id: "org_1",
+          project_id: "proj_1",
+          workload_id: "usp_classify",
+          customer_request_body: capture.customer_request_body,
+          response_body: capture.response_body,
+        })}\n`);
+      } finally {
+        state.rawCaptureActive -= 1;
+      }
+    }
     if (req.method === "GET" && url.pathname === `${evalBase}/eval-capture-catalog`) {
       return send(200, {
         captures: [{
@@ -316,29 +614,56 @@ async function withHostedFixture(fn) {
         },
       });
     }
+    if (req.method === "GET" && url.pathname === `${evalBase}/eval-cohorts`) {
+      return send(200, { eval_cohorts: state.evalCohorts });
+    }
     if (req.method === "POST" && url.pathname === `${evalBase}/eval-cohorts`) {
-      return send(201, {
+      const existing = body.operation_id
+        ? state.evalCohorts.find((entry) => entry.operation_id === body.operation_id)
+        : null;
+      if (existing) return send(200, existing);
+      const cohort = {
         id: "evc_123",
         org_id: "org_1",
         project_id: "proj_1",
         workload_id: "usp_classify",
+        operation_id: body.operation_id ?? null,
         name: body.name,
         selection: body.selection,
         capture_count: body.captures.length,
         cohort_sha256: "a".repeat(64),
         created_at: "2026-06-07T01:00:00Z",
-      });
+      };
+      state.evalCohorts.push(cohort);
+      if (state.evalCohortDropResponses > 0) {
+        state.evalCohortDropResponses -= 1;
+        return res.destroy();
+      }
+      return send(201, cohort);
     }
     if (req.method === "POST" && url.pathname === `${evalBase}/eval-cohorts/evc_123/export`) {
       return send(201, {
         export_id: "eve_123",
         cohort_id: "evc_123",
-        cohort_sha256: "a".repeat(64),
-        expires_at: "2026-06-07T02:00:00Z",
-        captures: [{ request_id: "req_123", content_sha256: rawCaptureSha, url: `${gatewayUrl}/eval-capture-req_123` }],
+        cohort_sha256: state.evalExportCohortSha,
+        expires_at: state.evalExportExpiries.shift() ?? new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        captures: [{ request_id: "req_123", content_sha256: rawCaptureSha, url: state.evalCaptureUrl ?? `${gatewayUrl}/eval-capture-req_123` }],
       });
     }
-    if (req.method === "GET" && url.pathname === "/eval-capture-req_123") return sendBytes(200, rawCapture);
+    if (req.method === "GET" && url.pathname === "/eval-capture-req_123") {
+      if (state.evalCaptureDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, state.evalCaptureDelayMs));
+      }
+      if (state.evalCaptureFailures > 0) {
+        state.evalCaptureFailures -= 1;
+        return send(503, { message: "synthetic eval capture failure" });
+      }
+      return sendBytes(200, rawCapture, state.evalCaptureDeclaredLength === null ? {} : { "content-length": String(state.evalCaptureDeclaredLength) });
+    }
+    if (req.method === "GET" && url.pathname === "/eval-capture-redirect") {
+      res.writeHead(302, { location: `${gatewayUrl}/eval-capture-req_123` });
+      return res.end();
+    }
     if (req.method === "POST" && (url.pathname === "/v1/messages" || url.pathname === "/v1/chat/completions")) {
       if (body?.model === "fixture-error") {
         return send(503, { error: { type: "upstream_capacity", code: "deployment_unavailable", message: "SECRET_PROVIDER_DETAIL" } }, {
@@ -2830,6 +3155,345 @@ class ScoreWithFeedback:
     });
   });
 
+  it("reads customer-safe reporting and billing data through first-class commands", async () => {
+    await withHostedFixture(async ({ home, repo, requests }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const credentialsPath = join(home, ".understudy", "credentials.json");
+      const credentials = JSON.parse(readFileSync(credentialsPath, "utf8"));
+      credentials.orgs.org_2 = {
+        api_key: "sk_test_org_2",
+        gateway_url: credentials.gateway_url,
+      };
+      writeFileSync(credentialsPath, `${JSON.stringify(credentials, null, 2)}\n`);
+
+      const reporting = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "summary",
+        "--window",
+        "7d",
+        "--group-by",
+        "workload",
+        "--exclude-project-id",
+        "proj_internal",
+        "--exclude-project-id",
+        " proj_internal ",
+      ], env, repo);
+      assert.equal(reporting.status, 0, reporting.stderr);
+      const reportingPayload = JSON.parse(reporting.stdout);
+      assert.equal(reportingPayload.totals.customer_cost_usd, 4.25);
+      assert.equal(reportingPayload.totals.future_total, "preserved");
+      assert.equal(reportingPayload.future_field, "preserved");
+      assert.equal(requests.at(-1).path, "/admin/v1/orgs/org_1/reporting");
+      assert.equal(requests.at(-1).search, "?window=7d&group_by=workload&exclude_project_id=proj_internal");
+      assert.equal(requests.at(-1).headers.authorization, "Bearer sk_test_hosted");
+
+      const usage = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "usage",
+        "--project",
+        "rehearsal",
+        "--window",
+        "30d",
+        "--group-by",
+        "workload,day",
+      ], env, repo);
+      assert.equal(usage.status, 0, usage.stderr);
+      assert.equal(JSON.parse(usage.stdout).groups[0].cache_read_pct, 0.2353);
+      assert.equal(requests.at(-1).path, "/admin/v1/orgs/org_1/projects/proj_1/usage-summary");
+      assert.equal(requests.at(-1).search, "?window=30d&group_by=workload%2Cday");
+
+      const workloadStatus = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "workload-status",
+        "--project",
+        "rehearsal",
+        "--window",
+        "6h",
+      ], env, repo);
+      assert.equal(workloadStatus.status, 0, workloadStatus.stderr);
+      assert.equal(JSON.parse(workloadStatus.stdout).workloads[0].route_shares.understudy, 0.1);
+      assert.equal(requests.at(-1).path, "/admin/v1/orgs/org_1/projects/proj_1/workload-status");
+      assert.equal(requests.at(-1).search, "?window=6h");
+
+      const callCost = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "cost",
+        "upstream_message_123",
+      ], env, repo);
+      assert.equal(callCost.status, 0, callCost.stderr);
+      assert.equal(JSON.parse(callCost.stdout).request_id, "req_123");
+      assert.equal(JSON.parse(callCost.stdout).customer_cost_usd, 0.012345);
+      assert.equal(requests.at(-1).path, "/admin/v1/orgs/org_1/calls/upstream_message_123/cost");
+
+      const pending = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "cost",
+        "req_pending",
+      ], env, repo);
+      assert.equal(pending.status, 0, pending.stderr);
+      assert.equal(JSON.parse(pending.stdout).pricing_status, "unpriced");
+      assert.equal(JSON.parse(pending.stdout).customer_cost_usd, null);
+
+      const breakdown = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "cost-breakdown",
+        "--project-id",
+        "proj_1",
+        "--window",
+        "7d",
+        "--workload-id",
+        "usp_classify",
+      ], env, repo);
+      assert.equal(breakdown.status, 0, breakdown.stderr);
+      const breakdownPayload = JSON.parse(breakdown.stdout);
+      assert.equal(breakdownPayload.totals.total_usd, 4.25);
+      assert.equal(breakdownPayload.coverage.data_completeness, 0.9833);
+      assert.equal(breakdownPayload.future_field, "preserved");
+      assert.equal(requests.at(-1).search, "?window=7d&workload_id=usp_classify");
+
+      const balance = await runWithEnvAsync(["--json", "billing", "balance"], env, repo);
+      assert.equal(balance.status, 0, balance.stderr);
+      assert.equal(JSON.parse(balance.stdout).balance.balance_usd, 95.75);
+
+      const summary = await runWithEnvAsync([
+        "--json",
+        "billing",
+        "summary",
+        "--from",
+        "2026-08-19T00:00:00Z",
+        "--to",
+        "2026-08-26T00:00:00Z",
+      ], env, repo);
+      assert.equal(summary.status, 0, summary.stderr);
+      assert.equal(JSON.parse(summary.stdout).summary.priced_events, 118);
+      assert.equal(requests.at(-1).search, "?from=2026-08-19T00%3A00%3A00.000Z&to=2026-08-26T00%3A00%3A00.000Z");
+
+      const trend = await runWithEnvAsync([
+        "--json",
+        "billing",
+        "trend",
+        "--from",
+        "2026-08-19T00:00:00Z",
+        "--to",
+        "2026-08-26T00:00:00Z",
+      ], env, repo);
+      assert.equal(trend.status, 0, trend.stderr);
+      assert.equal(JSON.parse(trend.stdout).points[0].cost_usd, 4.25);
+
+      const humanSummary = await runWithEnvAsync([
+        "billing",
+        "summary",
+        "--from",
+        "2026-08-19T00:00:00Z",
+        "--to",
+        "2026-08-26T00:00:00Z",
+      ], env, repo);
+      assert.equal(humanSummary.status, 0, humanSummary.stderr);
+      assert.match(humanSummary.stdout, /coverage note/i);
+      assert.match(humanSummary.stdout, /zero-cost traffic or pricing lag/i);
+      assert.doesNotMatch(humanSummary.stdout, /pricing gap/i);
+
+      const humanBreakdown = await runWithEnvAsync([
+        "reporting",
+        "cost-breakdown",
+        "--project-id",
+        "proj_1",
+      ], env, repo);
+      assert.equal(humanBreakdown.status, 0, humanBreakdown.stderr);
+      assert.match(humanBreakdown.stdout, /uncached \$2\.00/);
+      assert.match(humanBreakdown.stdout, /cache write \$0\.50/);
+      assert.match(humanBreakdown.stdout, /cache read \$0\.25/);
+      assert.match(humanBreakdown.stdout, /output \$1\.50/);
+      assert.doesNotMatch(humanBreakdown.stdout, /\u001b|\u0007/);
+      assert.match(humanBreakdown.stdout, /\\u000a/);
+      assert.match(humanBreakdown.stdout, /\\u001b/);
+
+      const human = await runWithEnvAsync([
+        "reporting",
+        "cost",
+        "req_pending",
+      ], env, repo);
+      assert.equal(human.status, 0, human.stderr);
+      assert.match(human.stdout, /unpriced/i);
+      assert.match(human.stdout, /pricing pending/i);
+      assert.doesNotMatch(human.stdout, /\$0(?:\.00+)?\b/);
+
+      const tiny = await runWithEnvAsync([
+        "reporting",
+        "cost",
+        "req_tiny",
+      ], env, repo);
+      assert.equal(tiny.status, 0, tiny.stderr);
+      assert.match(tiny.stdout, /<\$0\.000001/);
+    });
+  });
+
+  it("rejects invalid reporting dimensions and billing windows before the API call", async () => {
+    await withHostedFixture(async ({ home, repo, requests }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const initialRequests = requests.length;
+
+      const groupBy = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "summary",
+        "--group-by",
+        "provider",
+      ], env, repo);
+      assert.notEqual(groupBy.status, 0);
+      assert.match(groupBy.stderr, /group-by/i);
+
+      const window = await runWithEnvAsync([
+        "--json",
+        "billing",
+        "summary",
+        "--from",
+        "2026-08-26T00:00:00Z",
+        "--to",
+        "2026-08-19T00:00:00Z",
+      ], env, repo);
+      assert.notEqual(window.status, 0);
+      assert.match(window.stderr, /before/i);
+
+      const naiveTimestamp = await runWithEnvAsync([
+        "--json",
+        "billing",
+        "trend",
+        "--from",
+        "2026-08-19T00:00:00",
+        "--to",
+        "2026-08-26T00:00:00",
+      ], env, repo);
+      assert.notEqual(naiveTimestamp.status, 0);
+      assert.match(naiveTimestamp.stderr, /Z or a numeric UTC offset/i);
+
+      const calendarDate = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "summary",
+        "--from",
+        "2026-02-30",
+        "--to",
+        "2026-03-01",
+      ], env, repo);
+      assert.notEqual(calendarDate.status, 0);
+      assert.match(calendarDate.stderr, /calendar dates/i);
+
+      const usageGroup = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "usage",
+        "--project-id",
+        "proj_1",
+        "--group-by",
+        "workload,provider",
+      ], env, repo);
+      assert.notEqual(usageGroup.status, 0);
+      assert.match(usageGroup.stderr, /workload, model, day/i);
+
+      const usageDuration = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "usage",
+        "--project-id",
+        "proj_1",
+        "--window",
+        "31d",
+      ], env, repo);
+      assert.notEqual(usageDuration.status, 0);
+      assert.match(usageDuration.stderr, /no longer than 30d/i);
+      assert.equal(requests.length, initialRequests);
+    });
+  });
+
+  it("rejects calendar-invalid billing timestamps before the API call", async () => {
+    await withHostedFixture(async ({ home, repo, requests }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const initialRequests = requests.length;
+      const result = await runWithEnvAsync([
+        "--json",
+        "billing",
+        "summary",
+        "--from",
+        "2026-02-30T00:00:00Z",
+        "--to",
+        "2026-03-03T00:00:00Z",
+      ], env, repo);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /valid ISO UTC timestamps/i);
+      assert.equal(requests.length, initialRequests);
+    });
+  });
+
+  it("fails closed when call pricing status contradicts customer cost", async () => {
+    await withHostedFixture(async ({ home, repo }) => {
+      const env = { HOME: home, USERPROFILE: home };
+
+      const pricedWithoutCost = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "cost",
+        "req_priced_without_cost",
+      ], env, repo);
+      assert.notEqual(pricedWithoutCost.status, 0);
+      assert.match(pricedWithoutCost.stderr, /customer_cost_usd/i);
+
+      const unpricedWithCost = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "cost",
+        "req_unpriced_with_cost",
+      ], env, repo);
+      assert.notEqual(unpricedWithCost.status, 0);
+      assert.match(unpricedWithCost.stderr, /customer_cost_usd/i);
+    });
+  });
+
+  it("fails closed when usage reaches the server group limit", async () => {
+    await withHostedFixture(async ({ home, repo }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const result = await runWithEnvAsync([
+        "--json",
+        "reporting",
+        "usage",
+        "--project-id",
+        "proj_1",
+        "--window",
+        "29d",
+        "--group-by",
+        "workload,day",
+      ], env, repo);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /5,000-group server limit/i);
+    });
+  });
+
+  it("normalizes billing timezone offsets before sending them", async () => {
+    await withHostedFixture(async ({ home, repo, requests }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const result = await runWithEnvAsync([
+        "--json",
+        "billing",
+        "summary",
+        "--from",
+        "2026-08-18T17:00:00-07:00",
+        "--to",
+        "2026-08-25T17:00:00-07:00",
+      ], env, repo);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(
+        requests.at(-1).search,
+        "?from=2026-08-19T00%3A00%3A00.000Z&to=2026-08-26T00%3A00%3A00.000Z",
+      );
+    });
+  });
+
   it("creates a workload from a local workload card", async () => {
     await withHostedFixture(async ({ home, repo, requests }) => {
       const env = { HOME: home, USERPROFILE: home };
@@ -3482,6 +4146,87 @@ class ScoreWithFeedback:
     });
   });
 
+  it("exports one workload day through the generic raw trace endpoint", async () => {
+    await withHostedFixture(async ({ home, repo, requests }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const outputDir = join(repo, ".understudy", "traces", "synthetic-day");
+
+      const competingWindow = await runWithEnvAsync([
+        "--json", "traces", "export", "--project", "rehearsal", "--workload", "classify",
+        "--date", "2026-08-29", "--last", "1d", "--out", outputDir,
+        "--include-payload", "--yes",
+      ], env, repo);
+      assert.notEqual(competingWindow.status, 0);
+      assert.match(competingWindow.stderr, /either --date or --last/i);
+      assert.equal(requests.length, 0, "invalid window options fail before hosted reads");
+
+      const noResume = await runWithEnvAsync([
+        "--json", "traces", "export", "--project", "rehearsal", "--workload", "classify",
+        "--date", "2026-08-29", "--out", outputDir, "--no-resume",
+        "--include-payload", "--yes",
+      ], env, repo);
+      assert.notEqual(noResume.status, 0);
+      assert.match(noResume.stderr, /only valid for explicit trace ids.*fresh --out/i);
+      assert.equal(requests.length, 0, "unsupported workload no-resume fails before hosted reads");
+
+      const exported = await runWithEnvAsync([
+        "--json", "traces", "export", "--project", "rehearsal", "--workload", "classify",
+        "--date", "2026-08-29", "--out", outputDir,
+        "--include-payload", "--yes", "--concurrency", "2",
+      ], env, repo);
+      assert.equal(exported.status, 0, exported.stderr);
+      assert.doesNotMatch(exported.stdout + exported.stderr, /SECRET_PROMPT|SECRET_COMPLETION/);
+      const payload = JSON.parse(exported.stdout);
+      assert.equal(payload.mode, "workload_window");
+      assert.equal(payload.source.requested_count, 2);
+      assert.equal(payload.source.materialized_count, 2);
+      assert.equal(payload.source.skipped_count, 0);
+      assert.equal(payload.source.capture_count, 2);
+      assert.equal(payload.skipped, 0);
+      const exportRequests = requests.filter((entry) => entry.path.endsWith("/captures/export"));
+      assert.equal(exportRequests.length, 2);
+      assert.deepEqual(exportRequests[0].body, {
+        from: "2026-08-29T00:00:00.000Z",
+        to: "2026-08-30T00:00:00.000Z",
+      });
+      assert.equal(exportRequests[1].body.cursor, "raw_cursor_1");
+      assert.equal(exportRequests[1].body.ingestion_cutoff, payload.source.window.ingestion_cutoff);
+      const rows = readFileSync(join(outputDir, "source/index.jsonl"), "utf8")
+        .trim().split("\n").map((line) => JSON.parse(line));
+      assert.deepEqual(rows.map((row) => row.request_id), ["req_123", "req_456"]);
+      assert.match(readFileSync(join(outputDir, rows[0].local_path), "utf8"), /SECRET_PROMPT/);
+      assert.equal(existsSync(join(outputDir, "source/summary.json")), true);
+      assert.equal(existsSync(join(outputDir, "build-state.json")), false);
+    });
+  });
+
+  it("excludes concurrent standalone workload exports from the same output", async () => {
+    await withHostedFixture(async ({ home, repo, requests, state }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const outputDir = join(repo, ".understudy", "traces", "concurrent-day");
+      const args = [
+        "--json", "traces", "export", "--project", "rehearsal", "--workload", "classify",
+        "--date", "2026-08-29", "--out", outputDir, "--include-payload", "--yes",
+      ];
+      state.rawCaptureDelayMs = 400;
+      const readsBefore = requests.filter((entry) => entry.path === "/raw-workload-capture-0").length;
+      const first = runWithEnvAsync(args, env, repo);
+      const deadline = Date.now() + 5_000;
+      while (requests.filter((entry) => entry.path === "/raw-workload-capture-0").length === readsBefore) {
+        if (Date.now() > deadline) throw new Error("first standalone export did not reach capture download");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      const second = await runWithEnvAsync(args, env, repo);
+      assert.notEqual(second.status, 0);
+      assert.match(second.stderr, /already owns/);
+      const completed = await first;
+      state.rawCaptureDelayMs = 0;
+      assert.equal(completed.status, 0, completed.stderr);
+      assert.equal(existsSync(join(outputDir, "source", "summary.json")), true);
+    });
+  });
+
   it("selects, freezes, and materializes a workload-scoped eval cohort", async () => {
     await withHostedFixture(async ({ home, repo, requests }) => {
       const env = { HOME: home, USERPROFILE: home };
@@ -3489,7 +4234,7 @@ class ScoreWithFeedback:
       const catalog = await runWithEnvAsync([
         "--json", "evals", "catalog", "--project", "rehearsal", "--workload", "classify",
         "--from", "2026-06-01T00:00:00Z", "--to", "2026-06-08T00:00:00Z",
-        "--limit", "50", "--seed", "cedar-july", "--requires-tools", "--out", catalogPath,
+        "--limit", "50", "--seed", "fixture-july", "--requires-tools", "--out", catalogPath,
       ], env, repo);
       assert.equal(catalog.status, 0, catalog.stderr);
       assert.doesNotMatch(catalog.stdout, /SECRET_PROMPT|SECRET_COMPLETION/);
@@ -3498,12 +4243,13 @@ class ScoreWithFeedback:
 
       const create = await runWithEnvAsync([
         "--json", "evals", "cohort", "create", "--project", "rehearsal", "--workload", "classify",
-        "--from-catalog", catalogPath, "--name", "cedar-july",
+        "--from-catalog", catalogPath, "--name", "fixture-july",
       ], env, repo);
       assert.equal(create.status, 0, create.stderr);
       assert.equal(JSON.parse(create.stdout).cohort.id, "evc_123");
       const createRequest = requests.find((entry) => entry.path.endsWith("/eval-cohorts") && entry.method === "POST");
       assert.equal(createRequest.body.captures[0].request_id, "req_123");
+      assert.equal(createRequest.body.selection.sampling_seed, "fixture-july");
 
       const blocked = await runWithEnvAsync([
         "evals", "cohort", "export", "evc_123", "--project", "rehearsal", "--workload", "classify",
@@ -3552,6 +4298,236 @@ class ScoreWithFeedback:
       ], env, repo);
       assert.notEqual(blocked.status, 0);
       assert.match(blocked.stderr, /JSON mode cannot prompt/);
+    });
+  });
+
+  it("recommends raw-day eval building and labels cohort creation legacy", () => {
+    const help = run(["evals", "--help"]);
+    assert.equal(help.status, 0, help.stderr);
+    assert.match(help.stdout, /build \[options\]\s+Recommended:[\s\S]*raw workload day/i);
+    assert.match(help.stdout, /create \[options\]\s+Legacy:[\s\S]*cohort/i);
+  });
+
+  it("builds a v2 eval project from the generic one-day raw trace export", async () => {
+    await withHostedFixture(async ({ gatewayUrl, home, repo, requests }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      assert.equal(spawnSync("git", ["init", "-q", repo]).status, 0);
+      const outputDir = join(repo, ".understudy", "evals", "one day's draft");
+
+      const reservedOutput = join(repo, ".understudy");
+      rmSync(reservedOutput, { recursive: true, force: true });
+      const blockedReservedOutput = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "reserved-root", "--out", reservedOutput, "--yes",
+      ], env, repo);
+      assert.notEqual(blockedReservedOutput.status, 0);
+      assert.match(blockedReservedOutput.stderr, /must be a child directory under .*\.understudy.*root itself is reserved/i);
+      assert.equal(existsSync(join(repo, "..understudy.eval-build")), false);
+      assert.equal(requests.length, 0, "the reserved private root fails before hosted reads");
+      writeHostedConfig({ home, repo, gatewayUrl });
+
+      const unsafeOutput = join(repo, "evals", "unsafe-day");
+      const blockedOutput = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "unsafe-day", "--out", unsafeOutput, "--yes",
+      ], env, repo);
+      assert.notEqual(blockedOutput.status, 0);
+      assert.match(blockedOutput.stderr, /must use a destination under .*\.understudy/);
+      assert.equal(existsSync(unsafeOutput), false);
+      assert.equal(requests.length, 0, "unsafe repository paths fail before hosted reads");
+
+      const built = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "one-day", "--date", "2026-08-29", "--out", outputDir, "--yes",
+      ], env, repo);
+      assert.equal(built.status, 0, built.stderr);
+      assert.doesNotMatch(built.stdout + built.stderr, /SECRET_PROMPT|SECRET_COMPLETION/);
+      const builtPayload = JSON.parse(built.stdout);
+      assert.equal(builtPayload.next_action.kind, "coding_agent_prompt");
+      assert.deepEqual(builtPayload.next_action.command, {
+        executable: "understudy",
+        args: ["--json", "evals", "check", "--draft", "--project", outputDir],
+      });
+      assert.match(builtPayload.next_action.prompt, /infer the workload goal/i);
+      assert.match(builtPayload.next_action.prompt, /reconcile 0 skipped captures.*source\/skipped\.jsonl.*before.*coverage claims/i);
+      assert.match(builtPayload.next_action.prompt, /exact argument array/i);
+      assert.match(builtPayload.next_action.prompt, new RegExp(outputDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      const project = JSON.parse(readFileSync(join(outputDir, "eval-project.json"), "utf8"));
+      assert.equal(project.schema_version, "understudy.eval-project.v2");
+      assert.match(project.eval_id, /^eval_[a-f0-9]{24}$/);
+      assert.equal(project.name, "one-day");
+      assert.equal(project.status, "source_materialized");
+      assert.equal(project.source.requested_count, 2);
+      assert.equal(project.source.materialized_count, 2);
+      assert.equal(project.source.skipped_count, 0);
+      assert.equal(project.source.skipped_index, "source/skipped.jsonl");
+      assert.equal(project.source.capture_count, 2);
+      assert.equal(project.authoring.owner, "coding_agent");
+      assert.equal(project.authoring.semantic_preparation_performed, false);
+      const indexRows = readFileSync(join(outputDir, "source", "index.jsonl"), "utf8")
+        .trim().split("\n").map((line) => JSON.parse(line));
+      assert.deepEqual(indexRows.map((row) => row.request_id), ["req_123", "req_456"]);
+      assert.ok(indexRows.every((row) => /^[a-f0-9]{64}$/.test(row.content_sha256)));
+      assert.ok(indexRows.every((row) => typeof row.captured_at === "string"));
+      assert.match(readFileSync(join(outputDir, indexRows[0].local_path), "utf8"), /SECRET_PROMPT/);
+      assert.equal(existsSync(join(outputDir, "source", "summary.json")), true);
+      assert.equal(existsSync(join(outputDir, "build-state.json")), false);
+      assert.equal(
+        readFileSync(join(repo, ".git", "info", "exclude"), "utf8")
+          .split(/\r?\n/).filter((line) => line === "/.understudy/").length,
+        1,
+      );
+      const exportRequests = requests.filter((entry) => entry.path.endsWith("/captures/export") && entry.method === "POST");
+      assert.equal(exportRequests.length, 2);
+      assert.equal(exportRequests.at(-1).body.cursor, "raw_cursor_1");
+      assert.equal(
+        Date.parse(exportRequests[0].body.to) - Date.parse(exportRequests[0].body.from),
+        24 * 60 * 60 * 1000,
+      );
+      assert.deepEqual(
+        { from: exportRequests[0].body.from, to: exportRequests[0].body.to },
+        { from: "2026-08-29T00:00:00.000Z", to: "2026-08-30T00:00:00.000Z" },
+      );
+      assert.equal(exportRequests[0].body.ingestion_cutoff, undefined);
+      assert.equal(exportRequests[1].body.ingestion_cutoff, project.source.window.ingestion_cutoff);
+      assert.equal(requests.some((entry) => entry.path.endsWith("/eval-cohorts") && entry.method === "POST"), false);
+    });
+  });
+
+  it("surfaces skipped raw captures in the eval build JSON handoff", async () => {
+    await withHostedFixture(async ({ home, repo, state }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      assert.equal(spawnSync("git", ["init", "-q", repo]).status, 0);
+      state.rawCaptureUnavailableIndexes.add(1);
+      const outputDir = join(repo, ".understudy", "evals", "incomplete-day");
+
+      const built = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "incomplete-day", "--date", "2026-08-29", "--out", outputDir, "--yes",
+      ], env, repo);
+      assert.equal(built.status, 0, built.stderr);
+      const payload = JSON.parse(built.stdout);
+      assert.equal(payload.source.requested_count, 2);
+      assert.equal(payload.source.materialized_count, 1);
+      assert.equal(payload.source.skipped_count, 1);
+      assert.equal(payload.source.skipped_index, "source/skipped.jsonl");
+      assert.match(payload.next_action.prompt, /reconcile 1 skipped capture.*source\/skipped\.jsonl.*before.*coverage claims/i);
+
+      const project = JSON.parse(readFileSync(join(outputDir, "eval-project.json"), "utf8"));
+      assert.deepEqual(project.source, payload.source);
+      const skipped = readFileSync(join(outputDir, project.source.skipped_index), "utf8")
+        .trim().split("\n").map(JSON.parse);
+      assert.deepEqual(skipped.map((row) => row.request_id), ["req_456"]);
+    });
+  });
+
+  it("publishes a complete raw dump and excludes a concurrent builder from the same output", async () => {
+    await withHostedFixture(async ({ home, repo, requests, state }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const invalidOutput = join(repo, ".understudy", "evals", "invalid-checkpoint");
+      const invalidStaging = join(dirname(invalidOutput), ".invalid-checkpoint.eval-build");
+      const invalid = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "invalid-checkpoint", "--out", invalidOutput,
+        "--concurrency", "0", "--yes",
+      ], env, repo);
+      assert.notEqual(invalid.status, 0);
+      assert.match(invalid.stderr, /--concurrency must be between 1 and 16/);
+      assert.equal(existsSync(invalidStaging), false, "invalid state is never published as a resumable checkpoint");
+
+      const corrected = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "invalid-checkpoint", "--out", invalidOutput, "--yes",
+      ], env, repo);
+      assert.equal(corrected.status, 0, corrected.stderr);
+
+      const staleOutput = join(repo, ".understudy", "evals", "stale-builder");
+      const staleLock = join(dirname(staleOutput), ".stale-builder.eval-build.lock");
+      mkdirSync(staleLock, { recursive: true });
+      writeFileSync(join(staleLock, "owner.json"), JSON.stringify({
+        token: "stale-owner",
+        pid: 2_147_483_647,
+        created_at: "2026-01-01T00:00:00.000Z",
+      }));
+      const requestsBeforeStale = requests.length;
+      const stale = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "stale-builder", "--out", staleOutput, "--yes",
+      ], env, repo);
+      assert.notEqual(stale.status, 0);
+      assert.match(stale.stderr, /stale eval build lock remains/);
+      assert.equal(requests.length, requestsBeforeStale, "stale locks fail before hosted reads");
+      rmSync(staleLock, { recursive: true, force: true });
+
+      const concurrentOutput = join(repo, ".understudy", "evals", "concurrent-builder");
+      state.rawCaptureDelayMs = 400;
+      const captureReadsBefore = requests.filter((entry) => entry.path === "/raw-workload-capture-0").length;
+      const first = runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "concurrent-builder", "--out", concurrentOutput, "--yes",
+      ], env, repo);
+      const deadline = Date.now() + 5_000;
+      while (requests.filter((entry) => entry.path === "/raw-workload-capture-0").length === captureReadsBefore) {
+        if (Date.now() > deadline) throw new Error("first eval builder did not reach capture download");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      const second = await runWithEnvAsync([
+        "--json", "evals", "build", "--project", "rehearsal", "--workload", "classify",
+        "--name", "concurrent-builder", "--out", concurrentOutput, "--yes",
+      ], env, repo);
+      assert.notEqual(second.status, 0);
+      assert.match(second.stderr, /already owns/);
+      const completed = await first;
+      state.rawCaptureDelayMs = 0;
+      assert.equal(completed.status, 0, completed.stderr);
+      assert.equal(existsSync(join(concurrentOutput, "eval-project.json")), true);
+    });
+  });
+
+  it("rejects unsafe eval exports and never leaves partial payloads", async () => {
+    await withHostedFixture(async ({ home, repo, requests, state, gatewayUrl }) => {
+      const env = { HOME: home, USERPROFILE: home };
+      const exportArgs = (out) => [
+        "--json", "evals", "cohort", "export", "evc_123", "--project", "rehearsal", "--workload", "classify",
+        "--out", out, "--yes",
+      ];
+
+      state.evalCaptureUrl = "http://169.254.169.254/latest/meta-data";
+      const untrustedOut = join(repo, ".understudy", "evals", "untrusted-export");
+      const untrusted = await runWithEnvAsync(exportArgs(untrustedOut), env, repo);
+      assert.notEqual(untrusted.status, 0);
+      assert.match(untrusted.stderr, /untrusted origin/);
+      assert.equal(existsSync(untrustedOut), false);
+
+      state.evalCaptureUrl = `${gatewayUrl}/eval-capture-redirect`;
+      const redirectOut = join(repo, ".understudy", "evals", "redirect-export");
+      const redirected = await runWithEnvAsync(exportArgs(redirectOut), env, repo);
+      assert.notEqual(redirected.status, 0);
+      assert.equal(existsSync(redirectOut), false, "redirect failures retain no partial files");
+
+      state.evalCaptureUrl = null;
+      state.evalCaptureDeclaredLength = 16 * 1024 * 1024 + 1;
+      const oversizedOut = join(repo, ".understudy", "evals", "oversized-export");
+      const oversized = await runWithEnvAsync(exportArgs(oversizedOut), env, repo);
+      assert.notEqual(oversized.status, 0);
+      assert.match(oversized.stderr, /local download limit/);
+      assert.equal(existsSync(oversizedOut), false);
+
+      state.evalCaptureDeclaredLength = null;
+      state.evalExportExpiries.push(
+        new Date(Date.now() + 30_000).toISOString(),
+        new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      );
+      const refreshedOut = join(repo, ".understudy", "evals", "refreshed-export");
+      const exportsBeforeRefresh = requests.filter((entry) => entry.path.endsWith("/export") && entry.method === "POST").length;
+      const refreshed = await runWithEnvAsync(exportArgs(refreshedOut), env, repo);
+      assert.equal(refreshed.status, 0, refreshed.stderr);
+      assert.equal(
+        requests.filter((entry) => entry.path.endsWith("/export") && entry.method === "POST").length - exportsBeforeRefresh,
+        2,
+        "an export near expiry is refreshed for the same frozen cohort before download",
+      );
+
     });
   });
 
@@ -4107,7 +5083,7 @@ class ScoreWithFeedback:
     try {
       const source = join(root, "expenses.csv");
       const labels = ["meals", "office_supplies", "travel"];
-      const merchantGroups = ["alder", "birch", "cedar", "dogwood", "elm", "fir"];
+      const merchantGroups = ["alder", "birch", "cypress", "dogwood", "elm", "fir"];
       const rows = Array.from({ length: 90 }, (_, index) => {
         const label = labels[index % labels.length];
         const merchant = merchantGroups[Math.floor(index / labels.length) % merchantGroups.length];

@@ -56,6 +56,10 @@ comparison.
 
    For remote Understudy candidates, run `understudy models list --json`;
    prefer managed-catalog ids unless BYO provider-direct behavior is required.
+   For OpenAI GPT-6 candidates, apply the shared
+   [model and endpoint compatibility rules](../use-understudy-gateway/references/model-compatibility.md).
+   Record endpoint, token-limit field/value, and reasoning/tool settings per arm.
+   Preserve the frozen evaluation contract while adapting request syntax.
 3. **Run conformance smoke first.** Each candidate must complete one row without
    connection errors, empty responses, or bad model aliases. For agentic
    workloads, also run a synthetic read-then-write sentinel through the exact
@@ -64,6 +68,14 @@ comparison.
    no-op. For local MLX, prefer verified filesystem paths or Understudy snapshot
    aliases over arbitrary Hugging Face ids. Apply the shared gates in
    [`../capture-evidence/references/evaluation-evidence-gates.md`](../capture-evidence/references/evaluation-evidence-gates.md).
+   Check model identity on the smoke and every scored request, including tool
+   continuations. Save the requested model, effective/returned model, route,
+   status, and request id. HTTP 200 can be Backup recovery after a provider
+   rejects an input. Exclude `understudy-backup`, mismatched models, and
+   unverified identities from requested-model quality aggregates; retain them
+   in the attempt/failure counts so exclusions cannot inflate success rates.
+   Resolve input or routing errors and repeat conformance before the full arm.
+   If recovery is the intended experiment, label it as a separate routing arm.
    The smoke row proves only that the harness runs; it provides no model-quality
    evidence.
 
@@ -186,7 +198,8 @@ Use the workload harness's JSON exports directly. Keep the command concrete in
 ```
 
 For keyless managed-catalog sweeps, use one cleared/no-route workload and vary
-only request-body `model`. Do not use a traffic split unless the non-routed
+the model and its required endpoint/parameter syntax, recording differences.
+Do not use a traffic split unless the non-routed
 passthrough share has a managed provider credential or BYO key.
 
 For API-workflow sweeps, keep tool-access interpretation explicit:
