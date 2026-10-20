@@ -409,7 +409,8 @@ function emitCodeSent(pending: PendingLogin, json: boolean): void {
 
 async function fetchAuthMdMetadata(gatewayUrl: string) {
   const url = `${gatewayUrl.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
-  const res = await fetch(url, { headers: { accept: "application/json" } });
+  // Discovery and credential endpoints must not redirect around origin pinning.
+  const res = await fetch(url, { headers: { accept: "application/json" }, redirect: "error" });
   if (!res.ok) {
     throw new Error(`Could not read auth.md metadata (${res.status}).`);
   }
@@ -419,6 +420,7 @@ async function fetchAuthMdMetadata(gatewayUrl: string) {
 async function postJson(url: string, body: unknown): Promise<unknown> {
   const res = await fetch(url, {
     method: "POST",
+    redirect: "error",
     headers: { accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify(body),
   });

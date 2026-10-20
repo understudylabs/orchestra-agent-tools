@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -33,7 +33,7 @@ function fileMode(path) {
   return statSync(path).mode & 0o777;
 }
 
-function startFakeGateway({ registerOrigin } = {}) {
+function startFakeGateway({ registerOrigin, redirectAt, redirectTo } = {}) {
   const state = { registers: 0 };
   const server = createServer((req, res) => {
     let body = "";
@@ -41,6 +41,11 @@ function startFakeGateway({ registerOrigin } = {}) {
     req.on("end", () => {
       const base = `http://127.0.0.1:${server.address().port}`;
       const authBase = registerOrigin ?? base;
+      if (req.url === redirectAt) {
+        res.writeHead(307, { location: redirectTo });
+        res.end();
+        return;
+      }
       if (req.method === "GET" && req.url === "/.well-known/oauth-authorization-server") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({
@@ -87,6 +92,36 @@ function startFakeGateway({ registerOrigin } = {}) {
 }
 
 describe("login credential handling", () => {
+  for (const kind of ["file", "symlink"]) {
+    it(`does not reuse a predictable credential temp ${kind}`, { skip: !posix }, () => {
+      const home = mkdtempSync(join(tmpdir(), "understudy-login-temp-"));
+      try {
+        const moduleUrl = new URL("../dist/config/credentials.js", import.meta.url).href;
+        const script = `
+          import { mkdirSync, writeFileSync, symlinkSync } from "node:fs";
+          import { join } from "node:path";
+          import { writeCredentials } from ${JSON.stringify(moduleUrl)};
+          const dir = join(process.env.HOME, ".understudy");
+          mkdirSync(dir, { mode: 0o700 });
+          const temporary = join(dir, "credentials.json.tmp-" + process.pid);
+          const sentinel = join(dir, "sentinel");
+          writeFileSync(sentinel, "unchanged");
+          if (${JSON.stringify(kind)} === "symlink") symlinkSync(sentinel, temporary);
+          else writeFileSync(temporary, "stale", { mode: 0o644 });
+          writeCredentials({ api_key: "sk_test_private", orgs: {} });
+        `;
+        const result = spawnSync("node", ["--input-type=module", "-e", script], {
+          env: { ...baseEnv, HOME: home, USERPROFILE: home }, encoding: "utf8",
+        });
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(readFileSync(join(home, ".understudy", "sentinel"), "utf8"), "unchanged");
+        assert.equal(fileMode(join(home, ".understudy", "credentials.json")), 0o600);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
+  }
+
   it("takes the manual key from UNDERSTUDY_API_KEY instead of argv", async () => {
     const home = mkdtempSync(join(tmpdir(), "understudy-login-env-"));
     try {
@@ -153,6 +188,45 @@ describe("login credential handling", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+
+  for (const redirectAt of [
+    "/.well-known/oauth-authorization-server",
+    "/agent/auth/register",
+    "/agent/auth/claim/complete",
+  ]) {
+    it(`does not follow cross-origin redirects from ${redirectAt}`, async () => {
+      const home = mkdtempSync(join(tmpdir(), "understudy-login-redirect-"));
+      let leakedRequests = 0;
+      const receiver = createServer((req, res) => {
+        leakedRequests += 1;
+        req.resume();
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end("{}");
+      });
+      await new Promise((resolve) => receiver.listen(0, "127.0.0.1", resolve));
+      const redirectTo = `http://127.0.0.1:${receiver.address().port}/collect`;
+      const { server } = await startFakeGateway({ redirectAt, redirectTo });
+      const gatewayUrl = `http://127.0.0.1:${server.address().port}`;
+      try {
+        const sent = await runCli(
+          ["login", "--email", "agent@example.com", "--send-code", "--gateway-url", gatewayUrl, "--json"],
+          { HOME: home, USERPROFILE: home },
+        );
+        let result = sent;
+        if (redirectAt === "/agent/auth/claim/complete") {
+          assert.equal(sent.status, 0, sent.stderr);
+          result = await runCli(["login", "--code", "123456", "--json"], { HOME: home, USERPROFILE: home });
+        }
+        assert.equal(result.status, 1);
+        assert.equal(leakedRequests, 0, "sign-in requests must never reach the redirect receiver");
+        assert.ok(!existsSync(join(home, ".understudy", "credentials.json")));
+      } finally {
+        server.close();
+        receiver.close();
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
+  }
 
   it("creates login-pending.json and credentials.json at mode 600", async () => {
     const home = mkdtempSync(join(tmpdir(), "understudy-login-mode-"));
