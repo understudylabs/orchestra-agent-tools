@@ -20,17 +20,25 @@ patch using the repo's language, framework, tests, and style.
    - `anthropic-typescript.md`
    - `mastra-typescript.md`
    - `universal-typescript.md`
-6. Patch the smallest source region that routes calls through
+6. Read [session-turn-ids.md](session-turn-ids.md). Identify the application's
+   session and logical-turn boundaries, reuse suitable existing IDs, and plan
+   their propagation through model calls, tool continuations, retries, and jobs.
+7. Patch the smallest source region that routes calls through
    `UNDERSTUDY_API_KEY` and `UNDERSTUDY_GATEWAY_URL`.
-7. Preserve the developer's existing upstream provider key variable. Do not
+   Attach `x-understudy-session-id` and, for multi-turn sessions,
+   `x-understudy-turn-id` through per-request options; do not mutate a shared
+   client's default headers.
+8. Preserve the developer's existing upstream provider key variable. Do not
    delete or rename it.
-8. Make every call site that now routes through the gateway stream
+9. Make every call site that now routes through the gateway stream
    (`stream: true` or the client's streaming call form), aggregating locally
    where the caller needs one final object. Each recipe has an "After the
    patch — make gateway calls stream" / "Gateway calls must stream" section
    with the why and the per-client pattern.
-9. Run the narrowest local test or typecheck that proves the patched code still
-   loads.
+10. Run the narrowest local test or typecheck that proves the patched code still
+    loads, and the synthetic header-propagation checks in
+    [session-turn-ids.md](session-turn-ids.md). Report unresolved boundaries or
+    unsupported propagation paths rather than claiming complete attribution.
 
 ## Output
 
@@ -39,4 +47,5 @@ End with:
 - files changed;
 - command used to verify;
 - whether auth is configured;
+- session/turn boundary mapping, verified propagation, and remaining gaps;
 - exact command the developer or agent should run through `understudy run`.

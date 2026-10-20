@@ -33,8 +33,11 @@ If the agent's `model` is already a provider-instance form like
 
 ## The patch
 
-This is a two-step change: add the right `@ai-sdk/*` dep, then swap the
-agent's `model` field.
+For gateway routing, add the right `@ai-sdk/*` dep, then swap the agent's
+`model` field. Also follow [session-turn-ids.md](session-turn-ids.md) to carry
+session and turn IDs through a supported per-invocation hook in the installed
+Mastra version. A memory thread ID is not automatically an Understudy header;
+verify the outbound requests without mutating the shared provider's headers.
 
 ### Step 1 — install the right AI SDK provider
 
@@ -136,20 +139,20 @@ Key points:
 
 ## What doesn't need to change
 
-Mastra's higher-level API stays identical end-to-end. Don't touch:
+Preserve Mastra's higher-level behavior. Apart from per-invocation attribution
+and the streaming change below, don't touch:
 
 - `Agent` config fields other than `model` (`instructions`, `tools`,
   `memory`, `scorers`, `id`, `name`)
 - `Memory`, `Workflow`, scorer wiring
 - `new Mastra({ agents: { ... } })` registration
 - Tool definitions (`createTool`, Zod input schemas)
-- The `agent.generate(...)` / `agent.stream(...)` call sites — with the
-  streaming exception below
+- The `agent.generate(...)` / `agent.stream(...)` inputs and tool behavior
 - `mastra dev` / `mastra build` / `mastra start` scripts
 
 ## After the patch — make gateway calls stream
 
-The one follow-up that *does* touch call sites: agents now routed through
+Alongside per-invocation attribution, agents now routed through
 the gateway should use Mastra's streaming call form. The gateway's edge cuts
 any response with no first byte within ~125s (a 524, with no usage block to
 meter), and a non-streaming `agent.generate(...)` holds the response open for

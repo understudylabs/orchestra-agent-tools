@@ -42,6 +42,15 @@ cleanup. Do not pause for another confirmation between those phases. Ask again
 only before expanding the displayed data, destination, spend, retention,
 download, credential, or production-impact envelope.
 
+## Attribute application sessions and turns
+
+When connecting an application, follow
+[session and turn setup](../onboard/session-turn-ids.md). Identify execution
+and logical-turn boundaries and send `x-understudy-session-id` and
+`x-understudy-turn-id` through request-scoped headers. Verify propagation
+across continuations and retries, and isolation across concurrent executions.
+Credentials and a gateway URL alone do not establish this attribution.
+
 ## Always stream gateway inference
 
 Every inference request sent to the Understudy gateway (`/v1/messages` or

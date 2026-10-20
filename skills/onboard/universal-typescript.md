@@ -49,10 +49,10 @@ headers.
 If you find more than one site, list them all and ask the user which
 client to convert (per the master task's "one SDK per run" rule).
 
-## The patch — find these three things and change them
+## The patch — connection settings and request attribution
 
 Whichever client you're patching, the change is the same conceptually.
-Find the three concepts and change them:
+Update the connection settings, then attach request-scoped attribution:
 
 ### 1. The base URL
 
@@ -120,6 +120,15 @@ reads and every response header it adds — is documented at
 [reference/request-headers](https://docs.understudylabs.com/reference/request-headers)
 and
 [reference/response-headers](https://docs.understudylabs.com/reference/response-headers).
+
+### 4. Session and turn attribution
+
+Follow [session-turn-ids.md](session-turn-ids.md) to identify the application's
+session and logical-turn boundaries and propagate both IDs. Use a supported
+per-request or per-invocation header hook for the installed framework version;
+do not store changing IDs in shared constructor defaults. Preserve existing
+headers and verify tool continuations, retries, and concurrent executions.
+If the wrapper has no supported propagation hook, report the gap.
 
 ## Worked examples
 

@@ -3025,6 +3025,12 @@ class ScoreWithFeedback:
       // Per-stack recipes ship alongside SKILL.md.
       assert.ok(payload.references.length > 0);
       assert.ok(payload.references.some((ref) => ref.endsWith("openai-typescript.md")));
+      const attributionPath = join(repo, ".claude", "skills", "understudy-onboard", "session-turn-ids.md");
+      assert.ok(payload.references.includes(attributionPath));
+      assert.equal(
+        readFileSync(attributionPath, "utf8"),
+        readFileSync(resolve("skills", "onboard", "session-turn-ids.md"), "utf8"),
+      );
       for (const ref of payload.references) {
         assert.ok(existsSync(ref), `missing reference ${ref}`);
       }

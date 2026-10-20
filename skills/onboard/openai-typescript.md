@@ -22,11 +22,11 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 ## The patch
 
-Find every `new OpenAI(...)` construction site. Change only the constructor
-argument — leave `client.chat.completions.create`, `client.responses.*`,
-streaming, and tool calls untouched. (One exception, applied after the
-constructor patch: gateway calls must stream — see "After the patch — make
-gateway calls stream" below.)
+Find every `new OpenAI(...)` construction site. Change the constructor
+argument for gateway routing, then add request-scoped attribution using
+[session-turn-ids.md](session-turn-ids.md). Preserve model inputs, tools, and
+response handling. Gateway calls must also stream — see "After the patch —
+make gateway calls stream" below.
 
 **Before — bare construction:**
 
@@ -75,7 +75,8 @@ Key points:
 
 The OpenAI SDK's request and response shapes pass through the gateway
 unchanged (gateway `index.ts:205-215` mounts `/v1/chat/completions` as a
-direct OpenAI-shape route). Don't touch:
+direct OpenAI-shape route). Apart from per-request attribution headers and the
+streaming change below, preserve:
 
 - `client.chat.completions.create(...)` and its streaming form
 - `client.responses.create(...)` and `client.responses.stream(...)` (the
@@ -88,7 +89,7 @@ direct OpenAI-shape route). Don't touch:
 
 ## After the patch — make gateway calls stream
 
-The one follow-up that *does* touch call sites: every request that now goes
+Alongside per-request attribution headers, every request that now goes
 through the gateway should set `stream: true`. The gateway's edge cuts any
 response with no first byte within ~125s (a 524, with no usage block to
 meter), and a non-streaming call holds the response open for the model's full

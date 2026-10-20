@@ -99,6 +99,11 @@ provider API key env var can stay as-is — the gateway authenticates with the
 Understudy key that `understudy run` injects (see the gateway skill for
 key-header details per shape).
 
+Environment redirection does not create session or turn IDs. If the application
+does not already send them, report session/turn attribution as missing. Offer
+[session and turn setup](../onboard/session-turn-ids.md) as a separate code
+change within the developer's approved scope; keep this path free of code edits.
+
 ## Step 4 — Verify a trace is actually flowing (do not skip)
 
 Trigger exactly one real call through the app, then confirm the capture

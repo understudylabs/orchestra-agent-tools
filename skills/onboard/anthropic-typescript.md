@@ -21,12 +21,11 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 ## The patch
 
-Find every `new Anthropic(...)` construction site. For each one, change
-only the constructor argument — do **not** rewrite `client.messages.create`
-calls, streaming code, tool definitions, or response handling. The SDK's
-public API stays identical; you're just changing where the bytes go. (One
-exception, applied after the constructor patch: gateway calls must stream —
-see "After the patch — make gateway calls stream" below.)
+Find every `new Anthropic(...)` construction site. Change the constructor
+argument for gateway routing, then add request-scoped attribution using
+[session-turn-ids.md](session-turn-ids.md). Preserve model inputs, tools, and
+response handling. Gateway calls must also stream — see "After the patch —
+make gateway calls stream" below.
 
 Three constructor shapes you may see:
 
@@ -89,7 +88,8 @@ Key points:
 The SDK's response shape, streaming API, tool runner, vision support,
 prompt caching, and beta flags all pass through the gateway byte-faithfully
 (gateway `index.ts:139-168` preserves `anthropic-beta` and
-`anthropic-version` headers). Don't touch:
+`anthropic-version` headers). Apart from per-request attribution headers and the
+streaming change below, preserve:
 
 - `client.messages.create(...)` calls
 - `client.messages.stream(...)` and event handlers
@@ -101,7 +101,7 @@ prompt caching, and beta flags all pass through the gateway byte-faithfully
 
 ## After the patch — make gateway calls stream
 
-The one follow-up that *does* touch call sites: every request that now goes
+Alongside per-request attribution headers, every request that now goes
 through the gateway should stream. The gateway's edge cuts any response with
 no first byte within ~125s (a 524, with no usage block to meter), and a
 non-streaming `messages.create` holds the response open for the model's full
