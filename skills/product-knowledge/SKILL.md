@@ -1,6 +1,11 @@
 ---
 name: product-knowledge
 description: Use when a user asks what Understudy is, how Understudy Desktop works, how local model serving, Fusion sidekick, evals, model candidate results, rollout labs, Product Knowledge, or Understudy product capabilities should be explained to developers, customers, or agents.
+metadata:
+  understudy:
+    mode: interactive
+    safety: local-first
+    cli_required: false
 ---
 
 # Product Knowledge

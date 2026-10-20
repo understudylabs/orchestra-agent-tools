@@ -1,6 +1,11 @@
 ---
 name: verify-serving-parity
 description: Verify identical weights across serving lanes using observed render fingerprints, paired samples, and explicit evidence status.
+metadata:
+  understudy:
+    mode: interactive
+    safety: local-first
+    cli_required: false
 ---
 
 # Verify serving parity

@@ -252,6 +252,9 @@ async function runExport(
       "Provide exactly one of <request-id> or --request-ids-file <path>.",
     );
   }
+  if (singleRequestId && isInvalidRequestId(singleRequestId)) {
+    throw new Error(INVALID_REQUEST_ID_MESSAGE);
+  }
   if (opts.includePayload && !opts.yes) {
     throw new Error("Full capture export may contain prompts/completions. Re-run with --include-payload --yes to write it to a file.");
   }
@@ -550,18 +553,22 @@ function normalizeRequestIds(rows: string[]): string[] {
       `Request-id batch contains more than ${MAX_BATCH_REQUEST_IDS} rows.`,
     );
   }
-  const invalid = rows.find(
-    (requestId) =>
-      requestId.length === 0 ||
-      requestId.length > 512 ||
-      /[\u0000-\u001f\u007f]/.test(requestId),
-  );
+  const invalid = rows.find(isInvalidRequestId);
   if (invalid) {
-    throw new Error(
-      "Request ids must be non-empty, at most 512 characters, and contain no control characters.",
-    );
+    throw new Error(INVALID_REQUEST_ID_MESSAGE);
   }
   return [...new Set(rows)];
+}
+
+const INVALID_REQUEST_ID_MESSAGE =
+  "Request ids must be non-empty, at most 512 characters, and contain no control characters.";
+
+function isInvalidRequestId(requestId: string): boolean {
+  return (
+    requestId.length === 0 ||
+    requestId.length > 512 ||
+    /[\u0000-\u001f\u007f]/.test(requestId)
+  );
 }
 
 export function resolveBatchOutputDirectory(out: string): string {
@@ -579,7 +586,7 @@ function resolveOutputPath(out: string, requestId: string): string {
   if (out.endsWith("/") || out.endsWith("\\")) {
     return join(out, ".understudy", "captures", `${captureFilename(requestId)}.json`);
   }
-  return out || join(findProjectRoot(), ".understudy", "captures", `${requestId}.json`);
+  return out || join(findProjectRoot(), ".understudy", "captures", `${captureFilename(requestId)}.json`);
 }
 
 function captureFilename(requestId: string): string {

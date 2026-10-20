@@ -1,6 +1,11 @@
 ---
 name: export-trace
 description: Use for "get this trace", "show every request in this trace", "export these trace IDs", or "download this workload's captures for a day". Resolves explicit traces or a bounded workload window through customer APIs, exports captures privately, and hands local files to the trace viewer or ingest-traces.
+metadata:
+  understudy:
+    mode: interactive
+    safety: auth-gated
+    cli_required: true
 ---
 
 # Export Trace

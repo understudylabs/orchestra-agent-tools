@@ -120,7 +120,17 @@ export interface RouteSnapshot {
   created_at: string;
 }
 
+// Both ids become directory names under .understudy/routes; the leading
+// alphanumeric rejects ".", "..", and empty segments, and the character
+// class rejects path separators.
+const ROUTE_PATH_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
 export function routeSnapshotPath(projectId: string, workloadId: string): string {
+  for (const [label, value] of [["project id", projectId], ["workload id", workloadId]] as const) {
+    if (!ROUTE_PATH_ID_PATTERN.test(value)) {
+      throw new Error(`Refusing to build a route snapshot path from ${label} ${JSON.stringify(value)}.`);
+    }
+  }
   return join(findProjectRoot(), ".understudy", "routes", projectId, workloadId, "last-route.json");
 }
 

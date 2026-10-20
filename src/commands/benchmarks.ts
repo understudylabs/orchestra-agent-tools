@@ -1,6 +1,15 @@
 import { readFileSync } from "node:fs";
 import { Command } from "commander";
 
+// The scorecard server has no authentication, so a non-loopback bind must be an explicit choice.
+function guardRemoteScorecardHost(host: string, allowRemote: boolean | undefined, isLoopbackHost: (host: string) => boolean): void {
+  if (isLoopbackHost(host)) return;
+  if (!allowRemote) {
+    throw new Error(`--host ${host} serves private scorecards without authentication; pass --allow-remote to bind a non-loopback interface`);
+  }
+  console.error(`warning: binding ${host} serves private scorecards (including full conversation traces) to the network without authentication`);
+}
+
 /**
  * `understudy benchmarks …` — the agent-operator surface over the file-based
  * benchmark artifacts. `benchmarks mcp` serves the read/diff/review/queue
@@ -195,10 +204,12 @@ export function registerBenchmarksCommand(program: Command): void {
     .option("--root <dir>", "Benchmark root containing <slug>/viewer/index.html", ".understudy/benchmarks")
     .option("--port <n>", "Local port", "4317")
     .option("--host <host>", "Bind host (loopback by default)", "127.0.0.1")
-    .action(async (options: { root: string; port: string; host: string }) => {
-      const { startPrimeScorecardServer } = await import("../prime-scorecard-server.js");
+    .option("--allow-remote", "Acknowledge that a non-loopback --host serves private scorecards without authentication")
+    .action(async (options: { root: string; port: string; host: string; allowRemote?: boolean }) => {
+      const { startPrimeScorecardServer, isLoopbackHost } = await import("../prime-scorecard-server.js");
       const port = Number(options.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("--port must be an integer from 1 to 65535");
+      guardRemoteScorecardHost(options.host, options.allowRemote, isLoopbackHost);
       const result = await startPrimeScorecardServer(options.root, port, options.host);
       console.error(`Prime benchmark gallery: ${result.url} (${result.entries.length} scorecard(s))`);
     });
@@ -208,15 +219,17 @@ export function registerBenchmarksCommand(program: Command): void {
     .description("Reopen the private native scorecard for one benchmark through the local gallery server")
     .option("--port <n>", "Local port", "4317")
     .option("--host <host>", "Bind host (loopback by default)", "127.0.0.1")
-    .action(async (configPath: string, options: { port: string; host: string }) => {
+    .option("--allow-remote", "Acknowledge that a non-loopback --host serves private scorecards without authentication")
+    .action(async (configPath: string, options: { port: string; host: string; allowRemote?: boolean }) => {
       const path = await import("node:path");
       const { readPrimeImportConfig } = await import("../prime-benchmark-runner.js");
-      const { startPrimeScorecardServer } = await import("../prime-scorecard-server.js");
+      const { startPrimeScorecardServer, isLoopbackHost } = await import("../prime-scorecard-server.js");
       const config = readPrimeImportConfig(configPath);
       if (typeof config.scorecard_output_dir !== "string") throw new Error("config.scorecard_output_dir is required");
       if (typeof config.benchmark_id !== "string") throw new Error("config.benchmark_id is required");
       const port = Number(options.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("--port must be an integer from 1 to 65535");
+      guardRemoteScorecardHost(options.host, options.allowRemote, isLoopbackHost);
       const configFile = path.resolve(configPath);
       const output = path.isAbsolute(config.scorecard_output_dir)
         ? config.scorecard_output_dir

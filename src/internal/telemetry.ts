@@ -180,25 +180,25 @@ async function trackCliEvent(
 ): Promise<void> {
   if (!telemetryEnabled()) return;
 
-  const context = resolveTelemetryContext(opts);
-  if (!context) return;
-
-  const body = {
-    event_name: eventName,
-    event_version: EVENT_VERSION,
-    install_id: readOrCreateInstallId(),
-    created_at_ms: Date.now(),
-    version: readCliVersion(),
-    properties: sanitizeProperties({
-      ...context.properties,
-      ...(opts.properties ?? {}),
-    }),
-  };
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TELEMETRY_TIMEOUT_MS);
   timer.unref();
   try {
+    const context = resolveTelemetryContext(opts);
+    if (!context) return;
+
+    const body = {
+      event_name: eventName,
+      event_version: EVENT_VERSION,
+      install_id: readOrCreateInstallId(),
+      created_at_ms: Date.now(),
+      version: readCliVersion(),
+      properties: sanitizeProperties({
+        ...context.properties,
+        ...(opts.properties ?? {}),
+      }),
+    };
+
     await fetch(`${context.gatewayUrl.replace(/\/+$/, "")}/v1/agent/events`, {
       method: "POST",
       headers: {
@@ -323,15 +323,23 @@ function sanitizeProperties(
 function readOrCreateInstallId(): string {
   const path = globalTelemetryPath();
   if (existsSync(path)) {
-    const parsed = TelemetryStateSchema.safeParse(
-      JSON.parse(readFileSync(path, "utf8")),
-    );
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      // Corrupt or unreadable state file: fall through and regenerate.
+    }
+    const parsed = TelemetryStateSchema.safeParse(raw);
     if (parsed.success) return parsed.data.install_id;
   }
 
   const state = { install_id: randomUUID() };
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  chmodSync(path, 0o600);
+  try {
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    chmodSync(path, 0o600);
+  } catch {
+    // Read-only or full HOME: use an unpersisted id for this process.
+  }
   return state.install_id;
 }

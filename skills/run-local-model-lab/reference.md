@@ -4,23 +4,13 @@ Depth for [`SKILL.md`](SKILL.md). Keep this reference current by checking
 official model cards, runtime docs, and local hardware before recommending a
 download or route change.
 
-## Runtime chooser
+## Runtime
 
-Use the easiest OpenAI-compatible endpoint that fits the developer's machine and
-workload:
-
-- **llama.cpp / GGUF** — default for cross-platform and coding-sandbox use: a
-  single binary, no daemon, and `llama-server -hf <repo>:<quant>` pulls weights
-  straight from Hugging Face (works the day a model drops).
-- **MLX** — default on Apple Silicon when an MLX build exists; best throughput on
-  a Mac, pulls from Hugging Face.
-- **Ollama / LM Studio** — optional convenience fallback if a developer already
-  runs one; skip as the default because their library tags lag new HF releases.
-- **vLLM / SGLang** — prefer on NVIDIA or server GPUs when batching,
-  throughput, or OpenAI-compatible serving matters.
-- **Transformers / LiteRT-LM** — use for modality-specific demos, QAT/mobile
-  checkpoints, or when the model card's reference path is the only reliable
-  implementation.
+This skill serves with MLX only (`mlx_lm.server`, or `mlx_vlm.server` for the
+certified QAT snapshots), matching [`SKILL.md`](SKILL.md). Other runtimes
+(llama.cpp / GGUF, Ollama, LM Studio, vLLM, SGLang, Transformers) are out of
+scope here; they are covered, behind the same download approval gates, in
+[`../manage-local-models/reference.md`](../manage-local-models/reference.md).
 
 Always record the endpoint, runtime, model id, quantization, context setting,
 and hardware in `.understudy/local-model-lab/`.
@@ -31,8 +21,8 @@ Most developers — and agents in coding sandboxes — won't have a runtime or
 weights yet, so the skill has to bootstrap both. Only act after the SKILL's
 gates: no downloads without an explicit size cap, and gated weights (Gemma) need
 the model terms accepted + an `HF_TOKEN` (a token authorizes a download; it is
-not approval to download). Pick the lightest runtime that fits; each exposes an
-OpenAI-compatible endpoint, so the frozen eval just swaps `base_url`.
+not approval to download). MLX exposes an OpenAI-compatible endpoint, so the
+frozen eval just swaps `base_url`.
 
 ### Preflight — Python and runtime versions (do this first)
 
@@ -55,27 +45,6 @@ uv pip install --python .understudy/venvs/mlx/bin/python \
 Never run bare `pip install mlx-lm` / `pip install mlx-vlm` against system
 Python on macOS. An unpinned install on 3.9 resolves to `mlx-lm` 0.29.x, which
 does not support Gemma 4.
-
-### llama.cpp — cross-platform, single binary, best for sandboxes (pulls weights itself)
-
-Gemma 4 GGUF needs a llama.cpp build from **after Gemma 4's April 2026
-release**. Stale brew bottles fail with
-`unknown model architecture: 'gemma4'`. Upgrade before serving:
-
-```bash
-brew install llama.cpp && brew upgrade llama.cpp   # macOS; else build from source / package mgr
-llama-server --version                              # confirm a post-Gemma-4 build
-export HF_TOKEN=...                                 # only for gated repos; never commit it
-# downloads the GGUF from HF and serves OpenAI-compatible at :8080/v1
-llama-server -hf unsloth/gemma-4-E4B-it-GGUF:Q4_K_M --port 8080 --jinja
-# Nemotron 3 Nano — smallest gen-3 is the 4B dense; 30B-A3B is the MoE:
-#   llama-server -hf nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF:Q4_K_M --port 8080 --jinja
-#   llama-server -hf unsloth/Nemotron-3-Nano-30B-A3B-GGUF:Q4_K_M --port 8080 --jinja
-```
-
-If `gemma4` is still unknown after upgrade, build from current
-[llama.cpp](https://github.com/ggml-org/llama.cpp) `master` rather than an
-older package.
 
 ### MLX — Apple Silicon native (best throughput on a Mac)
 
@@ -101,18 +70,12 @@ one with a vanilla artifact when a catalog or download error occurs; surface
 the mismatch and repair the supported rung (provenance and smoke-test details:
 [`../manage-local-models/reference.md`](../manage-local-models/reference.md)).
 
-(Ollama / LM Studio also serve OpenAI-compatible if a developer already runs one,
-but skip them as the default: their library tags lag new HF releases, so brand-new
-models like Gemma 4 / Nemotron 3 may not have a tag yet — `llama.cpp -hf` and MLX
-pull straight from Hugging Face the day weights drop.)
-
-### Download weights explicitly (any runtime)
+### Download weights explicitly
 
 ```bash
 # accept the model's terms on its HF page first, then:
 export HF_TOKEN=...                       # gated models only; never commit
 hf download google/gemma-4-e4b-it --local-dir ./models/gemma-4-e4b-it
-# or a prebuilt quant: hf download unsloth/gemma-4-E4B-it-GGUF <file>.gguf
 ```
 
 ### Smoke-test the local endpoint, then run the eval
@@ -126,8 +89,8 @@ curl -sS http://localhost:8080/v1/chat/completions \
 Then run the frozen eval with `base_url=http://localhost:8080/v1` (or the gateway
 primitive's `--api-base-url`) — same harness, local model.
 
-Notes: exact repo ids and quant tags drift — verify on the model card. On Apple
-Silicon prefer an MLX 4-bit build; for portability use a llama.cpp GGUF `Q4_K_M`.
+Notes: exact repo ids and quant tags drift — verify on the model card. Prefer an
+MLX 4-bit build.
 Nemotron 3 Nano comes as a small **4B dense** (truly laptop/edge — a few GB at q4)
 and a **30B-A3B MoE** (holds all experts in memory, ~16–18 GB at q4, but runs at
 ~4B speed). Use the 4B for cheap local smoke; the MoE for stronger local quality
@@ -251,8 +214,6 @@ Write a small JSON record per run:
 - Installing unpinned `mlx-lm` / `mlx-vlm` into macOS system Python 3.9 —
   resolves to pre-Gemma-4 packages and fails with `Model type gemma4 not
   supported`. Always use `uv venv --python 3.13` and pin `mlx-lm>=0.31`.
-- Serving Gemma 4 GGUF with a stale llama.cpp (`unknown model architecture:
-  'gemma4'`) — upgrade or rebuild before blaming the weights.
 - Treating a local model as free without measuring setup time, hardware
   contention, latency, and maintenance.
 - Comparing local and remote runs with different prompts, tools, eval rows, or
