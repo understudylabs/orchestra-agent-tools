@@ -141,6 +141,12 @@ class InstructionProposer:
         if os.environ.get("STUB_ZERO_USAGE"):
             return SimpleNamespace(usage=SimpleNamespace(input_tokens=0, output_tokens=0))
         output_tokens = int(os.environ.get("STUB_OUTPUT_TOKENS", "5"))
+        late_after = os.environ.get("STUB_LATE_AFTER_CALLS")
+        if late_after is not None:
+            # Calls after the first N (the sentinel counts them) answer longer.
+            with open(os.environ["PROVIDER_SENTINEL"], encoding="utf-8") as handle:
+                if sum(1 for _ in handle) > int(late_after):
+                    output_tokens = int(os.environ["STUB_LATE_OUTPUT_TOKENS"])
         return SimpleNamespace(usage=SimpleNamespace(input_tokens=10, output_tokens=output_tokens))`);
   writeFileSync(join(dspyRoot, "__init__.py"), `
 import copy
@@ -200,7 +206,7 @@ class GEPA:
             live_events = [json.loads(line)["event"] for line in handle]
         inner = self.kwargs.get("gepa_kwargs") or {}
         callbacks = inner.get("callbacks") or []
-        for callback in callbacks:
+        for callback in ([] if os.environ.get("STUB_SKIP_REPLAY") else callbacks):
             callback.on_optimization_start({"trainset_size": 1, "valset_size": 1})
             callback.on_proposal_end({"iteration": 1, "new_instructions": {"predict": "evolved instruction"}})
             callback.on_valset_evaluated({
@@ -211,6 +217,35 @@ class GEPA:
             callback.on_candidate_rejected({"iteration": 2, "old_score": 0.75, "new_score": 0.5, "reason": "not-better"})
             callback.on_error({"iteration": 3, "exception": ValueError("x"), "will_continue": True})
             callback.on_optimization_end({"best_candidate_idx": 1, "total_iterations": 3, "total_metric_calls": 2})
+        # GEPA 0.1.4's loop: check the stoppers (any() short-circuits), then run an
+        # iteration of one reflection call and one student call per dev row. GEPA
+        # catches an iteration's exception and continues; STUB_RAISE_ON_REFUSAL
+        # lets it escape compile instead. STUB_BURST_* makes one iteration far
+        # costlier than the others.
+        iterations = int(os.environ.get("STUB_ITERATIONS", "0"))
+        state = SimpleNamespace(total_num_evals=0)
+        live_stoppers = [stopper for stopper in inner.get("stop_callbacks", []) if callable(stopper)]
+        best_instruction = "evolved instruction"
+        iterations_run = 0
+        while iterations_run < iterations and not any(stopper(state) for stopper in live_stoppers):
+            iterations_run += 1
+            burst = iterations_run == int(os.environ.get("STUB_BURST_AT_ITERATION", "0"))
+            try:
+                copied(prompt="reflection")
+                for _ in range(int(os.environ["STUB_BURST_CALLS"]) if burst else len(valset or [])):
+                    student(question="iteration")
+                    state.total_num_evals += 1
+            except Exception:
+                if os.environ.get("STUB_RAISE_ON_REFUSAL"):
+                    raise
+                continue
+            best_instruction = "evolved instruction " + str(iterations_run)
+            for callback in callbacks:
+                callback.on_valset_evaluated({
+                    "iteration": iterations_run, "candidate_idx": iterations_run + 1,
+                    "candidate": {"predict": best_instruction}, "average_score": 0.75,
+                    "num_examples_evaluated": 1, "total_valset_size": 1, "is_best_program": True,
+                })
         proposer = self.kwargs.get("instruction_proposer")
         COMPILES.append({
             "seed_instructions": student.signature.instructions,
@@ -223,6 +258,8 @@ class GEPA:
             "candidate_selection": self.kwargs.get("candidate_selection_strategy"),
             "use_merge": self.kwargs.get("use_merge"),
             "proposer": proposer.kwargs if proposer is not None else None,
+            "iterations_run": iterations_run,
+            "metric_calls": state.total_num_evals,
         })
         with open(os.environ["GEPA_KWARGS_PATH"], "w", encoding="utf-8") as handle:
             json.dump({
@@ -238,7 +275,7 @@ class GEPA:
             open(os.path.join(state_dir, "STOP"), "w", encoding="utf-8").close()
         evolved = copy.deepcopy(student)
         already_evolved = "evolved" in student.signature.instructions
-        evolved.signature.instructions = "evolved instruction"
+        evolved.signature.instructions = best_instruction
         evolved.detailed_results = SimpleNamespace(
             val_aggregate_scores=[0.75, 0.75] if already_evolved else [0.25, 0.75],
             total_metric_calls=2,

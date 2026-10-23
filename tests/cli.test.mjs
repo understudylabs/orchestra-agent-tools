@@ -2521,7 +2521,7 @@ class ChainOfThought(Predict):
       assert.equal(gepaKwargs.track_best_outputs, true);
       assert.deepEqual(gepaKwargs.gepa_kwargs, { use_cloudpickle: true });
       assert.deepEqual(gepaKwargs.gepa_callbacks, ["GepaProgress"]);
-      assert.deepEqual(gepaKwargs.gepa_stoppers, ["FileStopper"]);
+      assert.deepEqual(gepaKwargs.gepa_stoppers, ["FileStopper", "SpendStopper"]);
       assert.equal(gepaKwargs.log_dir, realpathSync(logDir));
       assert.equal(
         gepaKwargs.reflection_model,
