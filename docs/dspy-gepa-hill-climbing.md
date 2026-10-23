@@ -69,7 +69,7 @@ and the GEPA log behind. Two ways back:
 | Reflection output budget (3.4.1's structured proposer needs complete JSON) | `--max-tokens`, `--reflection-max-tokens` | 2048 / 2048 | A 256-token cap truncated reflection mid-JSON and GEPA silently kept the seed prompt |
 | Reflection minibatch | `--reflection-minibatch-size` | 1 (the tutorials use 3) | More mistakes per proposal gives the reflector more to generalize from |
 | Reflection sampling | `--reflection-temperature`, `--reflection-reasoning-effort` | 0.1 / none (the tutorials use temperature 1.0) | Higher temperature diversifies proposals; the default stays conservative and hash-bound |
-| Evaluation threads | `--num-threads` | 16 (DSPy's own default is 8) | Wall-clock time has a real cost; live runs at 32 threads through the Understudy gateway had no failures. Near the cap the spend ledger makes threads wait for in-flight calls instead of refusing them |
+| Evaluation threads | `--num-threads` | 16 (DSPy's own default is 8); 1 with `--program-bridge` | Wall-clock time has a real cost; live runs at 32 threads through the Understudy gateway had no failures. Near the cap the spend ledger makes threads wait for in-flight calls instead of refusing them. A bridge runs workload Python (possibly with stateful tools) and the bridge contract promises no thread safety, so it stays at 1 unless you pass a value |
 | `track_stats` | always on | on | Powers `gepa_stats` and `instructions_changed`, so a no-op run is visible |
 | GEPA callbacks (`on_valset_evaluated`, `on_candidate_accepted`, ...) | always on | on | Source of the streamed candidate events and `best-so-far.json` |
 | Stop conditions (`FileStopper`) | `touch .understudy/optimize-workload/dspy-gepa/STOP` | armed | Graceful stop after the current iteration; the run still finishes and keeps its candidate. A stale `STOP` file is cleared at start |
@@ -129,39 +129,109 @@ governor only ever makes a call wait or makes the run stop earlier.
 
 1. **Throttle, don't fail.** A call is admitted while committed + in-flight +
    its own worst case fits the current limit. Near the limit, a call that
-   would fit once in-flight calls settle waits for them (up to 600 seconds in
+   would fit once in-flight calls settle waits for them (up to 90 seconds in
    total, after which it counts as exhausted) instead of failing the run. A
    `spend-throttled` event (at most every 30 seconds) shows committed,
    in-flight and the limit. That is what makes `--num-threads 16` safe near the
-   cap.
+   cap. The wait stays under DSPy's own straggler timeout: DSPy 3.4.1's
+   `Evaluate` resubmits a row that has run for 120 seconds (once at most three
+   rows remain) and abandons the original thread.
 2. **A phase limit keeps the holdout affordable.** With `--evaluate-holdout`,
    optimization runs under `cap - holdout reserve`. The reserve is holdout rows
    x 2 programs (baseline and optimized) x predictors per row (1, or the task
-   spec's count) x 1.25 x the most expensive settled student call, plus one
-   worst-case student reservation so the holdout's last call can still
-   reserve. The baseline call runs under the full cap and calibrates it; before
-   any student call settles, the reserve uses the worst-case reservation per
-   call. The holdout evaluation then runs under the full cap. Without
-   `--evaluate-holdout` the reserve is zero.
+   spec's count) x the observed student calls per predictor invocation x 1.25 x
+   the 90th-percentile settled student call, plus one worst-case student
+   reservation so the holdout's last call can still reserve. Calls per
+   invocation covers DSPy's parse fallback (a ChatAdapter parse failure is
+   retried once through JSONAdapter, so an invocation costs 1 or 2 calls); it
+   is measured as student calls admitted per predictor invocation that reached
+   the metric, starting with the baseline call, clamped to 1-2, and 2 before
+   anything is observed. Before any student call settles, the reserve prices
+   every call at the worst-case reservation instead of the percentile. The
+   worst case is the larger of the largest student reservation so far and the
+   call being checked. Sizing from the 90th percentile rather than the most
+   expensive call trades a little holdout-completion safety for using more of
+   the budget: the hard cap still protects the holdout, which ends
+   `incomplete-budget` if the reserve runs out. The holdout evaluation then
+   runs under the full cap. Without `--evaluate-holdout` the reserve is zero.
 3. **Stop between iterations, before calls are refused.** GEPA scores a refused
    call as a miss (and GEPA 0.1.4 can misalign validation results after a
    runtime failure), so the governor adds a GEPA stop callback,
-   `SpendStopper`. Between iterations it stops the round when committed spend +
-   1.5 x the largest of the last three iteration costs + one worst-case call
-   reservation would cross the phase limit, and emits `budget-stop`. If the
-   optimization phase limit refuses a call anyway (an unusually expensive
-   iteration), the phase is marked exhausted without latching the run: further
-   optimization calls are refused, the stopper ends the round at its next
-   check, and the holdout still runs. If the refusal escapes GEPA's `compile`,
-   the run keeps the streamed `best-so-far.json` for this round (a later round
-   keeps the previous round's result).
-4. **Finish like any run.** A spend stop ends the climb (no further rounds),
+   `SpendStopper`. Between iterations it stops the round when spend so far
+   (committed plus in flight) + 1.5 x the largest of the last three iteration
+   costs + one worst-case call reservation would cross the phase limit, and
+   emits `budget-stop`. Iteration costs use committed spend, which only grows,
+   so a call still in flight at one check counts in the iteration it settles
+   in. If the optimization phase limit refuses a call anyway (an unusually
+   expensive iteration), the phase is marked exhausted without latching the
+   run: further optimization calls are refused, the stopper ends the round at
+   its next check, and the holdout still runs.
+4. **Only fully scored candidates count.** DSPy 3.4.1 evaluates candidates with
+   `Evaluate(max_errors=len(batch)*100)`, which swallows a refused call and
+   scores its row 0 while still reporting the whole dev split as evaluated. So
+   a dev evaluation that overlapped a refused call is marked `partial` (on its
+   `gepa-valset-evaluated` event, with `refused_calls`): it never becomes
+   `best-so-far.json`, its candidate is left out of `gepa_stats` (listed in
+   `partial_candidate_indices`, with `gepa_stats_status: "partial"`), and if
+   GEPA picked it, the round keeps its best fully scored candidate instead
+   (`recovered_candidate_from: "fully-scored-candidate"`), then the previous
+   round's result. A run with no candidate scored on the whole dev split (the
+   seed's own evaluation was refused) fails `budget-blocked` (exit 4,
+   `no-candidate-fully-scored`).
+5. **Recovering a candidate.** If the refusal escapes GEPA's `compile`, the run
+   keeps this round's streamed `best-so-far.json`; if the round streamed
+   nothing (a later round), it keeps the previous round's result; round 1 with
+   nothing streamed fails `budget-blocked` (exit 4,
+   `optimization-phase-limit-reached`). A recovered candidate has no GEPA stats
+   of its own: the round's scores are null (or the best-so-far score) and
+   `gepa_stats_status` is `unavailable`. Only a refusal found in the error's
+   cause chain counts as a spend stop; any other error keeps its own
+   classification, even after the phase was exhausted.
+6. **Leftover calls are refused, and in-flight calls drained.** When
+   optimization ends the ledger switches to a `finalizing` phase, then to
+   `holdout`. A call still waiting to reserve when the phase changes, or a
+   call from a thread last admitted during optimization (a straggler row DSPy
+   abandoned), is refused without latching (`late-call-refused`,
+   `late_refusals`), so optimization work can never spend the holdout's
+   reserve. Before the candidate's and the final spend evidence are sampled,
+   the run waits up to 60 seconds for calls still in flight; if some are still
+   in flight it emits `spend-drain-timeout` and the evidence counts their full
+   reservations (`drains` in `spend_governor` records each wait).
+7. **Finish like any run.** A spend stop ends the climb (no further rounds),
    writes `candidate.json` and the proof packet with `stopped_by:
    "spend-governor"`, scores the holdout if asked, and exits 0 with status
-   `candidate-created`. Only a run with no candidate to keep (nothing streamed
-   yet), or a call that does not fit the full cap outside optimization (the
-   baseline call, a holdout call), ends as before: `budget-blocked` with exit 4,
-   or a holdout marked `incomplete-budget`.
+   `candidate-created`. Only a run with no candidate to keep, or a call that
+   does not fit the full cap outside optimization (the baseline call, a holdout
+   call), ends as before: `budget-blocked` with exit 4, or a holdout marked
+   `incomplete-budget`.
+
+#### Why a large `--reflection-max-tokens` shortens a capped run
+
+The stopper keeps one worst-case call reservation of headroom, and the most
+expensive call is usually reflection. A reservation is the input ceiling
+(prompt bytes + 4,096 + 64 per message) at the input price plus the full
+output cap at the output price, so the output cap dominates:
+
+| `--reflection-max-tokens` | Output share of one reflection reservation at an illustrative $10 per million output tokens |
+|---|---|
+| 16,000 | $0.160 |
+| 4,096 | $0.041 |
+| 2,048 (default) | $0.020 |
+
+In a live run (Facility Support task spec, `gpt-4.1-nano` student, a Sol
+reflector, `--reflection-max-tokens 16000`, `--max-tokens 4096`, a $0.50 cap,
+`--evaluate-holdout`), one worst-case reflection reservation was $0.187. The
+phase limit was $0.362 ($0.50 - $0.138 holdout reserve), so the stopper ended
+optimization at $0.145 committed: $0.145 + 1.5 x the recent iteration cost +
+$0.187 would have crossed $0.362. The run used $0.18 of $0.50 (the holdout
+itself cost $0.040). Observed reflection outputs were 185-1,516 tokens, so a
+16,000-token cap reserved about ten times what any proposal used. Keep
+`--reflection-max-tokens` at 2,048-4,096 (the default 2,048 is fine; raise it
+only if `gepa-proposal` events show truncated proposals). The headroom is not
+double counted: the iteration estimate holds settled costs, the headroom is
+the one call that may still be reserving, and the overlap is that call's
+settled cost, a small fraction of its reservation. The holdout reserve's own
+worst-case term is a student call, kept back for the holdout phase.
 
 Watching spend: the stopper emits a `spend-rate` event per iteration with
 committed, in-flight and attributed spend, USD per minute over the run and the

@@ -163,7 +163,11 @@ validator kinds in [`reference.md`](reference.md):
    optimizing, and stops GEPA between iterations before the cap, finishing with
    the best candidate (`stopped_by: "spend-governor"`, exit 0); the
    `spend-rate` events and `--progress` lines show spend, rate and projection.
-   `--num-threads` defaults to 16. Use pareto selection and opt into merge only
+   `--num-threads` defaults to 16 (1 with `--program-bridge`); resume a run
+   started before that default with `--num-threads 1`. Keep
+   `--reflection-max-tokens` at 2,048-4,096: the stopper keeps one worst-case
+   reflection reservation of headroom, so a larger cap ends a capped run early.
+   Use pareto selection and opt into merge only
    when the approved budget covers it. For a workload-owned program,
    first pass `--program-bridge ... --admission-only`, inspect its hashed offline
    and one-episode live receipt, then compile separately with the exact
