@@ -2067,6 +2067,8 @@ printf '%s\n' '{"schema_version":"fixture.uv.v1","status":"fixture-ok"}'
         "run", "--project", programProject, "--locked", "python",
       ]);
       assert.equal(lockedUvArgs.includes("--with"), false);
+      // A bridge runs workload Python with no thread-safety contract: one thread unless asked.
+      assert.equal(lockedUvArgs[lockedUvArgs.indexOf("--num-threads") + 1], "1");
     }));
 
   it("preflights cumulative DSPy reservations without importing DSPy or calling a provider", { skip: !pythonAvailable }, () =>

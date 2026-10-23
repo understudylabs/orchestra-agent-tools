@@ -1672,12 +1672,17 @@ print(json.dumps({
       assert.deepEqual(blocked.map((event) => [event.scope, event.latched]), [["cap", true]]);
     }));
 
-  it("defaults the runtime to 16 evaluation threads", { skip: !pythonAvailable }, () =>
+  it("defaults the runtime to 16 evaluation threads, and a program bridge to 1", { skip: !pythonAvailable }, () =>
     withRepo(({ repo, samplesPath }) => {
-      const { result, seen } = runDspyGepa(repo, samplesPath);
+      const { result, seen, runtime } = runDspyGepa(repo, samplesPath);
       assert.equal(result.status, 0, result.stderr);
       assert.equal(seen().gepa.num_threads, 16);
       assert.equal(readJson(join(runDir(repo), "config.json")).gepa.num_threads, 16);
+      const defaults = runtimeScript(runtime, `
+from types import SimpleNamespace as NS
+print(json.dumps([rt.default_num_threads(NS(program_bridge=None)), rt.default_num_threads(NS(program_bridge="bridge.py"))]))
+`);
+      assert.deepEqual(defaults, [16, 1]);
     }));
 });
 

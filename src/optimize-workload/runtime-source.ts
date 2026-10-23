@@ -4874,7 +4874,18 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
     })
 
 
+def default_num_threads(args: argparse.Namespace) -> int:
+    """16 evaluation threads for the built-in scaffold; 1 for a program bridge.
+
+    A bridge runs workload Python that may hold stateful tools, and the bridge
+    contract makes no thread-safety promise, so it keeps the old default.
+    """
+    return 1 if args.program_bridge else 16
+
+
 def dspy_gepa(args: argparse.Namespace) -> None:
+    if args.num_threads is None:
+        args.num_threads = default_num_threads(args)
     if args.log_dir is None:
         args.log_dir = str(dspy_run_dir(args) / "gepa-log")
     args.phase = "setup"
@@ -5359,7 +5370,8 @@ def main() -> None:
     )
     dspy_gepa_parser.add_argument("--use-merge", type=bool_arg, default=False)
     dspy_gepa_parser.add_argument("--max-merge-invocations", type=non_negative_int_arg, default=5)
-    dspy_gepa_parser.add_argument("--num-threads", type=positive_int_arg, default=16)
+    # Default: 16 for the built-in scaffold, 1 for --program-bridge (see dspy_gepa).
+    dspy_gepa_parser.add_argument("--num-threads", type=positive_int_arg, default=None)
     dspy_gepa_parser.add_argument("--seed", type=int, default=0)
     dspy_gepa_parser.add_argument("--log-dir", default=None)
     dspy_gepa_parser.add_argument("--track-stats", type=bool_arg, default=False)
