@@ -32,6 +32,26 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Added
 
+- **`dspy-gepa` spend governor.** Runs now stop gracefully before
+  `--budget-usd` instead of failing near it. The spend ledger throttles: a call
+  that would fit once in-flight calls settle waits for them (bounded at 600 s)
+  instead of ending the run `budget-blocked`. With `--evaluate-holdout`,
+  optimization runs under the cap minus a holdout reserve (estimated from the
+  baseline call's settled cost) and the holdout runs under the full cap. A new
+  GEPA stop callback ends optimization between iterations when the next one
+  could cross that limit; the run then finalizes with GEPA's best candidate
+  (`stopped_by: "spend-governor"` in `candidate.json`, the proof packet, run
+  state and payload), scores the holdout, and exits 0 with `candidate-created`.
+  New events `spend-rate` (per iteration: committed, in-flight and attributed
+  spend, USD/min over the run and the last minute, projected spend for the
+  metric-call budget, minutes to the limit), `spend-throttled`, `budget-stop`
+  and a one-time `spend-projection-warning`; `--progress` prints one spend line
+  per iteration, and `spend_evidence.spend_governor` carries the latest
+  snapshot. The hard guarantee is unchanged: committed spend plus every
+  in-flight reservation never exceeds the cap. A call the full cap cannot fit
+  still ends the run `budget-blocked` (exit 4) or the holdout
+  `incomplete-budget`. Set the cap to what you are willing to spend; no padding
+  for threads or the holdout.
 - **`dspy-gepa` multi-predictor task specs.** `--task-spec PATH`
   (`understudy.dspy_gepa_task_spec.v1`) declares several typed predictors over
   shared inputs, the shape of DSPy's GEPA Facility Support Analyzer tutorial,
@@ -200,6 +220,10 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Changed
 
+- **`dspy-gepa` `--num-threads` defaults to 16** (was 1), in the CLI and the
+  runtime, and stays part of the hash-bound config. Live runs at 32 threads through the
+  Understudy gateway had no failures, and the spend governor throttles threads
+  near the cap.
 - **`dspy-gepa` runs on DSPy 3.4.1 and GEPA 0.1.4.** The v2 runtime now pins
   `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and `cloudpickle==3.1.2` with a bounded
   `litellm>=1.83,<2` on Python 3.13, and records all four in its package

@@ -29,11 +29,11 @@ All paths are under `.understudy/optimize-workload/` and owner-only.
 | Artifact | When it is written | What it holds |
 |---|---|---|
 | `dspy-gepa/events.jsonl` | Continuously, flushed per event, appended per invocation | Every provider call, phase, GEPA candidate event, and holdout progress, tagged with a `run_id` |
-| `dspy-gepa/run-state.json` | At every phase change (`status: running`), then at the end | `status`, `phase`, and the spend ledger so far |
+| `dspy-gepa/run-state.json` | At every phase change (`status: running`), then at the end | `status`, `phase`, `stopped_by`, and the spend ledger so far, with the spend governor snapshot (`spend_evidence.spend_governor`) |
 | `dspy-gepa/best-so-far.json` | Each time a new best clears the full dev split | The best instruction text and its dev score, with the `run_id` and `config_sha256` that produced it. A run with another config removes it before optimizing; a resume of the same config keeps it |
 | `dspy-gepa/config.json`, `package-state.json` | Before the first call | The hash-bound run config (including search settings and resolved prices) and package receipts |
 | `dspy-gepa/gepa-log/` | During optimization | GEPA's resumable state, bound to the config hash; round N of a climb uses `gepa-log/round-N` |
-| `candidate.json` | After optimization, before any holdout row is scored | Baseline and optimized instructions, `instructions_changed`, `gepa_stats`, `rounds`, `search` settings, spend evidence |
+| `candidate.json` | After optimization, before any holdout row is scored | Baseline and optimized instructions, `instructions_changed`, `gepa_stats`, `rounds`, `search` settings, `stopped_by` (`"spend-governor"` when the run stopped early to stay inside the budget) and `spend_stop`, spend evidence |
 | `dspy-gepa/holdout-evaluation.json` | With `--evaluate-holdout`, after `candidate.json` is frozen | Baseline vs optimized holdout scores, bound to `candidate_sha256` and `config_sha256`. Removed when optimizing starts, so an earlier run's file never stands in for this one |
 | `proof-packet.json` | At the end | Gate evidence and the holdout summary; `holdout_accessed_during_optimization` stays `false` |
 
@@ -69,7 +69,7 @@ and the GEPA log behind. Two ways back:
 | Reflection output budget (3.4.1's structured proposer needs complete JSON) | `--max-tokens`, `--reflection-max-tokens` | 2048 / 2048 | A 256-token cap truncated reflection mid-JSON and GEPA silently kept the seed prompt |
 | Reflection minibatch | `--reflection-minibatch-size` | 1 (the tutorials use 3) | More mistakes per proposal gives the reflector more to generalize from |
 | Reflection sampling | `--reflection-temperature`, `--reflection-reasoning-effort` | 0.1 / none (the tutorials use temperature 1.0) | Higher temperature diversifies proposals; the default stays conservative and hash-bound |
-| Evaluation threads | `--num-threads` | 1 (DSPy's own default is 8) | Raise only after checking the gateway returns no errors |
+| Evaluation threads | `--num-threads` | 16 (DSPy's own default is 8) | Wall-clock time has a real cost; live runs at 32 threads through the Understudy gateway had no failures. Near the cap the spend ledger makes threads wait for in-flight calls instead of refusing them |
 | `track_stats` | always on | on | Powers `gepa_stats` and `instructions_changed`, so a no-op run is visible |
 | GEPA callbacks (`on_valset_evaluated`, `on_candidate_accepted`, ...) | always on | on | Source of the streamed candidate events and `best-so-far.json` |
 | Stop conditions (`FileStopper`) | `touch .understudy/optimize-workload/dspy-gepa/STOP` | armed | Graceful stop after the current iteration; the run still finishes and keeps its candidate. A stale `STOP` file is cleared at start |
@@ -104,7 +104,7 @@ Spend controls, independent of the search:
 
 | Control | Flag | Notes |
 |---|---|---|
-| Hard cap | `--budget-usd` | Worst-case cost is reserved before each call, so the cap holds even if a response never arrives. After a blocked reservation or unusable usage, every later call in the run is refused |
+| Hard cap | `--budget-usd` | Worst-case cost is reserved before each call, so the cap holds even if a response never arrives. The [spend governor](#how-the-spend-governor-behaves) throttles near the cap and stops the run gracefully before it. A call the full cap cannot fit, or unusable usage, refuses every later call in the run |
 | Prices | `--input-usd-per-million`, `--output-usd-per-million` | The global fallback basis |
 | Per-model prices | `--model-price MODEL=IN,OUT` (repeatable) | Beats gateway prices and the global basis |
 | Reflection prices | `--reflection-input-usd-per-million`, `--reflection-output-usd-per-million` | For a pricier reflector |
@@ -115,6 +115,71 @@ Price resolution per call: reflection flags, then `--model-price`, then gateway
 prices, then the global basis. A model with no price from any of them stops the
 run before the first provider call. The resolved prices are part of the
 hash-bound config.
+
+### How the spend governor behaves
+
+Set `--budget-usd` to what you are willing to spend. The run stops gracefully
+before it, keeps GEPA's best candidate, and leaves room for the holdout
+evaluation; there is no need to pad the cap for concurrency or for the holdout.
+
+The guarantee does not change: committed spend (settled bounds, plus the full
+reservation of every call whose usage is missing or ambiguous) plus the full
+reservation of every call still in flight never exceeds `--budget-usd`. The
+governor only ever makes a call wait or makes the run stop earlier.
+
+1. **Throttle, don't fail.** A call is admitted while committed + in-flight +
+   its own worst case fits the current limit. Near the limit, a call that
+   would fit once in-flight calls settle waits for them (up to 600 seconds in
+   total, after which it counts as exhausted) instead of failing the run. A
+   `spend-throttled` event (at most every 30 seconds) shows committed,
+   in-flight and the limit. That is what makes `--num-threads 16` safe near the
+   cap.
+2. **A phase limit keeps the holdout affordable.** With `--evaluate-holdout`,
+   optimization runs under `cap - holdout reserve`. The reserve is holdout rows
+   x 2 programs (baseline and optimized) x predictors per row (1, or the task
+   spec's count) x 1.25 x the most expensive settled student call, plus one
+   worst-case student reservation so the holdout's last call can still
+   reserve. The baseline call runs under the full cap and calibrates it; before
+   any student call settles, the reserve uses the worst-case reservation per
+   call. The holdout evaluation then runs under the full cap. Without
+   `--evaluate-holdout` the reserve is zero.
+3. **Stop between iterations, before calls are refused.** GEPA scores a refused
+   call as a miss (and GEPA 0.1.4 can misalign validation results after a
+   runtime failure), so the governor adds a GEPA stop callback,
+   `SpendStopper`. Between iterations it stops the round when committed spend +
+   1.5 x the largest of the last three iteration costs + one worst-case call
+   reservation would cross the phase limit, and emits `budget-stop`. If the
+   optimization phase limit refuses a call anyway (an unusually expensive
+   iteration), the phase is marked exhausted without latching the run: further
+   optimization calls are refused, the stopper ends the round at its next
+   check, and the holdout still runs. If the refusal escapes GEPA's `compile`,
+   the run keeps the streamed `best-so-far.json` for this round (a later round
+   keeps the previous round's result).
+4. **Finish like any run.** A spend stop ends the climb (no further rounds),
+   writes `candidate.json` and the proof packet with `stopped_by:
+   "spend-governor"`, scores the holdout if asked, and exits 0 with status
+   `candidate-created`. Only a run with no candidate to keep (nothing streamed
+   yet), or a call that does not fit the full cap outside optimization (the
+   baseline call, a holdout call), ends as before: `budget-blocked` with exit 4,
+   or a holdout marked `incomplete-budget`.
+
+Watching spend: the stopper emits a `spend-rate` event per iteration with
+committed, in-flight and attributed spend, USD per minute over the run and the
+last 60 seconds, the phase limit and holdout reserve, the cost per metric call,
+the spend projected for the remaining metric-call budget (all rounds), and the
+minutes left to the phase limit. With `--progress` that is one line per
+iteration:
+
+```text
+[03:12] spend $0.21 @ $0.04/min, projected $0.83 of $3.00 (optimize limit $2.71)
+```
+
+After three iterations, if the projection exceeds the phase limit, a one-time
+`spend-projection-warning` says so; it does not block anything, since the
+stopper ends the run before the limit. The latest snapshot (with the stopper's
+projection) is in `run-state.json`, in `candidate.json` and the proof packet
+under `spend_evidence.spend_governor`, and in the final payload as
+`spend_governor`.
 
 ## Multi-predictor task specs
 
@@ -232,7 +297,7 @@ understudy optimize-workload adapter run --adapter dspy-gepa --execute \
   --repo . --samples samples.json \
   --task-spec docs/dspy-gepa-facility-support-task-spec.json \
   --model <student> --reflection-model <stronger-model> \
-  --reflection-minibatch-size 3 --reflection-temperature 1.0 --num-threads 8 \
+  --reflection-minibatch-size 3 --reflection-temperature 1.0 \
   --max-metric-calls 900 --component-selector round_robin \
   --budget-usd 5 --input-usd-per-million <in> --output-usd-per-million <out> \
   --reflection-input-usd-per-million <in> --reflection-output-usd-per-million <out> \
@@ -262,12 +327,16 @@ event carries `seq`, `run_id`, `at`, `elapsed_s`, and `event`:
 | `data-loaded` | `train`, `dev`, `holdout` counts |
 | `phase` | `name`: `baseline`, `optimizing`, `optimization-finished`, `evaluating-holdout` |
 | `seeded`, `stop-file-cleared`, `best-so-far-cleared` | the instructions the climb started from; a stale `STOP` was removed; another config's `best-so-far.json` was removed |
-| `round-started`, `round-finished` | `round`, `seed_val_score`, `best_val_score`, `gain`, `metric_calls`, `stopped_by_stop_file` |
-| `call-completed`, `call-failed` | `call_id`, `role`, `model`, tokens, `call_cost_usd`, `price_source`, running `attributed_cost_usd` and `reserved_upper_bound_usd` |
-| `budget-blocked` | the reservation that would have crossed the cap |
+| `round-started`, `round-finished` | `round`, `seed_val_score`, `best_val_score`, `gain`, `metric_calls`, `stopped_by_stop_file`, `stopped_by_spend_governor` |
+| `call-completed`, `call-failed` | `call_id`, `role`, `model`, tokens, `call_cost_usd`, `price_source`, running `attributed_cost_usd`, `reserved_upper_bound_usd` and `inflight_reserved_usd` |
+| `budget-blocked` | the reservation that did not fit: `phase`, `scope` (`optimization-phase`, not latched; or `cap`, latched), `reason`, `committed_usd`, `inflight_reserved_usd`, `limit_usd`, `holdout_reserve_usd` |
+| `spend-throttled` | at most every 30 s while calls wait for in-flight calls to settle: `committed_usd`, `inflight_reserved_usd`, `next_reservation_usd`, `limit_usd`, `waiting_calls` |
+| `spend-rate` | once per GEPA iteration: `committed_usd`, `inflight_reserved_usd`, `attributed_cost_usd`, `rate_usd_per_min`, `recent_rate_usd_per_min`, `phase_limit_usd`, `holdout_reserve_usd`, `iteration_cost_usd`, `usd_per_metric_call`, `projected_usd`, `projected_minutes_to_phase_limit` |
+| `spend-projection-warning` | once, after three iterations, when `projected_usd` exceeds `phase_limit_usd` |
+| `budget-stop` | the spend governor ended optimization: `reason`, `committed_usd`, `phase_limit_usd`, `holdout_reserve_usd`, `expected_next_iteration_usd` |
 | `gepa-started`, `gepa-proposal`, `gepa-valset-evaluated`, `gepa-candidate-accepted`, `gepa-candidate-rejected`, `gepa-error`, `gepa-finished` | GEPA's own progress with its `round`, including proposed instruction text and dev scores |
 | `holdout-progress` | `program` (`baseline`/`optimized`), `done`, `total`, `running_score` |
-| `run-finished`, `run-failed` | final status, reason, `phase`, totals |
+| `run-finished`, `run-failed` | final status, reason, `phase`, totals, `stopped_by` |
 
 Events hold counts, scores, token usage and instruction text. They never contain
 sample inputs, route URLs, or credentials.
@@ -330,7 +399,7 @@ understudy optimize-workload adapter run --adapter dspy-gepa --execute \
   --repo . --samples samples.json --input-keys message --output-keys urgency \
   --model <student> --reflection-model <stronger-model> --module cot \
   --match-mode case-insensitive \
-  --reflection-minibatch-size 3 --reflection-temperature 1.0 --num-threads 8 \
+  --reflection-minibatch-size 3 --reflection-temperature 1.0 \
   --max-metric-calls 300 --rounds 3 --stop-after-stale 8 --min-round-gain 0.02 \
   --budget-usd 5 --input-usd-per-million <in> --output-usd-per-million <out> \
   --reflection-input-usd-per-million <in> --reflection-output-usd-per-million <out> \
@@ -348,10 +417,12 @@ added when the total says nothing more, and reported cache writes are added to
 the input (Anthropic leaves them out of `input_tokens`). The attributed cost
 prices the reported counters and never exceeds the bound; for plain usage the
 two are equal. Calls still in flight, and calls whose usage is missing or
-ambiguous, keep their full reservation. Size `--budget-usd` at the expected
-spend plus `--num-threads` worst-case calls of headroom. Before settling, a
-Facility Support run (4,096-token student cap, 32 threads) was blocked at $5.91
-reserved against $0.23 spent.
+ambiguous, keep their full reservation. Set `--budget-usd` to what you are
+willing to spend: the [spend governor](#how-the-spend-governor-behaves) waits
+out in-flight reservations near the cap and stops the run before it, keeping
+the best candidate. Before settling and throttling, a Facility Support run
+(4,096-token student cap, 32 threads) was blocked at $5.91 reserved against
+$0.23 spent, and another lost 9 minutes ending `budget-blocked` near its cap.
 
 ## Experiments: what climbing bought
 
