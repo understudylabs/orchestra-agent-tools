@@ -1213,6 +1213,8 @@ printf '%s\\n' '{"schema_version":"fixture.uv.v1","status":"fixture-ok"}'
       assert.equal(flagValue("--proposer-skill"), seed);
       assert.equal(flagValue("--proposer-note"), "terse");
       assert.equal(flagValue("--proposer-max-chars"), "900");
+      // Evaluation threads default to 16; the spend ledger throttles them near the cap.
+      assert.equal(flagValue("--num-threads"), "16");
       assert.ok(uvArgs.includes("--evaluate-holdout"));
     }));
 });
@@ -1657,5 +1659,13 @@ print(json.dumps({
       assert.equal(payload().spend_evidence.calls_attempted, 0);
       const blocked = readEvents(repo).events.filter((event) => event.event === "budget-blocked");
       assert.deepEqual(blocked.map((event) => [event.scope, event.latched]), [["cap", true]]);
+    }));
+
+  it("defaults the runtime to 16 evaluation threads", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo, samplesPath }) => {
+      const { result, seen } = runDspyGepa(repo, samplesPath);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(seen().gepa.num_threads, 16);
+      assert.equal(readJson(join(runDir(repo), "config.json")).gepa.num_threads, 16);
     }));
 });

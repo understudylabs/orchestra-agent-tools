@@ -5006,7 +5006,7 @@ def main() -> None:
     )
     dspy_gepa_parser.add_argument("--use-merge", type=bool_arg, default=False)
     dspy_gepa_parser.add_argument("--max-merge-invocations", type=non_negative_int_arg, default=5)
-    dspy_gepa_parser.add_argument("--num-threads", type=positive_int_arg, default=1)
+    dspy_gepa_parser.add_argument("--num-threads", type=positive_int_arg, default=16)
     dspy_gepa_parser.add_argument("--seed", type=int, default=0)
     dspy_gepa_parser.add_argument("--log-dir", default=None)
     dspy_gepa_parser.add_argument("--track-stats", type=bool_arg, default=False)

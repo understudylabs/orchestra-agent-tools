@@ -288,7 +288,7 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
         "--max-merge-invocations",
         String(nonNegativeInteger(options.maxMergeInvocations ?? "5", "--max-merge-invocations")),
         "--num-threads",
-        String(positiveInteger(options.numThreads ?? "1", "--num-threads")),
+        String(positiveInteger(options.numThreads ?? "16", "--num-threads")),
         "--seed",
         String(integer(options.seed ?? "0", "--seed")),
         "--log-dir",
