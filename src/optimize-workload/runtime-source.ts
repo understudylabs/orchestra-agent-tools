@@ -67,6 +67,10 @@ class SpendBudgetExceeded(RuntimeError):
     pass
 
 
+class NoScoredCandidateError(SpendBudgetExceeded):
+    """Refused calls left the run without any candidate scored on the whole dev split."""
+
+
 class SpendEvidenceError(RuntimeError):
     pass
 
@@ -334,6 +338,13 @@ class RunEvents:
                 f"{stamp} budget-stop ({record.get('reason')}): spend " + money(record.get("committed_usd"))
                 + " of " + money(record.get("phase_limit_usd")) + " optimization limit; finishing with the best candidate"
             )
+        if name == "late-call-refused":
+            return f"{stamp} refused a call left over from an earlier phase ({record.get('reason')})"
+        if name == "spend-drain-timeout":
+            return (
+                f"{stamp} spend drain timed out: {record.get('inflight_calls')} call(s) still in flight; "
+                "their full reservations stay in the evidence"
+            )
         if name == "spend-throttled":
             return (
                 f"{stamp} spend throttled: waiting for in-flight calls ("
@@ -347,7 +358,20 @@ class RunEvents:
 
 
 class GepaProgress:
-    """GEPA 0.1.4 callbacks (every method optional) that stream optimizer progress."""
+    """GEPA 0.1.4 callbacks (every method optional) that stream optimizer progress.
+
+    DSPy 3.4.1 evaluates candidates with Evaluate(max_errors=len(batch)*100),
+    which swallows a refused call and scores its row failure_score (0) while
+    still reporting the whole dev split as evaluated. So a dev evaluation that
+    overlapped a spend refusal is marked partial: its score is not a real score,
+    it never becomes best-so-far, and the round's result is checked against it.
+    Refusals are counted from the ledger since the current GEPA iteration
+    started (the seed's evaluation runs before the first iteration, so since
+    this round's callbacks were built). GEPA may evaluate several proposals of
+    one iteration together and the optimization phase stays closed after its
+    first refusal, so every dev evaluation of an iteration with a refusal is
+    treated as having seen one.
+    """
 
     def __init__(
         self,
@@ -355,11 +379,20 @@ class GepaProgress:
         best_path: Path | None,
         round_index: int = 1,
         config_sha256: str | None = None,
+        ledger: SpendLedger | None = None,
     ) -> None:
         self._events = events
         self._best_path = best_path
         self._round = round_index
         self._config_sha256 = config_sha256
+        self._ledger = ledger
+        self._refusals_seen = ledger.refusal_count() if ledger is not None else 0
+        self.refusals_at_start = self._refusals_seen
+        self._refusals_at_iteration = self._refusals_seen
+        # One record per dev evaluation: candidate_idx, average_score,
+        # instructions, partial.
+        self.evaluations: list[dict[str, Any]] = []
+        self._best_full_score: float | None = None
 
     def on_optimization_start(self, event: dict[str, Any]) -> None:
         self._events.emit(
@@ -369,6 +402,10 @@ class GepaProgress:
             valset_size=event.get("valset_size"),
         )
 
+    def on_iteration_start(self, event: dict[str, Any]) -> None:
+        if self._ledger is not None:
+            self._refusals_at_iteration = self._ledger.refusal_count()
+
     def on_proposal_end(self, event: dict[str, Any]) -> None:
         self._events.emit(
             "gepa-proposal",
@@ -377,22 +414,49 @@ class GepaProgress:
             new_instructions=event.get("new_instructions"),
         )
 
+    def refusals_in_round(self) -> int:
+        if self._ledger is None:
+            return 0
+        return self._ledger.refusal_count() - self.refusals_at_start
+
     def on_valset_evaluated(self, event: dict[str, Any]) -> None:
         evaluated = event.get("num_examples_evaluated")
         total = event.get("total_valset_size")
         is_best = bool(event.get("is_best_program"))
+        refusals = self._ledger.refusal_count() if self._ledger is not None else 0
+        refused_calls = max(0, refusals - self._refusals_at_iteration)
+        self._refusals_seen = refusals
+        score = event.get("average_score")
+        partial = refused_calls > 0 or evaluated != total or not isinstance(score, (int, float))
+        candidate = event.get("candidate")
+        self.evaluations.append({
+            "iteration": event.get("iteration"),
+            "candidate_idx": event.get("candidate_idx"),
+            "average_score": score,
+            "instructions": dict(candidate) if isinstance(candidate, Mapping) else None,
+            "partial": partial,
+        })
         self._events.emit(
             "gepa-valset-evaluated",
             round=self._round,
             iteration=event.get("iteration"),
             candidate_idx=event.get("candidate_idx"),
-            average_score=event.get("average_score"),
+            average_score=score,
             num_examples_evaluated=evaluated,
             total_valset_size=total,
             is_best_program=is_best,
+            partial=partial,
+            refused_calls=refused_calls,
         )
-        # Only a best that cleared the whole dev split is worth restarting from.
-        if is_best and self._best_path is not None and evaluated == total:
+        if partial:
+            return
+        # Only a candidate scored on the whole dev split, with no refused call,
+        # is worth restarting from: GEPA's best, or one that beats every fully
+        # scored candidate when GEPA ranked a deflated partial score above it.
+        beats_full = self._best_full_score is not None and float(score) > self._best_full_score
+        if self._best_full_score is None or float(score) > self._best_full_score:
+            self._best_full_score = float(score)
+        if (is_best or beats_full) and self._best_path is not None:
             write_owner_only_json(self._best_path, {
                 "schema_version": "understudy.dspy_gepa_best_so_far.v1",
                 "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -781,15 +845,31 @@ def normalize_price_key(model: str | None) -> str | None:
 # Spend governor tuning. None of these can admit more spend: they only decide
 # how long a call that would fit once in-flight calls settle may wait, and how
 # far ahead of the limit the run stops.
-SPEND_THROTTLE_MAX_WAIT_S = 600.0
+#
+# DSPy 3.4.1's Evaluate runs rows on a ParallelExecutor (timeout=120,
+# straggler_limit=3): once at most three rows remain, a row running for 120 s
+# is resubmitted and the original thread is abandoned. The throttle wait stays
+# well under that, and a call that outlives its phase is refused (see reserve).
+SPEND_THROTTLE_MAX_WAIT_S = 90.0
 SPEND_THROTTLE_EVENT_INTERVAL_S = 30.0
 SPEND_THROTTLE_POLL_S = 5.0
+SPEND_DRAIN_MAX_WAIT_S = 60.0
+SPEND_DRAIN_POLL_S = 0.05
 SPEND_RATE_WINDOW_S = 60.0
 HOLDOUT_RESERVE_MARGIN = 1.25
+# The holdout reserve prices each call at this percentile of settled student
+# call costs (nearest rank), not at the single most expensive one.
+HOLDOUT_RESERVE_PERCENTILE = 0.9
+# DSPy's ChatAdapter retries a parse failure once through JSONAdapter, so one
+# predictor invocation costs one or two student calls.
+MAX_STUDENT_CALLS_PER_PREDICTOR_INVOCATION = 2.0
 SPEND_STOP_ITERATION_MARGIN = 1.5
 SPEND_STOP_RECENT_ITERATIONS = 3
 SPEND_PROJECTION_WARNING_AFTER_ITERATIONS = 3
 OPTIMIZATION_PHASE = "optimization"
+# Between the end of optimization and the holdout: the full cap applies, and
+# calls left over from optimization are refused.
+FINALIZING_PHASE = "finalizing"
 HOLDOUT_PHASE = "holdout"
 
 
@@ -811,6 +891,12 @@ class SpendLedger:
     optimization phase the limit is the cap minus a reserve for the holdout
     evaluation, and reaching it marks the phase exhausted without latching the
     run-wide failure, so the holdout can still run under the full cap.
+
+    A call belongs to the phase it entered reserve() in. One that is still
+    waiting when the phase changes, or that comes from a thread last admitted in
+    an earlier optimization phase (a row DSPy abandoned as a straggler), is
+    refused without latching, so leftover optimization work can never spend the
+    holdout's reserve or land after the final spend evidence is sampled.
     """
 
     def __init__(
@@ -891,6 +977,24 @@ class SpendLedger:
         self.holdout_calls_planned = 0
         self.max_student_settled_usd: float | None = None
         self.max_student_reserved_usd: float | None = None
+        # Settled student call costs, for the holdout reserve's percentile.
+        self._student_settled: list[float] = []
+        self._student_percentile: float | None = None
+        self._student_percentile_stale = False
+        # Observed ChatAdapter -> JSONAdapter fallback: student calls admitted
+        # per predictor invocation whose result reached the metric.
+        self.student_calls_admitted = 0
+        self.predictor_invocations_scored = 0
+        # Bumped by every begin_phase; a call admitted under an older epoch's
+        # optimization phase marks its thread (see reserve).
+        self._epoch = 0
+        self._thread = threading.local()
+        # The thread that switches phases runs the run itself (and DSPy's
+        # sequential evaluation with --num-threads 1); it is never left over.
+        self._owner_ident: int | None = None
+        self._inflight_calls = 0
+        self.late_refusals = 0
+        self.drains: list[dict[str, Any]] = []
         self.max_call_reserved_usd = 0.0
         self.started_monotonic = time.monotonic()
         self.started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -939,23 +1043,55 @@ class SpendLedger:
     def _committed_locked(self) -> float:
         return max(0.0, self.reserved_upper_bound_usd - self.inflight_reserved_usd)
 
+    def _student_cost_percentile_locked(self) -> float | None:
+        """HOLDOUT_RESERVE_PERCENTILE of settled student call costs (nearest rank)."""
+        if not self._student_settled:
+            return None
+        if self._student_percentile is None or self._student_percentile_stale:
+            ordered = sorted(self._student_settled)
+            rank = max(1, math.ceil(HOLDOUT_RESERVE_PERCENTILE * len(ordered)))
+            self._student_percentile = ordered[rank - 1]
+            self._student_percentile_stale = False
+        return self._student_percentile
+
+    def _calls_per_predictor_invocation_locked(self) -> float:
+        """Observed student calls per scored predictor invocation, in [1, 2].
+
+        Before anything is observed it is the worst case, 2. Calls whose run
+        raised or is still running count without an invocation, which only
+        raises the estimate.
+        """
+        if self.predictor_invocations_scored <= 0:
+            return MAX_STUDENT_CALLS_PER_PREDICTOR_INVOCATION
+        observed = self.student_calls_admitted / self.predictor_invocations_scored
+        return min(MAX_STUDENT_CALLS_PER_PREDICTOR_INVOCATION, max(1.0, observed))
+
+    def record_predictor_invocations(self, count: int) -> None:
+        """Count predictor invocations whose program run reached the metric."""
+        with self._lock:
+            self.predictor_invocations_scored += max(0, int(count))
+
     def _holdout_reserve_locked(self, projected_student: float | None = None) -> float:
         """Spend kept back for the holdout evaluation while optimizing.
 
-        Calibrated: planned holdout calls x the largest settled student call x
-        1.25. Before any student call settles: planned calls x the worst-case
-        student reservation. Either way one more worst-case student reservation
-        is added, so the holdout's last call can still reserve its worst case.
+        Expected holdout calls are the planned calls (rows x 2 programs x
+        predictors) x the observed student calls per predictor invocation
+        (parse fallbacks). Calibrated: expected calls x the 90th percentile of
+        settled student call costs x 1.25. Before any student call settles:
+        expected calls x the worst-case student reservation. Either way one more
+        worst-case student reservation is added, so the holdout's last call can
+        still reserve its worst case. The worst case is the larger of the largest
+        admitted student reservation and the call being checked.
         """
         planned = self.holdout_calls_planned
         if planned <= 0:
             return 0.0
-        worst = self.max_student_reserved_usd
-        if worst is None:
-            worst = projected_student or 0.0
-        estimate = planned * worst
-        if self.max_student_settled_usd is not None:
-            estimate = min(estimate, planned * self.max_student_settled_usd * HOLDOUT_RESERVE_MARGIN)
+        worst = max(self.max_student_reserved_usd or 0.0, projected_student or 0.0)
+        expected_calls = planned * self._calls_per_predictor_invocation_locked()
+        estimate = expected_calls * worst
+        typical = self._student_cost_percentile_locked()
+        if typical is not None:
+            estimate = min(estimate, expected_calls * typical * HOLDOUT_RESERVE_MARGIN)
         return estimate + worst
 
     def _phase_limit_locked(self, projected_student: float | None = None) -> float | None:
@@ -967,12 +1103,50 @@ class SpendLedger:
         return cap
 
     def begin_phase(self, phase: str, holdout_calls_planned: int | None = None) -> None:
-        """Switch the limit: optimization keeps the holdout reserve back, holdout gets the full cap."""
+        """Switch the limit: optimization keeps the holdout reserve back, the others get the full cap.
+
+        Calls still waiting from the previous phase wake up and are refused.
+        """
         with self._lock:
             self.phase = phase
+            self._epoch += 1
+            self._owner_ident = threading.get_ident()
             if holdout_calls_planned is not None:
                 self.holdout_calls_planned = max(0, int(holdout_calls_planned))
             self._settled.notify_all()
+
+    def refusal_count(self) -> int:
+        """Calls refused without latching (phase limit or outlived phase)."""
+        with self._lock:
+            return self.phase_refusals + self.late_refusals
+
+    def drain(self, timeout_s: float = SPEND_DRAIN_MAX_WAIT_S) -> dict[str, Any]:
+        """Wait (bounded) until no call is waiting to reserve and none is in flight.
+
+        Called after a phase switch, before the spend evidence is sampled. A
+        timeout is recorded and reported; the calls still in flight keep their
+        full reservation in the evidence, so it stays an upper bound.
+        """
+        started = time.monotonic()
+        with self._lock:
+            while self._waiting > 0 or self._inflight_calls > 0:
+                remaining = timeout_s - (time.monotonic() - started)
+                if remaining <= 0:
+                    break
+                # Polled: a waiter that gives up does not notify.
+                self._settled.wait(timeout=min(remaining, SPEND_DRAIN_POLL_S))
+            result = {
+                "phase": self.phase,
+                "drained": self._waiting == 0 and self._inflight_calls == 0,
+                "waited_s": round(time.monotonic() - started, 3),
+                "inflight_calls": self._inflight_calls,
+                "waiting_calls": self._waiting,
+                "inflight_reserved_usd": self.inflight_reserved_usd,
+            }
+            self.drains.append(result)
+        if not result["drained"]:
+            self._notify({"event": "spend-drain-timeout", **result, "timeout_s": timeout_s})
+        return result
 
     def _record_settlement_locked(self, amount: float) -> None:
         now = time.monotonic()
@@ -1005,6 +1179,12 @@ class SpendLedger:
             "max_call_reserved_usd": self.max_call_reserved_usd,
             "phase_exhausted": self.phase_exhausted,
             "phase_refusals": self.phase_refusals,
+            "late_refusals": self.late_refusals,
+            "inflight_calls": self._inflight_calls,
+            "waiting_calls": self._waiting,
+            "drains": [dict(item) for item in self.drains],
+            "holdout_student_call_usd": self._student_cost_percentile_locked(),
+            "student_calls_per_predictor_invocation": self._calls_per_predictor_invocation_locked(),
             "throttled_calls": self.throttled_calls,
             "throttle_wait_s": round(self.throttle_wait_s, 3),
             "projection": dict(self.latest_projection) if self.latest_projection else None,
@@ -1085,9 +1265,35 @@ class SpendLedger:
                 raise error
             admitted = not self.enforce
             wait_started: float | None = None
+            # The phase this call belongs to, and the optimization phase this
+            # thread was last admitted in (None for a fresh thread).
+            entry_epoch = self._epoch
+            thread_epoch = (
+                None
+                if threading.get_ident() == self._owner_ident
+                else getattr(self._thread, "optimization_epoch", None)
+            )
             while not admitted:
                 if self.failure is not None:
                     raise type(self.failure)(str(self.failure))
+                if self._epoch != entry_epoch or (thread_epoch is not None and thread_epoch != self._epoch):
+                    # The phase changed while this call waited, or the thread is
+                    # left over from an optimization phase that already ended (a
+                    # straggler DSPy abandoned). Refuse it without latching: it
+                    # must not spend the holdout's reserve or land after the
+                    # final spend evidence.
+                    self.late_refusals += 1
+                    blocked_error = SpendBudgetExceeded("call-outlived-its-phase")
+                    blocked_event = {
+                        "event": "late-call-refused",
+                        "role": role,
+                        "model": normalize_price_key(model),
+                        "phase": self.phase,
+                        "reason": "phase-changed-while-waiting" if self._epoch != entry_epoch else "thread-from-ended-optimization",
+                        "next_reservation_usd": projected,
+                        "late_refusals": self.late_refusals,
+                    }
+                    break
                 if self.phase == OPTIMIZATION_PHASE and self.phase_exhausted is not None:
                     # The optimization phase stays closed once its limit was reached;
                     # only the first refusal is reported.
@@ -1170,12 +1376,17 @@ class SpendLedger:
                 call_id = self.calls_attempted
                 self.reserved_upper_bound_usd += projected
                 self.inflight_reserved_usd += projected
+                self._inflight_calls += 1
                 self.max_call_reserved_usd = max(self.max_call_reserved_usd, projected)
                 if role == "student":
+                    self.student_calls_admitted += 1
                     self.max_student_reserved_usd = max(self.max_student_reserved_usd or 0.0, projected)
+                if self.phase == OPTIMIZATION_PHASE:
+                    self._thread.optimization_epoch = self._epoch
                 entry = {
                     "call_id": call_id,
                     "status": "reserved",
+                    "phase": self.phase,
                     "role": role,
                     "model": normalize_price_key(model),
                     "price_source": prices[2] if prices is not None else None,
@@ -1200,6 +1411,7 @@ class SpendLedger:
         # The call left flight; its reservation stays in reserved_upper_bound_usd
         # (committed) until complete() releases the unneeded part.
         self.inflight_reserved_usd = max(0.0, self.inflight_reserved_usd - float(entry["reserved_upper_bound_usd"]))
+        self._inflight_calls = max(0, self._inflight_calls - 1)
 
     def mark_error(self, call_id: int) -> None:
         with self._lock:
@@ -1273,6 +1485,8 @@ class SpendLedger:
                     settled_amount = settled
                     if entry["role"] == "student":
                         self.max_student_settled_usd = max(self.max_student_settled_usd or 0.0, settled)
+                        self._student_settled.append(settled)
+                        self._student_percentile_stale = True
                 entry.update({
                     "status": "complete",
                     "input_tokens": input_tokens,
@@ -3193,14 +3407,17 @@ class SpendStopper:
     """GEPA stop callback that ends optimization before it reaches the phase limit.
 
     GEPA 0.1.4 calls stoppers between iterations with its state, whose
-    total_num_evals is the round's metric-call count. Each call records the spend
-    since the previous one (one iteration; the first sample also covers the
-    seed evaluation) and stops the round when the optimization phase is already
-    exhausted, or when committed spend plus 1.5x the largest of the recent
-    iteration costs plus one worst-case call reservation would cross the phase
-    limit. Stopping before calls are refused matters: GEPA scores a refused
-    rollout as a miss. It also emits the per-iteration spend-rate telemetry and a
-    one-time projection warning. One instance serves every round of a run.
+    total_num_evals is the round's metric-call count. Each call records the
+    committed spend since the previous one (one iteration; the first sample also
+    covers the seed evaluation) and stops the round when the optimization phase
+    is already exhausted, or when spend so far (committed plus in flight) plus
+    1.5x the largest of the recent iteration costs plus one worst-case call
+    reservation would cross the phase limit. Iteration costs use committed spend,
+    which never decreases, so a call still in flight at one check counts in the
+    iteration it settles in and no iteration cost is negative. Stopping before
+    calls are refused matters: GEPA scores a refused rollout as a miss. It also
+    emits the per-iteration spend-rate telemetry and a one-time projection
+    warning. One instance serves every round of a run.
     """
 
     def __init__(
@@ -3217,8 +3434,8 @@ class SpendStopper:
         self._round = 0
         self._history: list[float] = []
         self._iterations = 0
-        self._last_spent = ledger.spend_snapshot()["reserved_upper_bound_usd"]
-        self._round_start_spent = self._last_spent
+        self._last_committed = ledger.spend_snapshot()["committed_usd"]
+        self._round_start_committed = self._last_committed
         self._round_first: tuple[int, float] | None = None
         self._calls_in_round = 0
         self._warned = False
@@ -3231,7 +3448,7 @@ class SpendStopper:
     def start_round(self, round_index: int) -> None:
         self._round = int(round_index)
         self._round_first = None
-        self._round_start_spent = self._ledger.spend_snapshot()["reserved_upper_bound_usd"]
+        self._round_start_committed = self._ledger.spend_snapshot()["committed_usd"]
         self._calls_in_round = 0
 
     def fired_in_round(self, round_index: int) -> bool:
@@ -3248,10 +3465,13 @@ class SpendStopper:
         if self.fired is not None and self.fired_round == self._round:
             return True
         snap = self._ledger.spend_snapshot()
-        # Between iterations nothing should be in flight; count it anyway.
+        # Between iterations nothing should be in flight, but a straggler can
+        # be: the stop check counts its full reservation (spent), while the
+        # iteration cost uses committed spend, which only grows.
         spent = float(snap["reserved_upper_bound_usd"])
-        delta = max(0.0, spent - self._last_spent)
-        self._last_spent = spent
+        committed = float(snap["committed_usd"])
+        delta = max(0.0, committed - self._last_committed)
+        self._last_committed = max(self._last_committed, committed)
         calls_in_round = self._calls_in_round + 1
         self._calls_in_round = calls_in_round
         if calls_in_round > 1:
@@ -3264,11 +3484,11 @@ class SpendStopper:
         usd_per_eval: float | None = None
         if evals is not None:
             if self._round_first is None:
-                self._round_first = (evals, spent)
+                self._round_first = (evals, committed)
                 if evals > 0:
-                    usd_per_eval = (spent - self._round_start_spent) / evals
+                    usd_per_eval = max(0.0, committed - self._round_start_committed) / evals
             elif evals > self._round_first[0]:
-                usd_per_eval = (spent - self._round_first[1]) / (evals - self._round_first[0])
+                usd_per_eval = max(0.0, committed - self._round_first[1]) / (evals - self._round_first[0])
             if usd_per_eval is None and self._ledger.latest_projection:
                 usd_per_eval = self._ledger.latest_projection.get("usd_per_metric_call")
         remaining_evals = (
@@ -3352,12 +3572,49 @@ class SpendStopper:
         return True
 
 
-def spend_stop_recoverable(error: BaseException, ledger: SpendLedger) -> bool:
-    """A compile that raised because the optimization phase limit refused a call."""
+# DSPy's ParallelExecutor raises this bare Exception, without a cause, once a
+# batch's errors reach max_errors.
+DSPY_CANCELLED_EXECUTION_MESSAGE = "Execution cancelled due to errors or interruption."
+
+
+def optimization_phase_stop(error: BaseException, ledger: SpendLedger) -> bool:
+    """An error raised because the optimization phase limit refused a call.
+
+    True only when the phase is exhausted without a run-wide failure and the
+    refusal is in the exception chain (DSPy keeps it as the cause of the
+    LMUnexpectedError it wraps engine errors in), or the error is DSPy's
+    cause-less executor cancellation after refusals. Any other error keeps its
+    own classification, even after the phase was exhausted.
+    """
     if ledger.failure is not None or ledger.phase_exhausted is None:
         return False
     cause = spend_cause(error)
-    return cause is None or isinstance(cause, SpendBudgetExceeded)
+    if cause is not None:
+        return isinstance(cause, SpendBudgetExceeded)
+    return (
+        type(error) is Exception
+        and str(error) == DSPY_CANCELLED_EXECUTION_MESSAGE
+        and ledger.refusal_count() > 0
+    )
+
+
+def spend_stop_recoverable(error: BaseException, ledger: SpendLedger) -> bool:
+    """A compile that raised because the optimization phase limit refused a call."""
+    return optimization_phase_stop(error, ledger)
+
+
+def without_gepa_results(program: Any) -> Any:
+    """A copy of program without the DSPy GEPA results a compile attached to it.
+
+    A recovered candidate must not carry an earlier round's detailed_results,
+    or its stats would be reported next to this round's instructions.
+    """
+    recovered = copy.deepcopy(program)
+    try:
+        delattr(recovered, "detailed_results")
+    except AttributeError:
+        pass
+    return recovered
 
 
 def recover_spend_stopped_candidate(
@@ -3368,10 +3625,11 @@ def recover_spend_stopped_candidate(
 ) -> tuple[Any, dict[str, Any]] | None:
     """The best candidate a spend-stopped compile leaves behind, or None.
 
-    The streamed best-so-far for this config and round is applied to the
-    program the round started from; a later round that found nothing new falls
-    back to the previous round's result. Round 1 without a streamed best has no
-    candidate.
+    The streamed best-so-far for this config and round (written only for a
+    candidate scored on the whole dev split) is applied to the program the
+    round started from; a later round that streamed nothing falls back to the
+    previous round's result. Round 1 without a streamed best has no candidate.
+    Neither carries GEPA stats: this round's compile returned none.
     """
     best: Any = None
     if best_path.exists():
@@ -3386,11 +3644,36 @@ def recover_spend_stopped_candidate(
         and isinstance(best.get("instructions"), dict)
         and best["instructions"]
     ):
-        recovered = copy.deepcopy(program_to_climb)
+        recovered = without_gepa_results(program_to_climb)
         apply_instructions(recovered, best["instructions"])
         return recovered, {"source": "best-so-far", "average_score": best.get("average_score")}
     if round_index > 1:
-        return program_to_climb, {"source": "previous-round", "average_score": None}
+        return without_gepa_results(program_to_climb), {"source": "previous-round", "average_score": None}
+    return None
+
+
+def fully_scored_candidate(
+    progress: GepaProgress,
+    program_to_climb: Any,
+    round_index: int,
+) -> tuple[Any, dict[str, Any]] | None:
+    """The best candidate this round scored on the whole dev split without a refused call.
+
+    Falls back to the previous round's result, which was fully scored. Round 1
+    with no fully scored candidate (the seed's own evaluation was refused) has
+    none. Neither carries GEPA results, so its stats are reported separately.
+    """
+    full = [
+        item for item in progress.evaluations
+        if not item["partial"] and item["instructions"] and isinstance(item["average_score"], (int, float))
+    ]
+    if full:
+        best = max(full, key=lambda item: float(item["average_score"]))
+        recovered = without_gepa_results(program_to_climb)
+        apply_instructions(recovered, best["instructions"])
+        return recovered, {"source": "fully-scored-candidate", "average_score": float(best["average_score"])}
+    if round_index > 1:
+        return without_gepa_results(program_to_climb), {"source": "previous-round", "average_score": None}
     return None
 
 
@@ -3402,6 +3685,7 @@ def build_gepa_search_kwargs(
     round_index: int,
     config_sha256: str | None = None,
     spend_stopper: SpendStopper | None = None,
+    progress: GepaProgress | None = None,
 ) -> dict[str, Any]:
     """dspy.GEPA keyword arguments for callbacks, stoppers and proposal strategy."""
     from gepa.utils.stop_condition import (
@@ -3426,7 +3710,7 @@ def build_gepa_search_kwargs(
         stoppers.append(TimeoutStopCondition(float(args.max_minutes) * 60))
     inner: dict[str, Any] = {
         "use_cloudpickle": True,
-        "callbacks": [GepaProgress(events, best_path, round_index, config_sha256)],
+        "callbacks": [progress or GepaProgress(events, best_path, round_index, config_sha256)],
         "stop_callbacks": stoppers,
     }
     if args.frontier_type != "instance":
@@ -3469,22 +3753,41 @@ def predictor_instructions(program: Any) -> dict[str, str]:
     }
 
 
-def gepa_run_stats(optimized: Any) -> dict[str, Any] | None:
-    """Summarize DspyGEPAResult (present because track_stats=True); None if absent."""
+def gepa_best_index(optimized: Any) -> int | None:
+    """DspyGEPAResult.best_idx (the first highest aggregate score), or None."""
+    detailed = getattr(optimized, "detailed_results", None)
+    scores = getattr(detailed, "val_aggregate_scores", None)
+    if not scores:
+        return None
+    return max(range(len(scores)), key=lambda index: float(scores[index]))
+
+
+def gepa_run_stats(optimized: Any, partial_candidates: set[int] | frozenset[int] = frozenset()) -> dict[str, Any] | None:
+    """Summarize DspyGEPAResult (present because track_stats=True); None if absent.
+
+    DSPy scores a refused call as a miss, so a candidate whose dev evaluation
+    had refused calls has a deflated score. Those candidates are listed and
+    left out: the baseline score is null if the seed was one of them, and the
+    best score is the best fully scored candidate's (null if there is none).
+    """
     detailed = getattr(optimized, "detailed_results", None)
     scores = getattr(detailed, "val_aggregate_scores", None)
     if not scores:
         return None
     scores = [float(score) for score in scores]
-    best_idx = max(range(len(scores)), key=lambda index: scores[index])
+    partial = sorted(index for index in partial_candidates if 0 <= index < len(scores))
+    full = [index for index in range(len(scores)) if index not in partial]
+    best_idx = max(full, key=lambda index: scores[index]) if full else None
     return {
         "split": "dev",
         "num_candidates": len(scores),
         "best_candidate_index": best_idx,
-        "baseline_val_score": scores[0],
-        "best_val_score": scores[best_idx],
+        "baseline_val_score": None if 0 in partial else scores[0],
+        "best_val_score": scores[best_idx] if best_idx is not None else None,
         "total_metric_calls": getattr(detailed, "total_metric_calls", None),
         "num_full_val_evals": getattr(detailed, "num_full_val_evals", None),
+        "partial": bool(partial),
+        "partial_candidate_indices": partial,
     }
 
 
@@ -4011,6 +4314,7 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
     bridge_state = None
     baseline_feedback = None
     routing: dict[str, str] = {}
+    predictors_per_row = len(task_spec["predictors"]) if task_spec is not None else 1
     if bridge_module is None:
         if task_spec is not None:
             # Rows were checked against the spec above; gold values are normalized
@@ -4063,9 +4367,17 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
         write_dspy_run_state(args, ledger, "running", None, phase="baseline")
         events.emit("phase", name="baseline")
         baseline_prediction = student(**{key: train_rows[0][key] for key in input_keys})
+        # The baseline run is the first observation of student calls per
+        # predictor invocation (parse fallbacks), which sizes the holdout reserve.
+        ledger.record_predictor_invocations(predictors_per_row)
         baseline_feedback = score_with_feedback(trainset[0], baseline_prediction)
 
         def metric(gold: Any, pred: Any, trace: Any = None, pred_name: str | None = None, pred_trace: Any = None) -> Any:
+            if pred_name is None:
+                # DSPy scores a program run with pred_name=None (per-predictor
+                # feedback passes a name): one run is predictors_per_row
+                # predictor invocations that reached the metric.
+                ledger.record_predictor_invocations(predictors_per_row)
             return score_with_feedback(gold, pred, pred_name)
     else:
         builder = getattr(bridge_module, "build_understudy_dspy_gepa", None)
@@ -4195,7 +4507,6 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
     args.owned_artifacts = {"best_so_far_path"}
     # From here the holdout evaluation keeps its reserve: optimization runs under
     # cap - reserve, calibrated by the baseline call's settled cost.
-    predictors_per_row = len(task_spec["predictors"]) if task_spec is not None else 1
     ledger.begin_phase(
         OPTIMIZATION_PHASE,
         holdout_calls_planned=len(holdout_rows) * 2 * predictors_per_row if args.evaluate_holdout else 0,
@@ -4217,10 +4528,13 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
     spend_stopper = SpendStopper(ledger, events, args.max_metric_calls, args.rounds)
     stopped_by: str | None = None
     spend_stop: dict[str, Any] | None = None
+    final_stats: dict[str, Any] | None = None
+    final_stats_status = "unavailable"
     for round_index in range(1, args.rounds + 1):
         round_dir = round_log_dir(log_dir, round_index)
         round_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         spend_stopper.start_round(round_index)
+        progress = GepaProgress(events, best_path, round_index, config_sha256, ledger)
         teleprompter = dspy.GEPA(
             metric=metric,
             max_metric_calls=args.max_metric_calls,
@@ -4237,12 +4551,15 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
             seed=args.seed,
             **build_gepa_search_kwargs(
                 args, events, stop_file, dspy_best_so_far_path(args), round_index, config_sha256, spend_stopper,
+                progress,
             ),
         )
         events.emit("round-started", round=round_index, of=args.rounds)
         recovered_from: dict[str, Any] | None = None
+        compiled: Any = None
         try:
-            optimized = teleprompter.compile(program_to_climb, trainset=trainset, valset=valset)
+            compiled = teleprompter.compile(program_to_climb, trainset=trainset, valset=valset)
+            optimized = compiled
         except Exception as error:
             # The optimization phase limit refused a call and GEPA let it out. Keep
             # the best candidate the run already streamed; without one this stays
@@ -4256,13 +4573,33 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
         if ledger.failure is not None:
             # DSPy scores a failed rollout as a miss; a spend stop is never a miss.
             raise ledger.failure
+        partial_candidates = {
+            int(item["candidate_idx"])
+            for item in progress.evaluations
+            if item["partial"] and isinstance(item["candidate_idx"], int)
+        }
+        round_stats = gepa_run_stats(compiled, partial_candidates) if compiled is not None else None
+        if compiled is not None and (partial_candidates or progress.refusals_in_round() > 0):
+            # DSPy swallowed refused calls as misses, so GEPA may have picked a
+            # candidate whose dev score is not a real score. Keep its pick only if
+            # it was fully scored; otherwise take the best fully scored candidate
+            # of this round, then the previous round's result.
+            best_index = gepa_best_index(compiled)
+            if best_index is None or best_index in partial_candidates:
+                reselected = fully_scored_candidate(progress, program_to_climb, round_index)
+                if reselected is None:
+                    raise NoScoredCandidateError("no-candidate-fully-scored")
+                optimized, recovered_from = reselected
+        if round_stats is None:
+            stats_status = "unavailable"
+        else:
+            stats_status = "partial" if round_stats["partial"] else "complete"
         spend_stopped = spend_stopper.fired_in_round(round_index) or ledger.phase_exhausted is not None
-        round_stats = gepa_run_stats(optimized)
         stopped_by_file = stop_file.exists()
         seed_score = round_stats["baseline_val_score"] if round_stats else None
         best_score = round_stats["best_val_score"] if round_stats else None
-        if best_score is None and recovered_from is not None:
-            best_score = recovered_from.get("average_score")
+        if recovered_from is not None and recovered_from.get("average_score") is not None:
+            best_score = recovered_from["average_score"]
         entry = {
             "round": round_index,
             "seed_val_score": seed_score,
@@ -4271,11 +4608,17 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
             "metric_calls": round_stats["total_metric_calls"] if round_stats else None,
             "stopped_by_stop_file": stopped_by_file,
             "stopped_by_spend_governor": spend_stopped,
+            # "unavailable" when compile raised and the candidate was recovered
+            # (its GEPA results are gone), "partial" when refused calls deflated
+            # some dev scores (those candidates are left out of the scores).
+            "gepa_stats_status": stats_status,
         }
         if recovered_from is not None:
             entry["recovered_candidate_from"] = recovered_from["source"]
         rounds_log.append(entry)
         events.emit("round-finished", **entry)
+        final_stats = round_stats
+        final_stats_status = stats_status
         program_to_climb = optimized
         # Every stop below reads the dev split only, or the spend ledger.
         if spend_stopped:
@@ -4285,7 +4628,7 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
                 "round": round_index,
             }
             spend_stop["phase_exhausted"] = ledger.phase_exhausted
-            spend_stop["compile_raised"] = recovered_from is not None
+            spend_stop["compile_raised"] = compiled is None
             if recovered_from is not None:
                 spend_stop["recovered_candidate_from"] = recovered_from["source"]
             break
@@ -4295,6 +4638,11 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
             break
         if entry["gain"] is not None and entry["gain"] <= args.min_round_gain:
             break
+    # Optimization is over. Calls it left behind (a straggler DSPy abandoned, or
+    # one still waiting to reserve) are refused from here, and calls still in
+    # flight get a bounded wait before any spend evidence is sampled.
+    ledger.begin_phase(FINALIZING_PHASE)
+    ledger.drain()
     optimized_instructions = predictor_instructions(optimized)
     instructions_changed = optimized_instructions != baseline_instructions
     # Per-predictor view for spec runs, keyed by spec name; the instruction maps
@@ -4314,7 +4662,6 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
         if task_spec is not None
         else None
     )
-    final_stats = gepa_run_stats(optimized)
     args.phase = "optimization-finished"
     events.emit(
         "phase",
@@ -4383,6 +4730,9 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
             else None
         ),
         "gepa_stats": final_stats,
+        # complete, partial (refused calls deflated some dev scores; those
+        # candidates are left out), or unavailable (a recovered candidate).
+        "gepa_stats_status": final_stats_status,
         "search": config_payload["search"],
         "rounds": rounds_log,
         # "spend-governor" when the run stopped early to stay inside the
@@ -4434,6 +4784,7 @@ def _dspy_gepa_execute(args: argparse.Namespace, ledger: SpendLedger) -> None:
         holdout_evaluation["config_sha256"] = config_sha256
         write_owner_only_json(holdout_path, holdout_evaluation)
         args.owned_artifacts.add("holdout_evaluation_path")
+        ledger.drain()
 
     spend_evidence = sampled_spend_evidence()
     proof = {
@@ -4594,18 +4945,20 @@ def dspy_gepa(args: argparse.Namespace) -> None:
         # failed rollout as a miss, so a spend stop is found in the exception
         # chain or in the ledger itself before the error type decides.
         cause = spend_cause(error) or ledger.failure
-        if cause is None and ledger.phase_exhausted is not None:
-            # The optimization phase limit refused a call and nothing was left to
-            # finalize; GEPA may have surfaced it as another error.
+        optimizing = getattr(args, "phase", None) == "optimizing"
+        if cause is None and optimizing and optimization_phase_stop(error, ledger):
+            # DSPy's cause-less executor cancellation after refused calls.
             cause = SpendBudgetExceeded("optimization-phase-limit-reached")
         if isinstance(cause, SpendBudgetExceeded):
-            emit_dspy_failure(
-                args,
-                ledger,
-                "budget-blocked",
-                "next-call-reservation-exceeds-budget",
-                4,
-            )
+            if isinstance(cause, NoScoredCandidateError):
+                reason = str(cause)
+            elif optimizing and optimization_phase_stop(error, ledger):
+                # The optimization phase limit refused a call and nothing was
+                # left to finalize.
+                reason = "optimization-phase-limit-reached"
+            else:
+                reason = "next-call-reservation-exceeds-budget"
+            emit_dspy_failure(args, ledger, "budget-blocked", reason, 4)
         elif isinstance(cause, SpendEvidenceError):
             emit_dspy_failure(args, ledger, "spend-evidence-error", str(cause), 5)
         elif isinstance(error, RuntimePackageVersionError):

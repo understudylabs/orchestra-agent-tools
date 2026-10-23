@@ -183,6 +183,8 @@ class Predict:
         configured_lm(prompt=str(kwargs))
         return SimpleNamespace(answer="a2" if "evolved" in self.signature.instructions else "a1")
     def dump_state(self, json_mode=False):
+        if os.environ.get("STUB_DUMP_STATE_RAISES"):
+            raise RuntimeError("dump_state bug")
         return {"predict": {"instructions": self.signature.instructions}}
 
 class ChainOfThought(Predict):
@@ -196,7 +198,14 @@ class GEPA:
         self.kwargs = kwargs
     def compile(self, student, trainset=None, valset=None):
         copied = copy.deepcopy(self.reflection_lm)
-        copied(prompt="reflection")
+        compile_number = len(COMPILES) + 1
+        # STUB_VALSET_EVAL: score candidates on the dev rows the way DSPy 3.4.1's
+        # Evaluate does, swallowing a failed (refused) row as a 0 score while still
+        # reporting every row as evaluated, and report each evaluation through
+        # on_valset_evaluated. The seed is scored first, before any reflection.
+        valset_eval = bool(os.environ.get("STUB_VALSET_EVAL"))
+        if not valset_eval:
+            copied(prompt="reflection")
         repo = os.path.dirname(os.environ["PROVIDER_SENTINEL"])
         # What a progress consumer could see while the optimizer is still running.
         state_dir = os.path.join(repo, ".understudy", "optimize-workload", "dspy-gepa")
@@ -227,9 +236,56 @@ class GEPA:
         live_stoppers = [stopper for stopper in inner.get("stop_callbacks", []) if callable(stopper)]
         best_instruction = "evolved instruction"
         iterations_run = 0
+        burst_compile = os.environ.get("STUB_BURST_IN_COMPILE")
+
+        def evaluate(program, burst=False):
+            scores = []
+            for index, example in enumerate(valset or []):
+                try:
+                    prediction = program(question=example.question)
+                    scores.append(1.0 if prediction.answer == example.answer else 0.0)
+                except Exception:
+                    scores.append(0.0)
+                if burst and index == 0:
+                    # An unexpectedly expensive stretch right after the first row.
+                    for _ in range(int(os.environ["STUB_BURST_CALLS"])):
+                        try:
+                            student(question="burst")
+                        except Exception:
+                            break
+            state.total_num_evals += len(scores)
+            return sum(scores) / len(scores)
+
+        aggregate = []
+        instructions = []
+
+        def report(instruction, score, iteration):
+            aggregate.append(score)
+            instructions.append(instruction)
+            for callback in callbacks:
+                callback.on_valset_evaluated({
+                    "iteration": iteration, "candidate_idx": len(aggregate) - 1,
+                    "candidate": {"predict": instruction}, "average_score": score,
+                    "num_examples_evaluated": len(valset), "total_valset_size": len(valset),
+                    "is_best_program": score > max(aggregate[:-1], default=-1.0),
+                })
+
+        if valset_eval:
+            report(student.signature.instructions, evaluate(student), 0)
         while iterations_run < iterations and not any(stopper(state) for stopper in live_stoppers):
             iterations_run += 1
-            burst = iterations_run == int(os.environ.get("STUB_BURST_AT_ITERATION", "0"))
+            burst = iterations_run == int(os.environ.get("STUB_BURST_AT_ITERATION", "0")) and (
+                burst_compile is None or int(burst_compile) == compile_number
+            )
+            if valset_eval:
+                try:
+                    copied(prompt="reflection")
+                except Exception:
+                    continue
+                candidate = copy.deepcopy(student)
+                candidate.signature.instructions = "evolved instruction " + str(iterations_run)
+                report(candidate.signature.instructions, evaluate(candidate, burst), iterations_run)
+                continue
             try:
                 copied(prompt="reflection")
                 for _ in range(int(os.environ["STUB_BURST_CALLS"]) if burst else len(valset or [])):
@@ -281,6 +337,15 @@ class GEPA:
             total_metric_calls=2,
             num_full_val_evals=2,
         )
+        if valset_eval:
+            # DSPy returns the candidate with the highest aggregate dev score.
+            best = max(range(len(aggregate)), key=lambda index: aggregate[index])
+            evolved.signature.instructions = instructions[best]
+            evolved.detailed_results = SimpleNamespace(
+                val_aggregate_scores=list(aggregate),
+                total_metric_calls=state.total_num_evals,
+                num_full_val_evals=len(aggregate),
+            )
         return evolved
 `, "utf8");
 }

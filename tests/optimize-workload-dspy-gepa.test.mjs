@@ -197,7 +197,11 @@ describe("dspy-gepa adapter on the DSPy 3.4 engine seam", () => {
         best_val_score: 0.75,
         total_metric_calls: 2,
         num_full_val_evals: 2,
+        partial: false,
+        partial_candidate_indices: [],
       });
+      assert.equal(candidate.gepa_stats_status, "complete");
+      assert.equal(candidate.rounds[0].gepa_stats_status, "complete");
       assert.equal(candidate.search.rounds, 1);
       assert.equal(candidate.search.match_mode, "exact");
     }));
@@ -1311,7 +1315,9 @@ print(json.dumps(out))
 import random, threading, time
 from types import SimpleNamespace as NS
 out = {}
-for phase, cap in ((None, 0.05), (rt.OPTIMIZATION_PHASE, 0.08), (rt.HOLDOUT_PHASE, 0.03)):
+# Optimization keeps an uncalibrated holdout reserve of 6 calls x 2 (parse
+# fallbacks) x the worst case, plus one: up to $0.13 at these ceilings.
+for phase, cap in ((None, 0.05), (rt.OPTIMIZATION_PHASE, 0.16), (rt.HOLDOUT_PHASE, 0.03)):
     ledger = rt.SpendLedger(cap, 1.0, 2.0, throttle_max_wait_s=1.0)
     if phase is not None:
         ledger.begin_phase(phase, holdout_calls_planned=6)
@@ -1395,11 +1401,15 @@ events = []
 ledger.observer = events.append
 ledger.begin_phase(rt.OPTIMIZATION_PHASE, holdout_calls_planned=4)
 out = {"empty": ledger.spend_snapshot()["holdout_reserve_usd"]}
-# One student call in flight: its worst case ($0.01 + $0.02 = $0.03) stands for every holdout call.
+# One student call in flight: its worst case ($0.01 + $0.02 = $0.03) stands for
+# every holdout call, and before any predictor invocation is scored each one may
+# cost two calls (a parse fallback): 4 x 2 x $0.03 + one $0.03 worst case.
 call = ledger.reserve(10_000, 10_000, student)
 out["worst_case"] = ledger.spend_snapshot()["holdout_reserve_usd"]
-# Settled at 1,000 + 500 tokens = $0.002: 4 x 1.25 x $0.002 + one $0.03 worst case.
+# Settled at 1,000 + 500 tokens = $0.002, and one call per scored invocation:
+# 4 x 1 x 1.25 x $0.002 + one $0.03 worst case.
 ledger.complete(call, NS(usage={"prompt_tokens": 1000, "completion_tokens": 500}))
+ledger.record_predictor_invocations(1)
 snapshot = ledger.spend_snapshot()
 out["calibrated"] = snapshot["holdout_reserve_usd"]
 out["phase_limit"] = snapshot["phase_limit_usd"]
@@ -1440,7 +1450,7 @@ print(json.dumps(out))
 `);
       const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-12, `${label}: ${actual} != ${expected}`);
       near(seen.empty, 0, "empty");
-      near(seen.worst_case, 5 * 0.03, "worst_case");
+      near(seen.worst_case, 4 * 2 * 0.03 + 0.03, "worst_case");
       near(seen.calibrated, 4 * 1.25 * 0.002 + 0.03, "calibrated");
       near(seen.phase_limit, 1 - (4 * 1.25 * 0.002 + 0.03), "phase_limit");
       assert.equal(seen.big, "optimization-phase-limit-reached");
@@ -1644,6 +1654,7 @@ print(json.dumps({
       }, spend);
       assert.equal(empty.result.status, 4, empty.result.stderr);
       assert.equal(empty.payload().status, "budget-blocked");
+      assert.equal(empty.payload().reason, "optimization-phase-limit-reached");
       assert.equal(existsSync(join(optimizeDir(emptyRepo), "candidate.json")), false);
     }));
 
@@ -1667,5 +1678,338 @@ print(json.dumps({
       assert.equal(result.status, 0, result.stderr);
       assert.equal(seen().gepa.num_threads, 16);
       assert.equal(readJson(join(runDir(repo), "config.json")).gepa.num_threads, 16);
+    }));
+});
+
+describe("dspy-gepa spend governor: concurrency and finalization", () => {
+  it("refuses a call that outlives its phase, without latching, and drains in-flight calls", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo, samplesPath }) => {
+      const { runtime } = runDspyGepa(repo, samplesPath);
+      const seen = runtimeScript(runtime, `
+import threading, time
+from types import SimpleNamespace as NS
+student = {"role": "student", "requested_model": "m"}
+reflection = {"role": "reflection", "requested_model": "m"}
+out = {"max_wait_s": rt.SPEND_THROTTLE_MAX_WAIT_S}
+ledger = rt.SpendLedger(1.0, 1.0, 2.0)
+events = []
+ledger.observer = events.append
+# A baseline-like $0.03 student call settles at $0.002 and calibrates the reserve:
+# 24 holdout calls x 2 (no scored invocation yet) x 1.25 x $0.002 + one $0.03
+# worst case = $0.15, so the optimization limit is $0.85.
+ledger.complete(ledger.reserve(10_000, 10_000, student), NS(usage={"prompt_tokens": 1000, "completion_tokens": 500}))
+ledger.begin_phase(rt.OPTIMIZATION_PHASE, holdout_calls_planned=24)
+out["limit"] = ledger.spend_snapshot()["phase_limit_usd"]
+# Two $0.45 reflection calls: the second fits the optimization limit only once the first settles.
+held = {}
+def first():
+    held["call"] = ledger.reserve(250_000, 100_000, reflection)
+    held["thread_ready"] = True
+    while not held.get("release"):
+        time.sleep(0.01)
+    # The same (now leftover) optimization thread tries another call.
+    try:
+        ledger.reserve(10, 10, student)
+        held["leftover"] = "admitted"
+    except rt.SpendBudgetExceeded as error:
+        held["leftover"] = str(error)
+thread_a = threading.Thread(target=first)
+thread_a.start()
+while not held.get("thread_ready"):
+    time.sleep(0.01)
+result = {}
+def second():
+    try:
+        result["second"] = ledger.reserve(250_000, 100_000, reflection)
+    except rt.SpendBudgetExceeded as error:
+        result["second"] = str(error)
+thread_b = threading.Thread(target=second)
+thread_b.start()
+time.sleep(0.3)
+out["waiting_before_switch"] = ledger.spend_snapshot()["waiting_calls"]
+# Under the full cap the waiting call would fit ($0.002 + $0.45 + $0.45 <= $1): it must still be refused.
+ledger.begin_phase(rt.FINALIZING_PHASE)
+thread_b.join(5)
+out["second"] = result["second"]
+out["second_left_promptly"] = not thread_b.is_alive()
+# The first call is still in flight: a short drain times out and says so.
+out["short_drain"] = ledger.drain(timeout_s=0.2)
+held["release"] = True
+thread_a.join(5)
+out["leftover"] = held["leftover"]
+# A fresh thread (the holdout's) and the phase-owning thread are admitted.
+fresh = {}
+def fresh_call():
+    fresh["call"] = ledger.reserve(10, 10, student)
+    ledger.complete(fresh["call"], NS(usage={"prompt_tokens": 5, "completion_tokens": 5}))
+thread_c = threading.Thread(target=fresh_call)
+thread_c.start()
+thread_c.join(5)
+out["fresh"] = fresh.get("call")
+owner = ledger.reserve(10, 10, student)
+ledger.complete(owner, NS(usage={"prompt_tokens": 5, "completion_tokens": 5}))
+out["owner"] = owner
+def settle_later():
+    time.sleep(0.2)
+    ledger.complete(held["call"], NS(usage={"prompt_tokens": 1000, "completion_tokens": 500}))
+threading.Thread(target=settle_later).start()
+out["drain"] = ledger.drain(timeout_s=5)
+snapshot = ledger.spend_snapshot()
+out["late_refusals"] = snapshot["late_refusals"]
+out["failure"] = None if ledger.failure is None else str(ledger.failure)
+out["phase_exhausted"] = ledger.phase_exhausted
+out["inflight_after"] = snapshot["inflight_calls"]
+out["drains"] = [item["drained"] for item in snapshot["drains"]]
+out["events"] = [[event["event"], event.get("reason")] for event in events if event["event"] in ("late-call-refused", "spend-drain-timeout", "budget-blocked")]
+print(json.dumps(out))
+`);
+      // DSPy's Evaluate resubmits a row that ran 120 s; the throttle never waits that long.
+      assert.ok(seen.max_wait_s < 120);
+      assert.ok(Math.abs(seen.limit - 0.85) < 1e-9, `limit ${seen.limit}`);
+      assert.equal(seen.waiting_before_switch, 1);
+      assert.equal(seen.second, "call-outlived-its-phase");
+      assert.equal(seen.second_left_promptly, true);
+      assert.equal(seen.short_drain.drained, false);
+      assert.equal(seen.short_drain.inflight_calls, 1);
+      assert.equal(seen.leftover, "call-outlived-its-phase");
+      assert.equal(seen.fresh, 3);
+      assert.equal(seen.owner, 4);
+      assert.equal(seen.drain.drained, true);
+      assert.equal(seen.inflight_after, 0);
+      assert.deepEqual(seen.drains, [false, true]);
+      assert.equal(seen.late_refusals, 2);
+      assert.equal(seen.failure, null);
+      assert.equal(seen.phase_exhausted, null);
+      assert.deepEqual(seen.events, [
+        ["late-call-refused", "phase-changed-while-waiting"],
+        ["spend-drain-timeout", null],
+        ["late-call-refused", "thread-from-ended-optimization"],
+      ]);
+    }));
+
+  it("never counts a negative iteration cost when a call is in flight between iterations", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo, samplesPath }) => {
+      const { runtime } = runDspyGepa(repo, samplesPath);
+      const seen = runtimeScript(runtime, `
+from types import SimpleNamespace as NS
+class Events:
+    def __init__(self):
+        self.items = []
+    def emit(self, event, **fields):
+        self.items.append({"event": event, **fields})
+student = {"role": "student", "requested_model": "m"}
+ledger = rt.SpendLedger(1.0, 1.0, 2.0)
+ledger.begin_phase(rt.OPTIMIZATION_PHASE, holdout_calls_planned=0)
+events = Events()
+stopper = rt.SpendStopper(ledger, events, max_metric_calls=1000, rounds=1)
+stopper.start_round(1)
+state = NS(total_num_evals=0)
+# A straggler reserves $0.03 and is still in flight at the first check.
+straggler = ledger.reserve(10_000, 10_000, student)
+stopper(state)
+# It settles at $0.002 during the next iteration, next to one $0.002 call.
+ledger.complete(straggler, NS(usage={"prompt_tokens": 1000, "completion_tokens": 500}))
+ledger.complete(ledger.reserve(10_000, 10_000, student), NS(usage={"prompt_tokens": 1000, "completion_tokens": 500}))
+state.total_num_evals = 2
+stopper(state)
+print(json.dumps([event["iteration_cost_usd"] for event in events.items if event["event"] == "spend-rate"]))
+`);
+      // Committed spend only grows: the straggler counts where it settled.
+      assert.equal(seen.length, 2);
+      assert.ok(Math.abs(seen[0]) < 1e-12, `first iteration cost ${seen[0]}`);
+      assert.ok(Math.abs(seen[1] - 0.004) < 1e-12, `second iteration cost ${seen[1]}`);
+    }));
+
+  it("checks a larger student call against its own worst case, not an older smaller one", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo, samplesPath }) => {
+      const { runtime } = runDspyGepa(repo, samplesPath);
+      const seen = runtimeScript(runtime, `
+from types import SimpleNamespace as NS
+student = {"role": "student", "requested_model": "m"}
+ledger = rt.SpendLedger(1.0, 1.0, 2.0)
+ledger.begin_phase(rt.OPTIMIZATION_PHASE, holdout_calls_planned=4)
+# A small $0.003 student call settles cheaply and calibrates the reserve.
+ledger.complete(ledger.reserve(1_000, 1_000, student), NS(usage={"prompt_tokens": 100, "completion_tokens": 100}))
+ledger.record_predictor_invocations(1)
+before = ledger.spend_snapshot()["phase_limit_usd"]
+# A $0.50 student call fits cap - (small reserve + $0.003), but not cap - (small reserve + $0.50).
+try:
+    ledger.reserve(100_000, 200_000, student)
+    result = "admitted"
+except rt.SpendBudgetExceeded as error:
+    result = str(error)
+print(json.dumps({"before": before, "result": result, "phase_exhausted": ledger.phase_exhausted}))
+`);
+      assert.ok(seen.before > 0.5, `limit before the large call was ${seen.before}`);
+      assert.equal(seen.result, "optimization-phase-limit-reached");
+      assert.equal(seen.phase_exhausted, "next-call-reservation-exceeds-limit");
+    }));
+
+  it("sizes the holdout reserve from the 90th percentile student call and the observed parse fallbacks", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo, samplesPath }) => {
+      const { runtime } = runDspyGepa(repo, samplesPath);
+      const seen = runtimeScript(runtime, `
+from types import SimpleNamespace as NS
+student = {"role": "student", "requested_model": "m"}
+ledger = rt.SpendLedger(10.0, 1.0, 2.0)
+ledger.begin_phase(rt.OPTIMIZATION_PHASE, holdout_calls_planned=10)
+# Ten student calls with a $0.30 worst case: nine settle at $0.003, one at $0.201.
+for index in range(10):
+    call = ledger.reserve(100_000, 100_000, student)
+    output = 100_000 if index == 9 else 1_000
+    ledger.complete(call, NS(usage={"prompt_tokens": 1_000, "completion_tokens": output}))
+out = {}
+# Ten calls for eight scored predictor invocations: 1.25 calls each (parse fallbacks).
+ledger.record_predictor_invocations(8)
+snapshot = ledger.spend_snapshot()
+out["fallback"] = [snapshot["holdout_reserve_usd"], snapshot["holdout_student_call_usd"], snapshot["student_calls_per_predictor_invocation"]]
+# Fewer calls than invocations is clamped to one call each.
+ledger.record_predictor_invocations(100)
+snapshot = ledger.spend_snapshot()
+out["clamped"] = [snapshot["holdout_reserve_usd"], snapshot["student_calls_per_predictor_invocation"]]
+print(json.dumps(out))
+`);
+      const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-12, `${label}: ${actual} != ${expected}`);
+      const [reserve, perCall, multiplier] = seen.fallback;
+      // p90 by nearest rank of ten costs is the ninth: $0.003, not the $0.201 maximum.
+      near(perCall, 0.003, "p90 student call");
+      near(multiplier, 1.25, "calls per invocation");
+      // 10 planned x 1.25 x $0.003 x 1.25 + one $0.30 worst case.
+      near(reserve, 10 * 1.25 * 0.003 * 1.25 + 0.3, "reserve");
+      assert.ok(reserve < 10 * 1.25 * 0.201 * 1.25 + 0.3, "the reserve ignores the single outlier");
+      near(seen.clamped[1], 1, "clamped calls per invocation");
+      near(seen.clamped[0], 10 * 0.003 * 1.25 + 0.3, "clamped reserve");
+    }));
+
+  it("keeps a refused dev evaluation out of best-so-far and reselects GEPA's pick when refusals deflated it", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo }) => {
+      const samples = writeSamples(repo, "governor-samples.json", governorRows());
+      // The seed answers a1 (scores 0 on dev); iteration 1's candidate answers a2, but a
+      // burst after its first dev row exhausts the phase, so DSPy-style evaluation
+      // swallows the other two rows as misses: 1/3, which GEPA would pick over the seed.
+      const { result, payload } = runDspyGepa(repo, samples, ["--evaluate-holdout", "--max-metric-calls", "400"], {
+        STUB_VALSET_EVAL: "1", STUB_SKIP_REPLAY: "1", STUB_ITERATIONS: "5", STUB_OUTPUT_TOKENS: "1000",
+        STUB_BURST_AT_ITERATION: "1", STUB_BURST_CALLS: "500",
+      }, ["--budget-usd", "0.2", ...governorPrices]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(payload().status, "candidate-created");
+      const candidate = readCandidate(repo);
+      assert.equal(candidate.stopped_by, "spend-governor");
+      assert.deepEqual(candidate.optimized_instructions, { predict: "seed instruction" });
+      assert.equal(candidate.instructions_changed, false);
+      assert.equal(candidate.rounds[0].recovered_candidate_from, "fully-scored-candidate");
+      assert.equal(candidate.rounds[0].gepa_stats_status, "partial");
+      assert.equal(candidate.rounds[0].seed_val_score, 0);
+      assert.equal(candidate.rounds[0].best_val_score, 0);
+      assert.equal(candidate.gepa_stats_status, "partial");
+      assert.deepEqual(candidate.gepa_stats.partial_candidate_indices, [1]);
+      assert.equal(candidate.gepa_stats.best_candidate_index, 0);
+      assert.equal(candidate.gepa_stats.best_val_score, 0);
+      const evaluated = readEvents(repo).events.filter((event) => event.event === "gepa-valset-evaluated");
+      assert.deepEqual(evaluated.map((event) => [event.candidate_idx, event.partial]), [[0, false], [1, true]]);
+      assert.ok(evaluated[1].refused_calls > 0);
+      // Best-so-far only ever holds a fully scored candidate.
+      assert.deepEqual(readJson(join(runDir(repo), "best-so-far.json")).instructions, { predict: "seed instruction" });
+      assert.equal(payload().holdout_evaluation.status, "complete");
+      assert.ok(payload().spend_evidence.reserved_upper_bound_usd <= 0.2);
+    }));
+
+  it("fails budget-blocked when refusals leave no candidate scored on the whole dev split", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo }) => {
+      const samples = writeSamples(repo, "governor-samples.json", governorRows());
+      const env = { STUB_VALSET_EVAL: "1", STUB_SKIP_REPLAY: "1" };
+      // Probe one student reservation and its settled cost under a roomy cap.
+      const probeRepo = mkdtempSync(join(repo, "probe-"));
+      const probe = runDspyGepa(probeRepo, samples, ["--evaluate-holdout"], env, ["--budget-usd", "1", ...governorPrices]);
+      assert.equal(probe.result.status, 0, probe.result.stderr);
+      const [baseline] = probe.payload().spend_evidence.entries;
+      // Room for the baseline call under the full cap, but the optimization phase limit
+      // (cap - holdout reserve, at least one worst case) cannot fit a dev row.
+      const cap = 1.5 * baseline.reserved_upper_bound_usd + 20 * baseline.settled_upper_bound_usd;
+      const { result, payload } = runDspyGepa(repo, samples, ["--evaluate-holdout"], env, [
+        "--budget-usd", cap.toFixed(8), ...governorPrices,
+      ]);
+      // DSPy would score every refused dev row 0 and return normally; that is not a candidate.
+      assert.equal(result.status, 4, result.stderr);
+      assert.equal(payload().status, "budget-blocked");
+      assert.equal(payload().reason, "no-candidate-fully-scored");
+      assert.equal(existsSync(join(optimizeDir(repo), "candidate.json")), false);
+      assert.equal(existsSync(join(runDir(repo), "best-so-far.json")), false);
+      const evaluated = readEvents(repo).events.filter((event) => event.event === "gepa-valset-evaluated");
+      assert.deepEqual(evaluated.map((event) => [event.candidate_idx, event.partial, event.num_examples_evaluated]), [[0, true, 3]]);
+      assert.equal(payload().spend_evidence.calls_completed, 1);
+    }));
+
+  it("classifies only a refusal in the exception chain as an optimization-phase stop", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo }) => {
+      const samples = writeSamples(repo, "governor-samples.json", governorRows());
+      const { runtime } = runDspyGepa(repo, samples);
+      const seen = runtimeScript(runtime, `
+student = {"role": "student", "requested_model": "m"}
+ledger = rt.SpendLedger(1.0, 1.0, 2.0)
+ledger.begin_phase(rt.OPTIMIZATION_PHASE, holdout_calls_planned=0)
+out = {"before": rt.spend_stop_recoverable(RuntimeError("bug"), ledger)}
+try:
+    ledger.reserve(2_000_000, 0, student)
+except rt.SpendBudgetExceeded as refusal:
+    try:
+        raise RuntimeError("wrapped LM error") from refusal
+    except RuntimeError as wrapped:
+        out["wrapped_refusal"] = rt.spend_stop_recoverable(wrapped, ledger)
+out["unrelated_bug"] = rt.spend_stop_recoverable(RuntimeError("bug"), ledger)
+out["dspy_cancelled"] = rt.spend_stop_recoverable(Exception(rt.DSPY_CANCELLED_EXECUTION_MESSAGE), ledger)
+print(json.dumps(out))
+`);
+      assert.deepEqual(seen, { before: false, wrapped_refusal: true, unrelated_bug: false, dspy_cancelled: true });
+
+      // After the phase was exhausted, a bug outside optimization keeps its own classification.
+      const burst = {
+        STUB_ITERATIONS: "10", STUB_OUTPUT_TOKENS: "1000", STUB_BURST_AT_ITERATION: "3", STUB_BURST_CALLS: "500",
+        STUB_DUMP_STATE_RAISES: "1",
+      };
+      const bugRepo = mkdtempSync(join(repo, "bug-"));
+      const bug = runDspyGepa(bugRepo, samples, ["--evaluate-holdout", "--max-metric-calls", "400"], burst, [
+        "--budget-usd", "0.2", ...governorPrices,
+      ]);
+      assert.equal(bug.result.status, 3, bug.result.stderr);
+      assert.equal(bug.payload().status, "error");
+      assert.equal(bug.payload().reason, "optimizer-execution-failed");
+      assert.notEqual(bug.payload().spend_evidence.spend_governor.phase_exhausted, null);
+    }));
+
+  it("reports no stale GEPA stats for a round recovered from best-so-far or the previous round", { skip: !pythonAvailable }, () =>
+    withRepo(({ repo }) => {
+      const samples = writeSamples(repo, "governor-samples.json", governorRows());
+      const outcomes = {};
+      for (const [name, burstAt] of [["previous-round", "1"], ["best-so-far", "2"]]) {
+        const caseRepo = mkdtempSync(join(repo, `${name}-`));
+        const { result, payload } = runDspyGepa(caseRepo, samples, ["--max-metric-calls", "400", "--rounds", "2"], {
+          STUB_SKIP_REPLAY: "1", STUB_ITERATIONS: "3", STUB_OUTPUT_TOKENS: "1000",
+          STUB_BURST_IN_COMPILE: "2", STUB_BURST_AT_ITERATION: burstAt, STUB_BURST_CALLS: "500", STUB_RAISE_ON_REFUSAL: "1",
+        }, ["--budget-usd", "0.2", ...governorPrices]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(payload().status, "candidate-created");
+        const candidate = readCandidate(caseRepo);
+        outcomes[name] = {
+          rounds: candidate.rounds.map((round) => [
+            round.recovered_candidate_from ?? null, round.seed_val_score, round.best_val_score, round.gepa_stats_status,
+          ]),
+          gepa_stats: candidate.gepa_stats,
+          gepa_stats_status: candidate.gepa_stats_status,
+          instructions: candidate.optimized_instructions,
+        };
+      }
+      assert.deepEqual(outcomes["previous-round"], {
+        rounds: [[null, 0.25, 0.75, "complete"], ["previous-round", null, null, "unavailable"]],
+        gepa_stats: null,
+        gepa_stats_status: "unavailable",
+        instructions: { predict: "evolved instruction 3" },
+      });
+      assert.deepEqual(outcomes["best-so-far"], {
+        rounds: [[null, 0.25, 0.75, "complete"], ["best-so-far", null, 0.75, "unavailable"]],
+        gepa_stats: null,
+        gepa_stats_status: "unavailable",
+        instructions: { predict: "evolved instruction 1" },
+      });
     }));
 });
