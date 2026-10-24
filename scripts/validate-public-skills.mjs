@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   configuredPrivateTermPolicy,
@@ -54,12 +54,12 @@ function parseArgs(argv) {
 }
 
 function parseFrontmatter(text) {
-  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
   if (!match) {
     return null;
   }
   const frontmatter = new Map();
-  for (const line of match[1].split("\n")) {
+  for (const line of match[1].split(/\r?\n/)) {
     if (!line.trim() || /^\s/.test(line)) {
       continue;
     }
@@ -172,7 +172,7 @@ function validateSkill(path, privateTermPolicy) {
     errors.push(`${skillMd}: unsupported frontmatter keys: ${JSON.stringify(extra)}`);
   }
   const name = frontmatter.get("name") ?? "";
-  const dirName = path.split("/").at(-1);
+  const dirName = basename(path);
   if (!name || !namePattern.test(name)) {
     errors.push(`${skillMd}: name must be lowercase hyphen-case`);
   } else if (name !== dirName) {

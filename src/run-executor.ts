@@ -110,8 +110,8 @@ export function armLabelOf(entry: ModelArmEntry): string {
   if (typeof entry === "string") return entry;
   const label = entry.label?.trim();
   if (label) return label;
-  const ref = String(entry.ref ?? "").replace(/\/+$/, "");
-  return ref.split("/").filter(Boolean).pop() ?? ref;
+  const ref = String(entry.ref ?? "").replace(/[/\\]+$/, "");
+  return ref.split(/[/\\]/).filter(Boolean).pop() ?? ref;
 }
 /**
  * A prompt-override experiment arm: the SAME model as `model`, with
@@ -999,7 +999,7 @@ export async function executeRunRequest(benchmarkDir: string, runId: string, opt
       // advertised on the request file so the UI knows what's executing.
       const journalPath = liveJournalPath(dir, runId, model);
       mkdirSync(join(runsDir(dir), "live"), { recursive: true });
-      const journalRel = relative(dir, journalPath);
+      const journalRel = relative(dir, journalPath).replaceAll("\\", "/");
       // Work items for this arm; a bounded pool honors --concurrency while the
       // cancel check between dequeues keeps the flip responsive.
       const queue: { task: Obj; rollout: number }[] = [];

@@ -70,7 +70,7 @@ function writeHarness(dir, harness) {
 describe("app-harness schema validation", () => {
   it("exposes the schema id constant and file path helper", () => {
     assert.equal(APP_HARNESS_SCHEMA, "understudy.app_harness.v1");
-    assert.equal(appHarnessPath("/tmp/b"), "/tmp/b/app-harness.json");
+    assert.equal(appHarnessPath("/tmp/b"), path.resolve("/tmp/b", APP_HARNESS_FILE));
   });
 
   it("accepts a valid harness and rejects each broken field", () => {

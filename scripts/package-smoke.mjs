@@ -47,9 +47,11 @@ const requiredPackageMembers = [
 ];
 
 function npmPackFiles() {
-  const result = spawnSync("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
+  const result = process.platform === "win32"
+    ? spawnSync("npm pack --dry-run --json", { encoding: "utf8", shell: true })
+    : spawnSync("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
   if (result.status !== 0) {
-    throw new Error(result.stderr || "npm pack failed");
+    throw new Error(result.stderr || result.error?.message || "npm pack failed");
   }
   const payload = JSON.parse(result.stdout);
   if (!Array.isArray(payload) || payload.length === 0 || !Array.isArray(payload[0].files)) {
@@ -76,7 +78,7 @@ function main() {
     }
   }
   const cliEntry = packageFiles.find((entry) => entry.path === "dist/bin.js");
-  if (cliEntry && (!Number.isInteger(cliEntry.mode) || (cliEntry.mode & 0o111) === 0)) {
+  if (process.platform !== "win32" && cliEntry && (!Number.isInteger(cliEntry.mode) || (cliEntry.mode & 0o111) === 0)) {
     errors.push("package/dist/bin.js: CLI entry must be executable on Unix");
   }
   for (const entry of packageFiles) {

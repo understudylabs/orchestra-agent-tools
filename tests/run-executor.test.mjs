@@ -6,6 +6,7 @@ import path from "node:path";
 import { after, describe, it } from "node:test";
 
 import {
+  armLabelOf,
   cancelRunRequest,
   createRunRequest,
   executeRunRequest,
@@ -882,7 +883,7 @@ describe("per-invocation output isolation (cross-run trace attribution)", () => 
     const a = verifiersWorkDir(dir, "run-aaa--gemma-4");
     const b = verifiersWorkDir(dir, "run-bbb--gemma-4");
     assert.notEqual(a, b);
-    assert.match(a, /runs\/work\/run-aaa--gemma-4$/);
+    assert.match(a, /runs[/\\]work[/\\]run-aaa--gemma-4$/);
     assert.ok(a.startsWith(path.resolve(dir)));
   });
 
@@ -907,7 +908,7 @@ describe("per-invocation output isolation (cross-run trace attribution)", () => 
     writeTrace(dir, "gemma-4", "legacy-task");
     const files = newOutputFiles(dir, 0);
     assert.equal(files.length, 1);
-    assert.match(files[0], /outputs\/understudy-trace-env--gemma-4--bash\/traces\.jsonl$/);
+    assert.match(files[0], /outputs[/\\]understudy-trace-env--gemma-4--bash[/\\]traces\.jsonl$/);
   });
 });
 
@@ -1022,5 +1023,25 @@ describe("prompt-override experiment arms", () => {
     assert.equal(seen.find((r) => r.task_id === "t2").system_prompt, "Suffix line.");
     // Run-scoped only: the on-disk task rows are restored byte-identically.
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(envPkg, "tasks.json"), "utf8")), sourceRows);
+  });
+
+  describe("armLabelOf", () => {
+    it("returns string entries as-is", () => {
+      assert.equal(armLabelOf("claude-3-5-sonnet"), "claude-3-5-sonnet");
+    });
+
+    it("prefers explicit label when provided", () => {
+      assert.equal(armLabelOf({ label: "custom-label", ref: "/path/to/model" }), "custom-label");
+    });
+
+    it("extracts model directory basename for POSIX paths and strips trailing slashes", () => {
+      assert.equal(armLabelOf({ ref: "/var/models/qwen-2.5-coder/" }), "qwen-2.5-coder");
+      assert.equal(armLabelOf({ ref: "models/qwen-2.5-coder" }), "qwen-2.5-coder");
+    });
+
+    it("extracts model directory basename for Windows paths and strips trailing backslashes", () => {
+      assert.equal(armLabelOf({ ref: "C:\\models\\qwen-2.5-coder\\" }), "qwen-2.5-coder");
+      assert.equal(armLabelOf({ ref: "models\\llama-3-8b" }), "llama-3-8b");
+    });
   });
 });
