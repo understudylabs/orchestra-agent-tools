@@ -7,6 +7,7 @@ import { afterEach, describe, it } from "node:test";
 
 import {
   compareClassifierWithFrontier,
+  computeHeldout,
   FRONTIER_CLASSIFICATION_SCHEMA,
 } from "../dist/local-classifier/frontier.js";
 
@@ -314,5 +315,13 @@ describe("frontier classification comparison", () => {
     assert.equal(failure.status, "failed");
     assert.equal(failure.exact_same_holdout, true);
     assert.equal(failure.holdout_sha256, sha256(readFileSync(data.holdoutPath)));
+  });
+
+  it("guards accuracy and macro_f1 against division by zero on empty holdout", () => {
+    const result = computeHeldout([], [], [], 0);
+    assert.equal(result.accuracy, 0);
+    assert.equal(result.macro_f1, 0);
+    assert.deepEqual(result.per_class, []);
+    assert.deepEqual(result.weakest_classes, []);
   });
 });

@@ -192,7 +192,7 @@ function summarizeCandidate(candidate: z.infer<typeof Candidate>, rows: z.infer<
     candidate_id: candidate.candidate_id,
     candidate_sha256: candidate.candidate_sha256,
     status: own.length === 0 ? "not_started" : complete ? "ok" : successful.length > 0 ? "partial" : "failed",
-    quality: complete ? metrics.reduce((sum, metric) => sum + metric, 0) / metrics.length : null,
+    quality: complete ? (metrics.length > 0 ? metrics.reduce((sum, metric) => sum + metric, 0) / metrics.length : 0) : null,
     family_scores: familyScores,
     cost_usd: own.reduce((sum, call) => sum + call.result.cost_usd, 0),
     latency_ms: { p50: percentile(own.map((call) => call.result.latency_ms), 0.5), p95: percentile(own.map((call) => call.result.latency_ms), 0.95) },
@@ -602,12 +602,12 @@ async function deriveGepaEvaluation(
   const familyScores: Record<string, number> = {};
   for (const family of new Set(input.dev_rows.map((row) => row.family))) {
     const metrics = evaluation.rows.filter((row) => row.family === family).map((row) => row.metric as number);
-    familyScores[family] = metrics.reduce((sum, metric) => sum + metric, 0) / metrics.length;
+    familyScores[family] = metrics.length > 0 ? metrics.reduce((sum, metric) => sum + metric, 0) / metrics.length : 0;
   }
   const metrics = evaluation.rows.map((row) => row.metric as number);
   return {
     status: "ok",
-    dev_quality: metrics.reduce((sum, metric) => sum + metric, 0) / metrics.length,
+    dev_quality: metrics.length > 0 ? metrics.reduce((sum, metric) => sum + metric, 0) / metrics.length : 0,
     family_scores: familyScores,
     cost_usd: evaluation.cost_usd,
     latency_ms: evaluation.latency_ms,
