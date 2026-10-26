@@ -7,7 +7,7 @@ that documentation when using another model or diagnosing changed behavior.
 ## OpenAI GPT-6 request settings
 
 - Chat Completions: use `max_completion_tokens`, not legacy `max_tokens`, for
-  GPT-6 Astra, GPT-6 Sol, GPT-6 Luna, and GPT-6.1 Sol. The limit includes visible
+  GPT-6 Astra, GPT-6 Sol, GPT-6 Luna, GPT-6.1 Sol, and GPT-6.1 Terra. The limit includes visible
   output and reasoning tokens. Do not send both fields.
 - Responses: use `max_output_tokens` and `reasoning.effort`; Chat uses
   `reasoning_effort`. Do not copy a Chat request body into Responses unchanged.
