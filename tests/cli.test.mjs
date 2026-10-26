@@ -4579,7 +4579,7 @@ class ScoreWithFeedback:
       assert.equal(gpt5Request.body.max_completion_tokens, 8);
       assert.equal(gpt5Request.body.max_tokens, undefined);
 
-      for (const model of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"]) {
+      for (const model of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra"]) {
         const probe = await runWithEnvAsync([
           "--json", "gateway", "probe", "--provider", "openai", "--model", model,
         ], env, repo);
