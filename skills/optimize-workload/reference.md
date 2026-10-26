@@ -179,8 +179,8 @@ Three ways to optimize, picked by commitment and workload shape:
 3. **Program lane (opt-in).** The agent can scaffold a reusable DSPy program
    from local samples using the program-scaffold pattern, verify parity, then
    run the approval-gated `adapter run --adapter dspy-gepa --execute` path
-   against the Understudy gateway with exact `dspy==3.3.0` and
-   `gepa[dspy]==0.1.1` plus `cloudpickle==3.1.2`, separate student/reflection deployments, an explicit
+   against the Understudy gateway with exact `dspy==3.4.1` and
+   `gepa[dspy]==0.1.4` plus `cloudpickle==3.1.2`, separate student/reflection deployments, an explicit
    dollar cap, and a conservative input/output token-price basis. A
    `--program-bridge` may provide a multi-component student, trainset, valset,
    `ScoreWithFeedback` metric, and deployable export callback. Before either LM

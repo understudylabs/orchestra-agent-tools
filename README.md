@@ -209,20 +209,9 @@ understudy models runtime doctor  # verify the pinned Apple Silicon VLM engine
 `spine` prints the public workflow and points agents at
 `skills/understudy/SKILL.md`.
 
-When Understudy Desktop is running, the CLI can inspect its authenticated local
-control plane and run models without exposing ports or tokens:
-
-```bash
-understudy desktop contract --json
-understudy desktop status --json
-understudy desktop model catalog --json
-understudy desktop chat --slot <slot-id> --session my-task "Inspect this"
-```
-
-`understudy desktop contract` prints the packaged OpenAPI 3.1 contract even
-when Desktop is not running. Model downloads, supervision exports, proof
-preparation, and tool-proof commands are explicit and local-only; use
-`understudy desktop --help` for the complete surface.
+Understudy Desktop is deprecated; the remaining `understudy desktop` commands
+print a deprecation warning and will be removed in a future release. See
+[`docs/desktop-deprecation.md`](docs/desktop-deprecation.md).
 
 ## The skill tree
 
@@ -428,8 +417,11 @@ understudy optimize-workload adapter run --repo . --adapter dspy-gepa \
   --num-threads 1 --execute
 ```
 
-The adapter creates an approval-gated `uv run --no-project` runtime with exact
-`dspy==3.3.0`, `gepa[dspy]==0.1.1`, and `cloudpickle==3.1.2` packages.
+The adapter creates an approval-gated `uv run --no-project --python 3.13`
+runtime with exact `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and `cloudpickle==3.1.2`
+packages plus `litellm>=1.83,<2`. Climb controls, streaming progress, and the
+holdout check are described in
+[`docs/dspy-gepa-hill-climbing.md`](docs/dspy-gepa-hill-climbing.md).
 Cloudpickle preserves resumable DSPy signature state. That environment, resumable
 logs, and owner-only optimizer receipts are local runtime state. They are not
 package infrastructure and must not be committed.

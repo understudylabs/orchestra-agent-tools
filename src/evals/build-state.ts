@@ -56,9 +56,14 @@ export function ensureUnderstudyGitExcluded(output: string): void {
   }
   const canonicalExisting = realpathSync(existing);
   const canonicalOutput = resolve(canonicalExisting, relative(existing, absoluteOutput));
+  // Inspect the destination's repository, never a caller's GIT_DIR/index override.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+  env.LC_ALL = "C";
+  env.GIT_OPTIONAL_LOCKS = "0";
   const rootResult = spawnSync("git", ["-C", canonicalExisting, "rev-parse", "--show-toplevel"], {
     encoding: "utf8",
     timeout: 2_000,
+    env,
   });
   if (rootResult.status !== 0) return;
   const root = rootResult.stdout.trim();
@@ -74,6 +79,7 @@ export function ensureUnderstudyGitExcluded(output: string): void {
   const excludeResult = spawnSync("git", ["-C", root, "rev-parse", "--git-path", "info/exclude"], {
     encoding: "utf8",
     timeout: 2_000,
+    env,
   });
   if (excludeResult.status !== 0) return;
   const rawExcludePath = excludeResult.stdout.trim();

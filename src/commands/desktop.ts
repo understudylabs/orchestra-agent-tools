@@ -482,6 +482,12 @@ export function registerDesktopCommand(program: Command): void {
     .command("desktop")
     .description("Use the authenticated local API of the running Understudy Desktop app.");
 
+  desktop.hook("preAction", () => {
+    process.stderr.write(
+      "warning: Understudy Desktop is deprecated; the desktop commands will be removed in a future release.\n",
+    );
+  });
+
   desktop
     .command("contract")
     .description("Print the versioned OpenAPI contract without requiring Desktop to be running.")

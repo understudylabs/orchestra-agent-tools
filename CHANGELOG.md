@@ -15,8 +15,59 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Removed
+
+- **Understudy Desktop.** The Tauri app in `apps/homescreen`, its
+  `desktop-release` workflow, the `desktop:*` and `runtime:desktop-readiness`
+  npm scripts, the release tooling under `scripts/`, and the tests that covered
+  only the app are removed. The last release is `desktop-v0.3.44-mvp`; the
+  updater pointer no longer advances, so installed apps will not receive
+  updates. See `docs/desktop-deprecation.md`.
+
+### Deprecated
+
+- **`understudy desktop ...` commands.** The command group still works against
+  an already-installed app but now prints a one-line deprecation warning to
+  stderr and will be removed in a future release. stdout is unchanged.
+
 ### Added
 
+- **`dspy-gepa` multi-predictor task specs.** `--task-spec PATH`
+  (`understudy.dspy_gepa_task_spec.v1`) declares several typed predictors over
+  shared inputs, the shape of DSPy's GEPA Facility Support Analyzer tutorial,
+  without user Python: `label` outputs become `Literal[...]`, `label-set`
+  outputs `list[Literal[...]]`, and `text` stays a matched string. Gold values
+  are checked against the spec before any provider call (a label set may be a
+  label list or the tutorial's `{label: bool}` object; errors name the row
+  index, never its content). The metric averages per-predictor scores, returns
+  them as `objective_scores`, and routes tutorial-style feedback to the
+  predictor GEPA is rewriting. New `--frontier-type
+  instance|objective|hybrid|cartesian` (objective modes need a spec);
+  `--component-selector` and the frontier are recorded in `search` and the
+  config hash, as is the spec's content. Candidates and holdout evaluations
+  report instructions and scores per predictor, and `--seed-instructions`
+  accepts spec names. The Facility Support spec ships as
+  `docs/dspy-gepa-facility-support-task-spec.json`; see
+  `docs/dspy-gepa-hill-climbing.md`.
+- **`dspy-gepa` streams and can climb.** Runs now stream
+  `dspy-gepa/events.jsonl`, a live `run-state.json` (`status: running` plus the
+  current `phase`), and `best-so-far.json` instead of writing everything at the
+  end; `--progress` prints live lines and `touch dspy-gepa/STOP` stops a run
+  gracefully. Climb controls: `--rounds`/`--min-round-gain` (each round in its
+  own resume log), `--seed-instructions`, `--stop-after-stale`,
+  `--stop-at-score`, `--max-minutes`, `--proposals-per-iteration`, and
+  `--proposer-skill`/`--proposer-note`/`--proposer-max-chars`, all hash-bound
+  into the resume config. Spend: `--reflection-max-tokens`, reflection prices,
+  repeatable `--model-price`, `--prices-from-gateway auto|off|require` for
+  gateway-routed roles, and an observe-only `--no-spend-ledger` for plain
+  sample runs. `--evaluate-holdout` scores baseline and optimized once after
+  `candidate.json` is frozen and writes `dspy-gepa/holdout-evaluation.json`;
+  `--match-mode case-insensitive` fixes a metric trap found in a live run,
+  where exact match read 29.4% to 77.9% on a task whose baseline was already
+  88.2% once casing was ignored. Holdout results always report both scores.
+  Candidates record the evolved instruction text, `instructions_changed`,
+  `gepa_stats`, rounds, and search settings. Measured results and the flag
+  map are in `docs/dspy-gepa-hill-climbing.md`.
 - **Trace-level hosted capture exports.** `understudy traces export <trace-id>`
   calls the customer trace request-ID lookup and hands every returned ID to the
   existing resumable request capture exporter. Explicit `--trace-ids-file`
@@ -149,6 +200,21 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Changed
 
+- **`dspy-gepa` runs on DSPy 3.4.1 and GEPA 0.1.4.** The v2 runtime now pins
+  `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and `cloudpickle==3.1.2` with a bounded
+  `litellm>=1.83,<2` on Python 3.13, and records all four in its package
+  receipt. Spend is metered at DSPy's engine seam (`complete(Request)`), which
+  survives DSPy 3.5's removal of `BaseLM.forward()` overrides; zero input and
+  zero output usage fails closed as missing usage, a budget or usage failure
+  that DSPy wraps is still reported as `budget-blocked` or
+  `spend-evidence-error`, and no later call in that run reaches a provider. The
+  student `--max-tokens` default rises from 256 to 2048 and reflection gets its
+  own `--reflection-max-tokens` (default 2048): a 256-token reflection cap
+  truncated GEPA's JSON proposals and silently left the seed prompt unchanged.
+  The ledger now settles each completed call's reservation to a conservative
+  billable bound; only in-flight and usage-ambiguous calls hold their worst
+  case. Holding every call at its full output cap blocked a live run at $5.91
+  reserved against $0.23 spent.
 - **`check-routing-health` now leads with the new reporting endpoints.**
   The skill's primary path is one org-wide grounding call to
   `/admin/v1/orgs/:org_id/reporting` (usage/cost series across all projects,
@@ -170,6 +236,43 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Fixed
 
+- **`dspy-gepa` spend settles to what may have been billed.** A completed call
+  used to settle to the price of its reported input and output tokens, but
+  DSPy's usage counters are provider-verbatim: Gemini and xAI leave reasoning
+  out of `output_tokens` and Anthropic leaves cache writes out of
+  `input_tokens`. Settling now keeps the larger of output and `total_tokens`
+  minus input, adds separately reported reasoning when the total adds nothing,
+  and adds reported cache writes (attribute or nested dict usage), capped at
+  the reservation and recorded per entry as `settled_upper_bound_usd`; the
+  overrun check reads `total_tokens` too. The fail-closed latch and the refusal
+  that sets it now happen under the reservation lock, so a concurrent call can
+  no longer reserve in between. Gateway prices apply only to roles whose bound
+  base URL is the gateway's, not to any bridge route that names itself
+  `understudy-gateway`.
+- **`dspy-gepa` task specs read values, not methods, and survive parse
+  failures.** Spec outputs and inputs are read by key, since attribute access
+  on `dspy.Example`/`Prediction` returns methods for names such as `labels` or
+  `items`; those member names, `_`-prefixed names, `model_*`, `signature`,
+  `instructions`, `fields`, and the arguments `dspy.Predict` consumes
+  (`config`, `demos`, `lm`, `prediction`) are refused in the CLI and the
+  runtime, which also rechecks the installed DSPy's members. A predictor whose
+  answer fails to parse (`Low` for the label `low`) now scores 0 for that
+  predictor with format feedback instead of failing the whole row, so every row
+  reports all `objective_scores` and objective frontiers no longer favor
+  candidates that fail most rows. Spec rows are validated before the gateway
+  price lookup. The docs now say `--match-mode` applies to `text` predictors
+  only.
+- **`dspy-gepa` keeps the holdout unseen and its artifacts honest.** A train or
+  dev split naming the holdout (`--dev-split Holdout`), or equal train and dev
+  splits, is refused in the CLI and the runtime, which also asserts holdout rows
+  are disjoint from train and dev before any provider call. A seed inside
+  `.understudy/optimize-workload/` or the `--log-dir` is refused, since the run
+  rewrites it and the identical command could never resume; copy it out first.
+  `holdout-evaluation.json` is removed when optimizing starts and listed only
+  when this run wrote it, and `best-so-far.json` now carries `run_id` and
+  `config_sha256` and is removed unless it belongs to the same config. A
+  bridge's context-window gate must report `max_tokens` at least the run's
+  student or reflection output cap.
 - **Honest backend readiness for the same training plan.** Compiling a portable
   plan no longer claims a backend can run a recipe it has no executor for:
   `adapter_implemented` now comes from the local MLX and Tinker executor

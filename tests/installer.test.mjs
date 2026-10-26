@@ -21,10 +21,14 @@ describe("install.sh", () => {
     assert.match(script, /git clone --depth 1 --filter=blob:none --sparse/);
     assert.match(script, /sparse-checkout set/);
     assert.doesNotMatch(script, /sparse-checkout set[^\n]*apps\/homescreen/);
-    assert.match(script, /npm install --prefix "\$INSTALL_SOURCE_DIR" --omit=dev --ignore-scripts/);
+    assert.match(script, /npm ci --prefix "\$INSTALL_SOURCE_DIR" --omit=dev --ignore-scripts/);
     assert.match(script, /tsconfig\.install\.json/);
     assert.match(script, /npm pkg delete scripts\.prepare --prefix "\$INSTALL_SOURCE_DIR"/);
-    assert.match(script, /npm pack "\$INSTALL_SOURCE_DIR" --ignore-scripts/);
+    assert.match(script, /npm pack \. --ignore-scripts/);
+    // npm pack drops package-lock.json, so the runtime dependencies installed
+    // from the lockfile must be bundled into the tarball before it is packed.
+    assert.match(script, /npm pkg set --prefix "\$INSTALL_SOURCE_DIR" --json bundleDependencies=/);
+    assert.ok(script.indexOf("--json bundleDependencies=") < script.indexOf("npm pack . --ignore-scripts"));
   });
 
   it("runs from a pipe when noninteractive mode is explicit", () => {
@@ -329,6 +333,9 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          // The piped installer only trusts the installed package; the tests
+          // install the adapters from this checkout, which needs the opt-in.
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
         },
@@ -368,6 +375,7 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
         },
@@ -416,6 +424,7 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           PATH: `${bin}:${process.env.PATH}`,
           UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
@@ -507,6 +516,7 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
         },
@@ -615,6 +625,7 @@ describe("install.sh", () => {
     const env = {
       ...process.env,
       CI: "1",
+      UNDERSTUDY_INSTALL_FROM_CWD: "1",
       HOME: home,
       HERMES_HOME: hermesHome,
       UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
@@ -684,6 +695,7 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           // Isolate from any real ~/.hermes so autodetection never edits it.
           HERMES_HOME: join(home, ".hermes"),
@@ -783,6 +795,7 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           PATH: `${bin}:${process.env.PATH}`,
           UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
@@ -964,6 +977,7 @@ describe("install.sh", () => {
         env: {
           ...process.env,
           CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
           HOME: home,
           PATH: `${bin}:${process.env.PATH}`,
           UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
@@ -1059,10 +1073,11 @@ describe("install.sh", () => {
 
     // The failed adapter step must not write last-step=2, or --resume would
     // start at step 3 and exit 0 while the plugin is still missing. The state
-    // dir resolves from the default lab under HOME, not the --lab override.
+    // dir follows the --lab override.
     assert.equal(result.status, 3, result.stderr || result.stdout);
     assert.match(result.stdout, /Step 2 is not marked complete/);
-    const stateDir = join(home, ".understudy", "agent-tools", "install-state");
+    const stateDir = join(lab, "install-state");
+    assert.equal(existsSync(join(home, ".understudy", "agent-tools", "install-state")), false);
     const lastStep = join(stateDir, "last-step");
     if (existsSync(lastStep)) {
       assert.notEqual(readFileSync(lastStep, "utf8").trim(), "2");

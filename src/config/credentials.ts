@@ -1,12 +1,14 @@
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
+  renameSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 
 import { globalCredentialsPath } from "./paths.js";
@@ -66,8 +68,20 @@ export function writeCredentials(credentials: Credentials): void {
   CredentialsSchema.parse(credentials);
   const path = globalCredentialsPath();
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  writeFileSync(path, `${JSON.stringify(credentials, null, 2)}\n`, { encoding: "utf8" });
-  chmodSync(path, 0o600);
+  // A fresh private directory prevents stale files or symlinks at a
+  // predictable temporary path from receiving the credential.
+  const temporaryDir = mkdtempSync(`${path}.tmp-`);
+  try {
+    const temporary = join(temporaryDir, "credentials.json");
+    writeFileSync(temporary, `${JSON.stringify(credentials, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+    });
+    renameSync(temporary, path);
+  } finally {
+    rmSync(temporaryDir, { recursive: true, force: true });
+  }
 }
 
 function warnIfPermissive(path: string): void {

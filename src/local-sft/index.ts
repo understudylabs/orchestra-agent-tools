@@ -256,9 +256,21 @@ function directoryEvidence(path: string): { sha256: string; sizeBytes: number } 
   return { sha256: digest.digest("hex"), sizeBytes };
 }
 
-function scrubbedOfflineEnvironment(): NodeJS.ProcessEnv {
+// Allowlist, like tinker-sft and trace-foundry: the offline children need the
+// toolchain, locale, CA bundle and the HF/uv cache locations, nothing else.
+const OFFLINE_ENV_PASSTHROUGH = [
+  "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
+  "XDG_CACHE_HOME", "XDG_DATA_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE",
+  "HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "PYTHONUNBUFFERED",
+];
+const OFFLINE_ENV_PASSTHROUGH_PREFIXES = ["UV_"];
+
+export function scrubbedOfflineEnvironment(parentEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
-  for (const [key, value] of Object.entries(process.env)) {
+  for (const [key, value] of Object.entries(parentEnv)) {
+    if (value === undefined) continue;
+    if (!OFFLINE_ENV_PASSTHROUGH.includes(key) && !OFFLINE_ENV_PASSTHROUGH_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+    // uv reads UV_INDEX_*_PASSWORD / UV_PUBLISH_TOKEN; the prefix must not re-admit those.
     if (/(api[_-]?key|token|secret|credential|password)/i.test(key)) continue;
     environment[key] = value;
   }

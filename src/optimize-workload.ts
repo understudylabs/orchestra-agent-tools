@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { DEFAULT_GATEWAY_URL } from "./config/defaults.js";
 import { readCredentials } from "./config/credentials.js";
@@ -63,6 +63,9 @@ type ProofPacketArtifact = {
 const understandDir = ".understudy/capture-evidence";
 const optimizeDir = ".understudy/optimize-workload";
 const runtimeDir = join(optimizeDir, "uv-runtime");
+// dspy needs >=3.10 and gepa/litellm need <3.15. Pin the interpreter so a
+// no-project run does not depend on whichever Python uv or the shell defaults to.
+const optimizerPythonVersion = "3.13";
 const requiredArtifacts = ["harness.json", "environment.json", "metric.json", "splits.json", "baseline.json"] as const;
 
 type AdapterRunOptions = {
@@ -81,6 +84,7 @@ type AdapterRunOptions = {
   trainSplit?: string;
   devSplit?: string;
   maxTokens?: string;
+  reflectionMaxTokens?: string;
   temperature?: string;
   reasoningEffort?: string;
   reflectionTemperature?: string;
@@ -88,6 +92,26 @@ type AdapterRunOptions = {
   budgetUsd?: string;
   inputUsdPerMillion?: string;
   outputUsdPerMillion?: string;
+  reflectionInputUsdPerMillion?: string;
+  reflectionOutputUsdPerMillion?: string;
+  modelPrice?: string[];
+  pricesFromGateway?: string;
+  spendLedger?: boolean;
+  evaluateHoldout?: boolean;
+  matchMode?: string;
+  seedInstructions?: string;
+  taskSpec?: string;
+  frontierType?: string;
+  rounds?: string;
+  minRoundGain?: string;
+  stopAfterStale?: string;
+  stopAtScore?: string;
+  maxMinutes?: string;
+  proposalsPerIteration?: string;
+  proposerSkill?: string[];
+  proposerNote?: string;
+  proposerMaxChars?: string;
+  progress?: boolean;
   scoreObjective?: string;
   reflectionMinibatchSize?: string;
   candidateSelectionStrategy?: string;
@@ -126,7 +150,7 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
     name: "dspy-gepa",
     schemaVersion: "understudy.dspy_gepa_adapter.v2",
     runtimeCommand: "dspy-gepa",
-    packages: ["dspy==3.3.0", "gepa[dspy]==0.1.1", "cloudpickle==3.1.2"],
+    packages: ["dspy==3.4.1", "gepa[dspy]==0.1.4", "cloudpickle==3.1.2", "litellm>=1.83,<2"],
     providerCalls: true,
     requiresAuth: () => true,
     buildArgs: (repo, options) => {
@@ -151,8 +175,24 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
       if (options.programBridge && !options.admissionOnly && !options.admissionReceipt) {
         throw new Error("bridge compilation requires --admission-receipt from a prior --admission-only run");
       }
-      if (!options.programBridge && (!options.inputKeys?.length || !options.outputKeys?.length)) {
-        throw new Error("--input-keys and --output-keys are required for dspy-gepa unless --program-bridge is supplied");
+      if (options.taskSpec && options.programBridge) {
+        throw new Error("--task-spec is not supported with --program-bridge");
+      }
+      if (options.taskSpec && options.outputKeys?.length) {
+        throw new Error("--task-spec and --output-keys are mutually exclusive");
+      }
+      if (options.taskSpec && options.inputKeys?.length) {
+        throw new Error("--task-spec defines the input keys; drop --input-keys");
+      }
+      const taskSpec = options.taskSpec ? requireTaskSpec(options.taskSpec) : undefined;
+      if (
+        !options.programBridge &&
+        !taskSpec &&
+        (!options.inputKeys?.length || !options.outputKeys?.length)
+      ) {
+        throw new Error(
+          "--input-keys and --output-keys (or --task-spec) are required for dspy-gepa unless --program-bridge is supplied",
+        );
       }
       if ((options.inputKeys?.length && !options.outputKeys?.length) || (!options.inputKeys?.length && options.outputKeys?.length)) {
         throw new Error("--input-keys and --output-keys must be supplied together");
@@ -163,18 +203,7 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
       if (!options.reflectionModel) {
         throw new Error("--reflection-model is required for dspy-gepa");
       }
-      const budgetUsd = requiredPositiveNumber(options.budgetUsd, "--budget-usd");
-      const inputUsdPerMillion = requiredNonNegativeNumber(
-        options.inputUsdPerMillion,
-        "--input-usd-per-million",
-      );
-      const outputUsdPerMillion = requiredNonNegativeNumber(
-        options.outputUsdPerMillion,
-        "--output-usd-per-million",
-      );
-      if (inputUsdPerMillion === 0 && outputUsdPerMillion === 0) {
-        throw new Error("dspy-gepa requires a non-zero input or output price basis");
-      }
+      const spendArgs = spendLedgerArgs(options);
       const temperature = requiredNonNegativeNumber(options.temperature ?? "0.1", "--temperature");
       const reflectionTemperature = requiredNonNegativeNumber(
         options.reflectionTemperature ?? "0.1",
@@ -197,12 +226,30 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
       if (!["round_robin", "all"].includes(componentSelector)) {
         throw new Error("--component-selector must be round_robin or all");
       }
+      const frontierType = options.frontierType ?? "instance";
+      if (!(frontierTypes as readonly string[]).includes(frontierType)) {
+        throw new Error(`--frontier-type must be one of: ${frontierTypes.join(", ")}`);
+      }
+      if (frontierType !== "instance" && !taskSpec) {
+        // Objective frontiers need per-objective scores, which only spec metrics return.
+        throw new Error(`--frontier-type ${frontierType} requires --task-spec`);
+      }
+      if (taskSpec && options.module !== undefined && options.module !== taskSpec.module) {
+        throw new Error(`--module ${options.module} differs from the task spec's module (${taskSpec.module})`);
+      }
+      const trainSplit = options.trainSplit ?? "train";
+      const devSplit = options.devSplit ?? "dev";
+      requireDisjointSplits(trainSplit, devSplit);
+      const logDir = resolve(options.logDir ?? join(repo, optimizeDir, "dspy-gepa", "gepa-log"));
+      if (options.seedInstructions) {
+        rejectSeedInsideRunArtifacts(options.seedInstructions, [join(repo, optimizeDir), logDir]);
+      }
       const args = [
         "dspy-gepa",
         "--repo",
         repo,
         "--module",
-        options.module ?? "predict",
+        taskSpec?.module ?? options.module ?? "predict",
         "--model",
         options.model,
         "--reflection-model",
@@ -212,11 +259,13 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
         "--split-key",
         options.splitKey ?? "split",
         "--train-split",
-        options.trainSplit ?? "train",
+        trainSplit,
         "--dev-split",
-        options.devSplit ?? "dev",
+        devSplit,
         "--max-tokens",
-        String(positiveInteger(options.maxTokens ?? "256", "--max-tokens")),
+        String(positiveInteger(options.maxTokens ?? "2048", "--max-tokens")),
+        "--reflection-max-tokens",
+        String(positiveInteger(options.reflectionMaxTokens ?? "2048", "--reflection-max-tokens")),
         "--temperature",
         String(temperature),
         "--reasoning-effort",
@@ -225,18 +274,15 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
         String(reflectionTemperature),
         "--reflection-reasoning-effort",
         reflectionReasoningEffort,
-        "--budget-usd",
-        String(budgetUsd),
-        "--input-usd-per-million",
-        String(inputUsdPerMillion),
-        "--output-usd-per-million",
-        String(outputUsdPerMillion),
+        ...spendArgs,
         "--reflection-minibatch-size",
         String(positiveInteger(options.reflectionMinibatchSize ?? "1", "--reflection-minibatch-size")),
         "--candidate-selection-strategy",
         candidateSelectionStrategy,
         "--component-selector",
         componentSelector,
+        "--frontier-type",
+        frontierType,
         "--use-merge",
         options.useMerge === true ? "true" : "false",
         "--max-merge-invocations",
@@ -246,15 +292,19 @@ const adapterRegistry: Record<string, UvAdapterSpec> = {
         "--seed",
         String(integer(options.seed ?? "0", "--seed")),
         "--log-dir",
-        resolve(options.logDir ?? join(repo, optimizeDir, "dspy-gepa", "gepa-log")),
+        logDir,
         "--track-stats",
         "true",
+        ...searchArgs(options),
       ];
       if (options.samples) {
         args.push("--samples", resolve(options.samples));
       }
       if (options.inputKeys?.length && options.outputKeys?.length) {
         args.push("--input-keys", options.inputKeys.join(","), "--output-keys", options.outputKeys.join(","));
+      }
+      if (taskSpec) {
+        args.push("--task-spec", taskSpec.path);
       }
       if (options.programBridge) {
         const bridgePath = requireRegularFile(options.programBridge, "--program-bridge");
@@ -421,7 +471,193 @@ function nonNegativeInteger(value: string, flag: string): number {
   return parsed;
 }
 
-const secretKeyPattern = /(?:^|[_-])(api[_-]?key|authorization|password|secret|token)(?:$|[_-])/i;
+const pricesFromGatewayModes = ["auto", "off", "require"] as const;
+const matchModes = ["exact", "case-insensitive"] as const;
+const frontierTypes = ["instance", "objective", "hybrid", "cartesian"] as const;
+
+function priceKey(model: string): string {
+  return model.startsWith("openai/") ? model.slice("openai/".length) : model;
+}
+
+function parseModelPriceFlag(entry: string): { model: string; input: number; output: number } {
+  const separator = entry.indexOf("=");
+  const prices = separator < 0 ? [] : entry.slice(separator + 1).split(",");
+  const input = Number(prices[0]);
+  const output = Number(prices[1]);
+  if (
+    separator <= 0 ||
+    prices.length !== 2 ||
+    !Number.isFinite(input) ||
+    !Number.isFinite(output) ||
+    input < 0 ||
+    output < 0 ||
+    (input === 0 && output === 0)
+  ) {
+    throw new Error(`--model-price must look like MODEL=INPUT,OUTPUT with non-negative USD per million tokens, got: ${entry}`);
+  }
+  return { model: priceKey(entry.slice(0, separator).trim()), input, output };
+}
+
+// Reflection may run on a pricier model than the student, so it can carry its own
+// price basis. Both prices or neither; without them the model or global basis applies.
+function optionalReflectionPrices(options: AdapterRunOptions): { input: number; output: number } | undefined {
+  const { reflectionInputUsdPerMillion: rawInput, reflectionOutputUsdPerMillion: rawOutput } = options;
+  if (rawInput === undefined && rawOutput === undefined) return undefined;
+  if (rawInput === undefined || rawOutput === undefined) {
+    throw new Error(
+      "--reflection-input-usd-per-million and --reflection-output-usd-per-million must be supplied together",
+    );
+  }
+  const input = requiredNonNegativeNumber(rawInput, "--reflection-input-usd-per-million");
+  const output = requiredNonNegativeNumber(rawOutput, "--reflection-output-usd-per-million");
+  if (input === 0 && output === 0) {
+    throw new Error("dspy-gepa requires a non-zero reflection input or output price basis");
+  }
+  return { input, output };
+}
+
+// Builds the spend-ledger flags for dspy-gepa. The ledger enforces a hard cap by
+// default; --no-spend-ledger turns it into an observer that records usage only and
+// is refused for program bridges, whose budget allocation binds the cap.
+function spendLedgerArgs(options: AdapterRunOptions): string[] {
+  const mode = options.pricesFromGateway ?? "auto";
+  if (!(pricesFromGatewayModes as readonly string[]).includes(mode)) {
+    throw new Error(`--prices-from-gateway must be one of: ${pricesFromGatewayModes.join(", ")}`);
+  }
+  const modelPrices = (options.modelPrice ?? []).map(parseModelPriceFlag);
+  const reflectionPrices = optionalReflectionPrices(options);
+  const args: string[] = [
+    ...modelPrices.flatMap((price) => ["--model-price", `${price.model}=${price.input},${price.output}`]),
+    ...(reflectionPrices
+      ? [
+          "--reflection-input-usd-per-million",
+          String(reflectionPrices.input),
+          "--reflection-output-usd-per-million",
+          String(reflectionPrices.output),
+        ]
+      : []),
+    "--prices-from-gateway",
+    mode,
+  ];
+  const hasGlobalPrice = options.inputUsdPerMillion !== undefined || options.outputUsdPerMillion !== undefined;
+  const globalPriceArgs = (): string[] => {
+    const input = requiredNonNegativeNumber(options.inputUsdPerMillion, "--input-usd-per-million");
+    const output = requiredNonNegativeNumber(options.outputUsdPerMillion, "--output-usd-per-million");
+    if (input === 0 && output === 0) {
+      throw new Error("dspy-gepa requires a non-zero input or output price basis");
+    }
+    return ["--input-usd-per-million", String(input), "--output-usd-per-million", String(output)];
+  };
+
+  if (options.spendLedger === false) {
+    if (options.programBridge) {
+      throw new Error("--no-spend-ledger is not supported with --program-bridge");
+    }
+    if (options.budgetUsd !== undefined) {
+      throw new Error("--budget-usd cannot be combined with --no-spend-ledger: no spend cap is enforced without the ledger");
+    }
+    return [...args, ...(hasGlobalPrice ? globalPriceArgs() : []), "--no-spend-ledger"];
+  }
+
+  const budgetUsd = requiredPositiveNumber(options.budgetUsd, "--budget-usd");
+  if (hasGlobalPrice) {
+    return [...args, "--budget-usd", String(budgetUsd), ...globalPriceArgs()];
+  }
+  const covered = new Set(modelPrices.map((price) => price.model));
+  const studentCovered = covered.has(priceKey(options.model ?? ""));
+  const reflectionCovered =
+    reflectionPrices !== undefined || covered.has(priceKey(options.reflectionModel ?? ""));
+  if (mode !== "require" && !(studentCovered && reflectionCovered)) {
+    throw new Error(
+      "--input-usd-per-million is required for provider-backed dspy-gepa unless every model has a --model-price / reflection price or --prices-from-gateway require is set",
+    );
+  }
+  return [...args, "--budget-usd", String(budgetUsd)];
+}
+
+// Climb and search flags for dspy-gepa: warm start, rounds, stoppers, multi-proposal
+// search, the instruction proposer, and the opt-in holdout evaluation. The runtime
+// re-validates every value before any provider call.
+function searchArgs(options: AdapterRunOptions): string[] {
+  if (options.matchMode !== undefined && !(matchModes as readonly string[]).includes(options.matchMode)) {
+    throw new Error(`--match-mode must be one of: ${matchModes.join(", ")}`);
+  }
+  if (options.programBridge) {
+    // A bridge owns its seed program, metric and holdout set.
+    const builtInOnly: Array<[string, boolean]> = [
+      ["--seed-instructions", Boolean(options.seedInstructions)],
+      ["--evaluate-holdout", options.evaluateHoldout === true],
+      ["--match-mode", options.matchMode !== undefined],
+    ];
+    for (const [flag, used] of builtInOnly) {
+      if (used) throw new Error(`${flag} is not supported with --program-bridge`);
+    }
+  }
+  const counted: Array<[string, string | undefined]> = [
+    ["--rounds", options.rounds],
+    ["--stop-after-stale", options.stopAfterStale],
+    ["--proposals-per-iteration", options.proposalsPerIteration],
+    ["--proposer-max-chars", options.proposerMaxChars],
+  ];
+  const args: string[] = [];
+  for (const [flag, value] of counted) {
+    if (value !== undefined) args.push(flag, String(positiveInteger(value, flag)));
+  }
+  for (const [flag, value] of [
+    ["--stop-at-score", options.stopAtScore],
+    ["--max-minutes", options.maxMinutes],
+  ] as const) {
+    if (value !== undefined) args.push(flag, String(requiredPositiveNumber(value, flag)));
+  }
+  if (options.minRoundGain !== undefined) {
+    args.push("--min-round-gain", String(requiredNonNegativeNumber(options.minRoundGain, "--min-round-gain")));
+  }
+  if (options.matchMode !== undefined) args.push("--match-mode", options.matchMode);
+  if (options.proposerNote !== undefined) args.push("--proposer-note", options.proposerNote);
+  if (options.seedInstructions) {
+    args.push("--seed-instructions", requireRegularFile(options.seedInstructions, "--seed-instructions"));
+  }
+  for (const skill of options.proposerSkill ?? []) {
+    args.push("--proposer-skill", resolve(skill));
+  }
+  if (options.evaluateHoldout === true) args.push("--evaluate-holdout");
+  return args;
+}
+
+// Holdout rows are matched case-insensitively and train/dev rows exactly, so a dev
+// split named "Holdout" would optimize on rows later reported as unseen. The
+// runtime re-checks this and asserts the rows are disjoint before any provider call.
+function requireDisjointSplits(trainSplit: string, devSplit: string): void {
+  if (trainSplit.toLowerCase() === "holdout" || devSplit.toLowerCase() === "holdout") {
+    throw new Error("--train-split and --dev-split must not name the holdout split");
+  }
+  if (trainSplit === devSplit) {
+    throw new Error("--train-split and --dev-split must differ");
+  }
+}
+
+// The seed is bound by content hash, and a run rewrites best-so-far.json,
+// candidate.json and its log dir, so seeding from them would break resuming.
+function rejectSeedInsideRunArtifacts(seedInput: string, ownedDirs: string[]): void {
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return resolve(path);
+    }
+  };
+  const seed = real(seedInput);
+  for (const dir of ownedDirs.map(real)) {
+    const rel = relative(dir, seed);
+    if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) {
+      throw new Error(
+        "--seed-instructions must not point inside .understudy/optimize-workload or the --log-dir, which the run rewrites; copy the file elsewhere first",
+      );
+    }
+  }
+}
+
+const secretKeyPattern =/(?:^|[_-])(api[_-]?key|authorization|password|secret|token)(?:$|[_-])/i;
 const secretValuePattern = /^(?:bearer\s+|sk-[A-Za-z0-9]|-----BEGIN [A-Z ]*PRIVATE KEY-----)/i;
 const envNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -437,6 +673,135 @@ function requireRegularFile(pathInput: string, flag: string): string {
     throw new Error(`${flag} must point to a non-symlink regular file`);
   }
   return path;
+}
+
+// Declarative multi-predictor programs for dspy-gepa. The runtime re-validates the
+// spec (it is the authority) and checks every used sample row against it before
+// any provider call; this check fails fast on a malformed file. Keep the two in step.
+const taskSpecSchemaVersion = "understudy.dspy_gepa_task_spec.v1";
+const taskSpecKinds = ["label", "label-set", "text"];
+const taskSpecPredictorName = /^[a-z][a-z0-9_]{0,63}$/;
+const taskSpecFieldName = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+// dspy.Module members a predictor attribute must not shadow, and ChainOfThought's field.
+const taskSpecReservedNames = new Set([
+  "batch", "callbacks", "deepcopy", "dump_state", "forward", "get_lm", "history",
+  "inspect_history", "load", "load_state", "map_named_predictors", "named_parameters",
+  "named_predictors", "named_sub_modules", "parameters", "predictors", "reset_copy",
+  "save", "set_lm",
+]);
+// Field names that fail late or read back wrong: ChainOfThought's field,
+// dspy.Example/Prediction members (attribute access returns the method, not the
+// value), names the Signature class or pydantic reject (and any model_ prefix), and
+// keyword arguments Predict consumes. Keep in step with TASK_SPEC_RESERVED_FIELDS.
+const taskSpecReservedFields = new Set([
+  "reasoning",
+  "completions", "copy", "from_completions", "get", "get_lm_usage", "inputs", "items",
+  "keys", "labels", "set_lm_usage", "toDict", "values", "with_inputs", "without",
+  "fields", "instructions", "model_config", "signature",
+  "config", "demos", "lm", "new_signature", "prediction",
+]);
+const taskSpecReservedField = (name: string): boolean => taskSpecReservedFields.has(name) || name.startsWith("model_");
+const taskSpecMaxPredictors = 32;
+const taskSpecMaxLabels = 256;
+const taskSpecMaxInstructions = 20000;
+
+type TaskSpecSummary = { path: string; module: "predict" | "cot"; inputs: string[]; outputs: string[] };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function rejectUnknownKeys(value: Record<string, unknown>, allowed: string[], path: string): void {
+  const unknown = Object.keys(value).filter((key) => !allowed.includes(key)).sort();
+  if (unknown.length) {
+    throw new Error(`--task-spec ${path} has unknown keys: ${unknown.join(", ")}`);
+  }
+}
+
+function requireTaskSpec(pathInput: string): TaskSpecSummary {
+  const path = requireRegularFile(pathInput, "--task-spec");
+  if ((lstatSync(path).mode & 0o400) === 0) {
+    throw new Error("--task-spec must be readable by its owner");
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new Error("--task-spec must contain valid JSON");
+  }
+  if (!isPlainObject(raw)) throw new Error("--task-spec must contain a JSON object");
+  rejectUnknownKeys(raw, ["schema_version", "description", "inputs", "module", "predictors"], "spec");
+  if (raw.schema_version !== taskSpecSchemaVersion) {
+    throw new Error(`--task-spec schema_version must be ${taskSpecSchemaVersion}`);
+  }
+  const inputs = raw.inputs;
+  if (
+    !Array.isArray(inputs) ||
+    inputs.length === 0 ||
+    !inputs.every((key) => typeof key === "string" && taskSpecFieldName.test(key) && !taskSpecReservedField(key)) ||
+    new Set(inputs).size !== inputs.length
+  ) {
+    throw new Error("--task-spec inputs must be a non-empty list of unique, non-reserved field names");
+  }
+  const module = raw.module ?? "predict";
+  if (module !== "predict" && module !== "cot") throw new Error("--task-spec module must be predict or cot");
+  const predictors = raw.predictors;
+  if (!Array.isArray(predictors) || predictors.length === 0 || predictors.length > taskSpecMaxPredictors) {
+    throw new Error(`--task-spec predictors must be a list of 1 to ${taskSpecMaxPredictors} predictors`);
+  }
+  const names = new Set<string>();
+  const outputs: string[] = [];
+  predictors.forEach((entry, index) => {
+    const at = `predictors[${index}]`;
+    if (!isPlainObject(entry)) throw new Error(`--task-spec ${at} must be an object`);
+    rejectUnknownKeys(entry, ["name", "output", "instructions", "type"], at);
+    const name = entry.name;
+    if (typeof name !== "string" || !taskSpecPredictorName.test(name) || taskSpecReservedNames.has(name)) {
+      throw new Error(`--task-spec ${at}.name must match ^[a-z][a-z0-9_]{0,63}$ and not be a dspy.Module member`);
+    }
+    if (names.has(name)) throw new Error(`--task-spec ${at}.name repeats another predictor's name`);
+    names.add(name);
+    const output = entry.output ?? name;
+    if (
+      typeof output !== "string" ||
+      !taskSpecFieldName.test(output) ||
+      taskSpecReservedField(output) ||
+      inputs.includes(output) ||
+      outputs.includes(output)
+    ) {
+      throw new Error(`--task-spec ${at}.output must be a field name that is not reserved, an input, or another output`);
+    }
+    outputs.push(output);
+    const instructions = entry.instructions;
+    if (
+      instructions !== undefined &&
+      (typeof instructions !== "string" || !instructions.trim() || instructions.length > taskSpecMaxInstructions)
+    ) {
+      throw new Error(`--task-spec ${at}.instructions must be non-empty text of at most ${taskSpecMaxInstructions} characters`);
+    }
+    const type = entry.type;
+    if (!isPlainObject(type) || !taskSpecKinds.includes(type.kind as string)) {
+      throw new Error(`--task-spec ${at}.type.kind must be label, label-set, or text`);
+    }
+    rejectUnknownKeys(type, ["kind", "labels"], `${at}.type`);
+    if (type.kind === "text") {
+      if ("labels" in type) throw new Error(`--task-spec ${at}.type.labels is not allowed for text`);
+      return;
+    }
+    const labels = type.labels;
+    if (
+      !Array.isArray(labels) ||
+      labels.length === 0 ||
+      labels.length > taskSpecMaxLabels ||
+      !labels.every((label) => typeof label === "string" && label.length > 0 && label.trim() === label) ||
+      new Set(labels.map((label: string) => label.split(/\s+/).join(" ").toLowerCase())).size !== labels.length
+    ) {
+      throw new Error(
+        `--task-spec ${at}.type.labels must be 1 to ${taskSpecMaxLabels} unique non-empty strings without surrounding whitespace`,
+      );
+    }
+  });
+  return { path, module, inputs: inputs as string[], outputs };
 }
 
 function rejectBridgeConfigSecrets(value: unknown, path = "bridge_config"): void {
@@ -658,6 +1023,9 @@ export function runOptimizerAdapter(options: AdapterRunOptions): Record<string, 
     env.UNDERSTUDY_GATEWAY_URL = auth.gatewayUrl;
     env.UNDERSTUDY_AUTH_SOURCE = auth.source;
   }
+  // dspy-gepa streams progress lines to stderr when asked, or by default on a terminal.
+  const showProgress = adapter.name === "dspy-gepa" && (options.progress ?? Boolean(process.stderr.isTTY));
+  if (showProgress) args.push("--progress");
   const out = runUvPython(
     repo,
     runtimePath,
@@ -665,6 +1033,7 @@ export function runOptimizerAdapter(options: AdapterRunOptions): Record<string, 
     adapter.packages,
     env,
     options.programProject ? resolve(options.programProject) : undefined,
+    showProgress,
   );
   freezeCandidateIntoActiveExperiment(repo, out);
   return out;
@@ -741,10 +1110,12 @@ function runUvPython(
   packages: string[] = [],
   env: Record<string, string> = {},
   programProject?: string,
+  streamStderr = false,
 ): Record<string, unknown> {
+  // A locked workload project owns its interpreter through its own lock.
   const uvArgs = programProject
     ? ["run", "--project", programProject, "--locked"]
-    : ["run", "--no-project"];
+    : ["run", "--no-project", "--python", optimizerPythonVersion];
   if (!programProject) {
     for (const pkg of packages) {
       uvArgs.push("--with", pkg);
@@ -754,6 +1125,8 @@ function runUvPython(
   const result = spawnSync("uv", uvArgs, {
     cwd: repo,
     encoding: "utf8",
+    // Inherit stderr so progress lines appear live; stdout stays captured for the final JSON.
+    ...(streamStderr ? { stdio: ["ignore", "pipe", "inherit"] as ["ignore", "pipe", "inherit"] } : {}),
     env: {
       ...process.env,
       ...env,

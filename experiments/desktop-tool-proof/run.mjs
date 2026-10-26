@@ -470,16 +470,14 @@ async function restoreResidency(capability, originalRunningSlotIds) {
   }
 }
 
-function modelSystemPrompt(modelId) {
-  const cards = JSON.parse(readFileSync(
-    resolve(here, "../../apps/homescreen/src-tauri/knowledge/model_cards.json"),
-    "utf8",
-  ));
-  const card = cards.find((candidate) => candidate.id === modelId);
-  const targetId = card?.alias_for ?? modelId;
-  return cards.find((candidate) => candidate.id === targetId)?.system_prompt
-    ?? cards.find((candidate) => candidate.id === "default")?.system_prompt
-    ?? "You are an AI assistant in the Understudy desktop app.";
+// The desktop app's model cards (and their per-model system prompts) were
+// removed with the app; the default card's prompt is kept inline.
+const defaultSystemPrompt =
+  "You are an AI assistant in the Understudy desktop app. Be direct, accurate, and useful. "
+  + "Do not claim to be an Understudy-trained model unless the selected model card explicitly says so.";
+
+function modelSystemPrompt() {
+  return defaultSystemPrompt;
 }
 
 async function loadDirectContext(capability, candidates) {
@@ -525,7 +523,7 @@ async function runDirectTurn(
         provider_kind: "openai-compatible",
         role: "primary",
         messages: [
-          { role: "system", content: modelSystemPrompt(target.modelId) },
+          { role: "system", content: modelSystemPrompt() },
           { role: "user", content: task.prompt },
         ],
         tools: context.tools,

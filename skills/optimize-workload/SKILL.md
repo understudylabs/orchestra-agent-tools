@@ -120,19 +120,36 @@ validator kinds in [`reference.md`](reference.md):
    `optimize-workload adapter run --adapter <name> ... --execute`.
    `eval-input-gepa` runs upstream GEPA locally without provider calls unless a
    model-backed path is explicitly selected. `adapter run --adapter dspy-gepa
-   --execute` uses exact `dspy==3.3.0`, `gepa[dspy]==0.1.1`, and
-   `cloudpickle==3.1.2` packages and
+   --execute` uses exact `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and
+   `cloudpickle==3.1.2` packages on Python 3.13 and
    additionally requires separate student/reflection model names, an approved dollar cap, and explicit input
    and output token prices before it resolves the Understudy API key. It passes
    auth to the child process through environment only, disables client-side
-   retries, and reserves each request against one cumulative price-basis ledger before
+   retries, and reserves each request's worst case against one price-basis ledger
+   (settled to a conservative billable bound once usage returns) before
    running train/dev rows. A program bridge may bind student and reflection to
    independent credential-free routes by naming credential environment
    variables; missing mappings use the Understudy Gateway. Receipt the
    requested alias, exact executed DSPy/LiteLLM model, and only response model
    identity actually exposed. Do not infer ZDR from a route name or
    `workload_capture: false`. Treat the resulting attribution
-   as a conservative cap under the supplied prices, not a provider invoice. GEPA's
+   as a conservative cap under the supplied prices, not a provider invoice.
+   The ledger takes narrower per-call prices (reflection prices,
+   `--model-price`, or prices the gateway publishes) and, for plain sample
+   runs only, an observe-only `--no-spend-ledger`. While a `dspy-gepa` run is
+   going it streams `.understudy/optimize-workload/dspy-gepa/events.jsonl`, a
+   live `run-state.json`, and `best-so-far.json`; `touch .../dspy-gepa/STOP`
+   ends it gracefully. Use `--rounds`, `--seed-instructions`, the stop flags,
+   `--proposals-per-iteration` and the `--proposer-*` flags to climb past one
+   pass, and `--evaluate-holdout` to score baseline vs optimized once after the
+   candidate is frozen. Select on the dev split and read the holdout once; use
+   `--match-mode case-insensitive` when casing is not part of the task. For a
+   workload with several labeled outputs (urgency, sentiment, a category set),
+   declare one typed predictor per output in a `--task-spec` JSON instead of
+   `--output-keys`: labels become `Literal` types, each predictor gets its own
+   feedback, and `--frontier-type hybrid` can keep per-predictor winners. The
+   flag reference, event schema, and noise caveats are in
+   [`docs/dspy-gepa-hill-climbing.md`](../../docs/dspy-gepa-hill-climbing.md). GEPA's
    edge is natural-language feedback: the metric must return a diagnosis of
    *why* each failing row failed and what to change, not a bare score — bland
    feedback wastes the optimizer. For an agentic workload this means the

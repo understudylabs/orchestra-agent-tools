@@ -155,26 +155,14 @@ claimed/completed lines into `runs/events.jsonl`.
   rollout past its timeout is killed into a `rollout_timeout` anomaly row.
 - Events stream to stderr; stdout stays parseable JSON.
 
-## Desktop app: what it is, how to get it, what it covers
+## Desktop app: what it is, what it covers
 
-**Distribution (verified in-repo + on GitHub, 2026-07):** Understudy Desktop
-is a Tauri app released as GitHub Releases on
-`understudylabs/understudy-agent-tools`, tags `desktop-vX.Y.Z-mvp`. Each
-release ships `Understudy_<version>_aarch64.dmg` (macOS Apple Silicon — the
-only platform currently built), `Understudy.app.tar.gz` + `.sig`, and
-`latest.json` (the Tauri v2 updater manifest; canonical endpoint
-`https://github.com/understudylabs/understudy-agent-tools/releases/latest/download/latest.json`).
-To find/download it:
-
-```sh
-gh release list -R understudylabs/understudy-agent-tools --limit 5
-gh release download <tag> -R understudylabs/understudy-agent-tools -p '*.dmg'
-```
-
-The app self-updates via the signed updater once installed. There is no
-standalone download website in this repo — do not invent one; point users at
-the GitHub Releases page. No Intel-mac, Windows, or Linux builds exist yet;
-say so rather than guessing.
+**Distribution:** Understudy Desktop is deprecated. The last build is GitHub
+release `desktop-v0.3.44-mvp` on `understudylabs/understudy-agent-tools`
+(macOS Apple Silicon only); it no longer self-updates and no further releases
+are planned. Do not point users at a download; point them at the CLI and
+`docs/desktop-deprecation.md`. The guidance below applies only to a copy that
+is already installed and running.
 
 **What the app manages vs headless CLI:**
 

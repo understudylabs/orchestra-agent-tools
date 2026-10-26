@@ -128,6 +128,10 @@ understudy optimize-workload adapter run --repo . --adapter dspy-gepa --samples 
 understudy optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
 ```
 
+`dspy-gepa` streams its progress while it runs and supports warm starts, climb
+rounds, stoppers, multi-proposal search, per-model prices, and an opt-in
+holdout evaluation. See [`dspy-gepa-hill-climbing.md`](dspy-gepa-hill-climbing.md).
+
 Required behavior:
 
 - Missing artifact: exit non-zero with the missing path.
@@ -145,12 +149,25 @@ Required behavior:
   token-price basis before resolving auth. Pass auth only through the child
   environment, disable client-side retries, and reserve a conservative
   price-basis upper bound before every request. Stop before a reservation could cross the
-  cap; fail closed when usage is missing or exceeds the reservation. Run
-  train/dev rows only, exclude holdout rows, and write owner-only candidate,
+  cap; settle a completed call's reservation to a conservative billable bound once its
+  usage is known (the larger of output and total minus input, plus separately reported
+  reasoning when the total adds nothing, plus reported cache writes; never above the
+  reservation), while in-flight and usage-ambiguous calls keep their full reservation;
+  fail closed when usage is missing (including zero input and zero output
+  tokens) or exceeds the reservation, and refuse every later reservation in
+  that run, latching the refusal under the same lock as the reservation. Run
+  train/dev rows only, exclude holdout rows (refuse a train or dev split that names
+  the holdout, or equal train and dev splits, and assert the rows are disjoint before
+  any provider call), and write owner-only candidate,
   proof, and terminal run-state artifacts with reservation and attribution
   evidence. The attribution is not a provider-invoice claim. The runtime is
-  exactly `dspy==3.3.0`, `gepa[dspy]==0.1.1`, and `cloudpickle==3.1.2`; it records and verifies all three
-  installed versions before any model call.
+  exactly `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and `cloudpickle==3.1.2`, with
+  `litellm>=1.83,<2`, on Python 3.13 (`uv run --no-project --python 3.13`); it
+  records and verifies all four installed versions before any model call.
+  The sole exception to the dollar cap is the explicit `--no-spend-ledger`
+  observe-only mode for built-in sample runs: it rejects `--budget-usd`, is
+  refused for program bridges, still records per-call usage, and marks every
+  receipt `spend_enforcement: none`.
 - Eval-input GEPA adapter: require `--execute`, read a local manifest with
   `rows`, `inputs`, or `inputs_path`, support exact-match label and tool-call
   objectives, invoke upstream `gepa.optimize` through `uv`, run train/dev rows
@@ -160,7 +177,7 @@ Required behavior:
 - Holdout access during optimization: mark the run contaminated and require a
   new split contract before any claim.
 
-### DSPy 3.3 GEPA controls
+### DSPy 3.4 GEPA controls
 
 The DSPy adapter forwards these GEPA controls without reimplementing GEPA:
 `--reflection-minibatch-size`, `--candidate-selection-strategy` (`pareto` or
@@ -169,17 +186,66 @@ The DSPy adapter forwards these GEPA controls without reimplementing GEPA:
 `--log-dir`, and `--track-stats`. Student and reflection sampling are explicit
 and hash-bound with `--temperature`, `--reasoning-effort`,
 `--reflection-temperature`, and `--reflection-reasoning-effort` (conservative
-defaults: `0.1` and `none`). Start a new workload at `--num-threads 1`.
+defaults: `0.1` and `none`). Output caps are separate: `--max-tokens` for the
+student and `--reflection-max-tokens` for reflection (both default `2048`;
+GEPA's structured proposals are truncated under a student-sized cap). Start a
+new workload at `--num-threads 1`.
 The adapter always enables upstream `track_best_outputs` for result lineage.
 The log directory is owner-only and contains a config binding; an existing log
 directory is resumable only when the exact package, workload-source, data,
-admission, model, optimizer, and spend configuration hash matches.
+admission, model, optimizer, search, and spend configuration hash matches.
+Each climb round (`--rounds`) is its own GEPA run: round 1 uses the log
+directory and round N uses `<log-dir>/round-N` under the same binding.
 
-The single user-supplied input/output price basis covers both model names. It
-must therefore be a conservative upper bound for the student and reflection
-deployments. Both independent LM instances share the same cumulative ledger,
-reserve before every request, disable retries, and fail closed on incomplete
-usage evidence.
+Climb and search controls are hash-bound into the same config:
+`--rounds`/`--min-round-gain`, the stoppers `--stop-after-stale`,
+`--stop-at-score`, `--max-minutes` and an always-armed
+`.understudy/optimize-workload/dspy-gepa/STOP` file (cleared at start),
+`--proposals-per-iteration` (GEPA 0.1.4 `IndependentSampling` plus
+`BestImprovement`), and `--proposer-skill`/`--proposer-note`/
+`--proposer-max-chars` (DSPy's `InstructionProposer`; skill files are bound by
+content hash). `--seed-instructions`, `--match-mode`, `--evaluate-holdout`,
+and `--task-spec` act on the built-in scaffold and are refused for program
+bridges. `--component-selector` and `--frontier-type` are recorded in `search`;
+`objective`, `hybrid`, and `cartesian` frontiers need a task spec. Every stop
+and selection reads the dev split only.
+
+A `--task-spec` (`understudy.dspy_gepa_task_spec.v1`) replaces
+`--input-keys`/`--output-keys` with several typed predictors. The CLI requires a
+regular, non-symlink, owner-readable file; the runtime re-validates it, binds
+its content hash and normalized form into the config, and checks every used
+sample row's gold values against it before any provider call, failing with the
+row index and predictor name only. The schema and scoring are in
+[`dspy-gepa-hill-climbing.md`](dspy-gepa-hill-climbing.md#multi-predictor-task-specs).
+
+Spend is metered at the DSPy engine seam: each LM owns a metering engine that
+wraps DSPy's LiteLLM engine, so every `complete(Request)` reserves before and
+records usage after the provider call, and DSPy copies share one ledger. The
+credential and base URL live on the inner engine, never on `dspy.LM`. An error
+DSPy wraps around a budget or usage failure is still classified as
+`budget-blocked` or `spend-evidence-error`.
+
+By default one user-supplied input/output price basis covers both model names
+and must be a conservative upper bound for both deployments. Each call may
+instead resolve a narrower basis, in order: `--reflection-input-usd-per-million`
+/`--reflection-output-usd-per-million` for reflection calls, a repeatable
+`--model-price MODEL=IN,OUT` for the requested model, a price the Understudy
+gateway publishes for a gateway-routed role (`--prices-from-gateway
+auto|off|require`; bridge routes to other providers never take gateway prices),
+then the global basis. The resolved prices are part of the hash-bound config,
+and every ledger entry records its role, price source, and rates. A model with
+no price from any source stops the run before the first provider call. Both
+independent LM instances share the same ledger, reserve before
+every request, disable retries, and fail closed on incomplete usage evidence.
+
+`--evaluate-holdout` is a post-freeze diagnostic, not a claim: after
+`candidate.json` is written and hashed, the baseline and optimized programs are
+scored once on the holdout rows and the result goes to owner-only
+`dspy-gepa/holdout-evaluation.json`, bound to the candidate and config hashes.
+It always reports exact and case-insensitive scores (`by_match`), never feeds
+selection, keeps `holdout_accessed_during_optimization: false`, and marks a
+budget stop mid-evaluation `incomplete-budget` instead of discarding the
+candidate.
 
 A bridge may route either LM independently with optional non-secret
 `inference_routes.student` and `inference_routes.reflection` objects. Each
@@ -294,7 +360,7 @@ returns:
 }
 ```
 
-DSPy 3.3.0 exposes `teacher` in the compile signature but its GEPA adapter
+DSPy 3.4.1 exposes `teacher` in the compile signature but its GEPA adapter
 rejects non-null teachers. The bridge field is retained for forward-compatible
 shape, but this pinned runtime fails explicitly when it is non-null. A workload
 may precompute teacher-derived examples or feedback before the approved run;
@@ -312,7 +378,10 @@ bundle was loaded; that proof belongs in admission.
 Successful runs persist owner-only `package-state.json`, `config.json`,
 `admission-receipt.json`,
 `program-state.json`, `bundle-manifest.json` when exported, `run-state.json`,
-the candidate, and proof packet. These receipts contain hashes and redacted
+the candidate, and proof packet. While a run is going it also streams
+owner-only `events.jsonl` (append-only, one `run_id` per invocation), a
+`run-state.json` with `status: running` and the current `phase`, and
+`best-so-far.json` whenever a new best clears the full dev split. These receipts contain hashes and redacted
 structure, never API keys or raw malformed response bodies.
 
 ## Claim Packet

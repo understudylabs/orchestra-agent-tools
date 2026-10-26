@@ -1,6 +1,6 @@
 # Portable task models
 
-Understudy Desktop can install a task-specific classifier from a `.zip`, a ZIP container renamed to `.understudy-model`, or an unpacked directory ending in `.understudy-model`. Open **Trained models** and drag the downloaded file or directory onto the window. The app safely extracts archives, verifies every included file, atomically installs the verified package under `~/.understudy/models/task-models/`, and automatically starts the package's required base-model download when it is not already present.
+A task-specific classifier ships as a `.zip`, a ZIP container renamed to `.understudy-model`, or an unpacked directory ending in `.understudy-model`. The Understudy Desktop drag-and-drop installer (which extracted, verified, and installed packages under `~/.understudy/models/task-models/`) was retired with the app; see [`desktop-deprecation.md`](desktop-deprecation.md). The bundle format below is unchanged, and the CLI consumes an unpacked bundle directly by path: queue a run with `understudy runs queue --benchmark <dir> --local-arm <label>=<path>` and run it with `understudy runs execute --benchmark <dir>`.
 
 The package contains the small task-specific parts, not another copy of the base model:
 

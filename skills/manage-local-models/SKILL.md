@@ -57,10 +57,9 @@ canonical runtime evidence — reuse it instead of spawning your own MLX servers
 or a second download of the same weights. The concrete verbs:
 `understudy desktop model list` / `model catalog` (cached snapshots and the
 bundled certified catalog), `slot list|add|assign` (residency),
-`download list|start` (managed downloads), and `chat --slot <id>`. If the app
-is not installed, it ships as GitHub Releases on
-`understudylabs/understudy-agent-tools` (macOS Apple Silicon `.dmg`, tags
-`desktop-v*`); the headless CLI covers everything in this skill without it.
+`download list|start` (managed downloads), and `chat --slot <id>`. The desktop
+app is deprecated (see `docs/desktop-deprecation.md`); if it is not already
+installed, use the headless CLI, which covers everything in this skill.
 
 ## Flow
 

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -56,7 +57,9 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
 }
 
 function authorized(request: IncomingMessage, token: string): boolean {
-  return request.headers.authorization === `Bearer ${token}`;
+  const expected = Buffer.from(`Bearer ${token}`);
+  const got = Buffer.from(String(request.headers.authorization ?? ""));
+  return got.length === expected.length && timingSafeEqual(got, expected);
 }
 
 function writeState(path: string, payload: unknown): void {
@@ -80,7 +83,13 @@ export async function startConversationSidecar(options: {
   const controllers = new Map<string, AbortController>();
   const activePiSessions = new Map<string, string>();
   const server = createServer(async (request, response) => {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    let url: URL;
+    try {
+      url = new URL(request.url ?? "/", "http://127.0.0.1");
+    } catch {
+      sendJson(response, 400, { error: "bad request" });
+      return;
+    }
     if (request.method === "GET" && url.pathname === "/health") {
       sendJson(response, 200, {
         status: "ok",
@@ -205,7 +214,13 @@ export async function startConversationSidecar(options: {
     }
     const cancelMatch = url.pathname.match(/^\/v1\/runs\/([^/]+)$/);
     if (request.method === "DELETE" && cancelMatch) {
-      const runId = decodeURIComponent(cancelMatch[1]);
+      let runId: string;
+      try {
+        runId = decodeURIComponent(cancelMatch[1]);
+      } catch {
+        sendJson(response, 400, { error: "bad request" });
+        return;
+      }
       const controller = controllers.get(runId);
       if (!controller) {
         sendJson(response, 404, { error: "run not found" });

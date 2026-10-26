@@ -282,6 +282,12 @@ export function readPrimeExecutionConfig(configPath: string): PrimeExecutionConf
   validatePrimeProviderPolicy(config.provider_policy);
   for (const [key, val] of Object.entries(config.identity ?? {})) {
     if (typeof val !== "string" || !val.trim()) throw new Error(`identity.${key} is required`);
+    // Identity values become path segments under the config dir (prepared TOML,
+    // attempt dirs, canonical layout); "/" is allowed (e.g. openai/gpt-5) but
+    // the value must not escape its root.
+    if (val.startsWith("/") || /[\\\0]/.test(val) || val.split("/").some((part) => part === "" || part === "." || part === "..")) {
+      throw new Error(`identity.${key} must be a relative path-safe name (no leading "/", empty, "." or ".." segments)`);
+    }
   }
   assertPositiveInt(config.sampling?.max_tokens, "sampling.max_tokens", 0);
   assertPositiveInt(config.concurrency?.tasks, "concurrency.tasks", 1);

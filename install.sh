@@ -6,8 +6,11 @@ LAB="${UNDERSTUDY_LAB:-$HOME/.understudy/agent-tools}"
 INSTALL_REPO_URL="${UNDERSTUDY_INSTALL_REPO_URL:-https://github.com/UnderstudyLabs/understudy-agent-tools.git}"
 INSTALL_REF="${UNDERSTUDY_INSTALL_REF:-main}"
 INSTALL_PACKAGE="${UNDERSTUDY_INSTALL_PACKAGE:-}"
-INSTALL_SOURCE_DIR="${UNDERSTUDY_INSTALL_SOURCE_DIR:-$LAB/source/understudy-agent-tools}"
-STATE_DIR="${UNDERSTUDY_INSTALL_STATE_DIR:-$LAB/install-state}"
+INSTALL_COMMIT="${UNDERSTUDY_INSTALL_COMMIT:-}"
+INSTALL_SOURCE_OVERRIDDEN=0
+if [ -n "${UNDERSTUDY_INSTALL_REPO_URL:-}${UNDERSTUDY_INSTALL_REF:-}${UNDERSTUDY_INSTALL_PACKAGE:-}" ]; then
+  INSTALL_SOURCE_OVERRIDDEN=1
+fi
 INSTALLER_COMMIT="${UNDERSTUDY_INSTALLER_COMMIT:-unknown}"
 LAUNCH_CLAUDE="${UNDERSTUDY_LAUNCH_AGENT:-${UNDERSTUDY_LAUNCH_CLAUDE:-1}}"
 CLAUDE_PERMISSION_MODE="${UNDERSTUDY_CLAUDE_PERMISSION_MODE:-auto}"
@@ -97,12 +100,14 @@ Environment overrides:
   UNDERSTUDY_LAB                 local runtime/log directory, default ~/.understudy/agent-tools
   UNDERSTUDY_INSTALL_REPO_URL    public repo URL, default https://github.com/UnderstudyLabs/understudy-agent-tools.git
   UNDERSTUDY_INSTALL_REF         Git ref for public repo install, default main
-  UNDERSTUDY_INSTALL_SOURCE_DIR  temporary sparse checkout, default $UNDERSTUDY_LAB/source/understudy-agent-tools
+  UNDERSTUDY_INSTALL_COMMIT      optional full commit SHA the checkout of UNDERSTUDY_INSTALL_REF must match
+  UNDERSTUDY_INSTALL_SOURCE_DIR  scratch checkout the installer deletes and re-clones, default $UNDERSTUDY_LAB/source/understudy-agent-tools
   UNDERSTUDY_INSTALL_STATE_DIR   install markers, default $UNDERSTUDY_LAB/install-state
   UNDERSTUDY_INSTALL_LOG_DIR     install logs, default $UNDERSTUDY_LAB/logs
   UNDERSTUDY_INSTALL_LOG_FILE    exact install log path
   UNDERSTUDY_INSTALLER_COMMIT    optional script commit label when caller knows it
   UNDERSTUDY_INSTALL_PACKAGE     optional npm package spec override
+  UNDERSTUDY_INSTALL_FROM_CWD    set to 1 to install agent adapters from a checkout in the current directory
   UNDERSTUDY_NONINTERACTIVE      set to 1 to use safe defaults without prompting
   UNDERSTUDY_REQUIRE_CONFIRM     set to 1 to fail when no prompt TTY exists
   UNDERSTUDY_KEEP_LOGIN          set to 1 to keep an existing sign-in
@@ -122,9 +127,20 @@ EOF
   shift
 done
 
+INSTALL_SOURCE_DIR="${UNDERSTUDY_INSTALL_SOURCE_DIR:-$LAB/source/understudy-agent-tools}"
+STATE_DIR="${UNDERSTUDY_INSTALL_STATE_DIR:-$LAB/install-state}"
 LOG_DIR="${UNDERSTUDY_INSTALL_LOG_DIR:-$LAB/logs}"
 LOG_FILE="${UNDERSTUDY_INSTALL_LOG_FILE:-$LOG_DIR/install-$(date -u +"%Y%m%dT%H%M%SZ").log}"
-mkdir -p "$LOG_DIR"
+# The installer's own state lives under ~/.understudy, which the CLI keeps
+# 0700; create it the same way so a fresh install does not leave it 0755.
+private_mkdir() {
+  ( umask 077; mkdir -p "$@" )
+  if [ -d "$HOME/.understudy" ]; then
+    chmod 700 "$HOME/.understudy" 2>/dev/null || true
+  fi
+}
+private_mkdir "$LOG_DIR"
+( umask 077; : >>"$LOG_FILE" ) 2>/dev/null || true
 
 # ── presentation ─────────────────────────────────────────────────────
 # Fancy output needs a TTY on stdout; pipes, CI, and dumb terminals get
@@ -163,6 +179,20 @@ say() {
     printf '\033[1munderstudy\033[0m %s\n' "$*"
   fi
   log "$*"
+}
+# Like say, but kept out of the install log (for text that embeds the user's
+# email or other personal details).
+say_unlogged() {
+  if [ "$FANCY" = "1" ]; then
+    printf '  %s│%s %s\n' "$D" "$R" "$*"
+  else
+    printf '\033[1munderstudy\033[0m %s\n' "$*"
+  fi
+}
+# Mask credentials embedded in URLs (https://user:token@host/...) before a
+# command line or source spec is shown or logged.
+redact_url() {
+  printf '%s\n' "$*" | sed -E 's#(://)[^/@[:space:]]+@#\1<redacted>@#g'
 }
 ok() {
   if [ "$FANCY" = "1" ]; then
@@ -224,12 +254,15 @@ banner() {
 run_logged() {
   local label="$1"
   shift
-  log "RUN $*"
+  log "RUN $(redact_url "$@")"
   local status=0
   if [ "$FANCY" = "1" ]; then
     local frames=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏) i=0 start=$SECONDS
     "$@" >>"$LOG_FILE" 2>&1 &
     local pid=$!
+    # Ctrl-C must take the background step down with the installer, or it
+    # keeps writing into the scratch checkout and the global npm prefix.
+    trap 'kill "$pid" 2>/dev/null || true; printf "\r\033[2K\033[?25h"; exit 130' INT TERM
     printf '\033[?25l'
     while kill -0 "$pid" 2>/dev/null; do
       printf '\r  %s%s%s %s %s%ss%s ' "$AC" "${frames[$((i % 10))]}" "$R" "$label" "$D" "$((SECONDS - start))" "$R"
@@ -237,6 +270,7 @@ run_logged() {
       sleep 0.1
     done
     wait "$pid" || status=$?
+    trap - INT TERM
     printf '\r\033[2K\033[?25h'
     if [ "$status" = "0" ]; then
       ok "$label ${D}($((SECONDS - start))s)${R}"
@@ -245,10 +279,11 @@ run_logged() {
   else
     if "$@" >>"$LOG_FILE" 2>&1; then
       return 0
+    else
+      status="$?"
     fi
-    status="$?"
   fi
-  fail_line "Command failed: $*"
+  fail_line "Command failed: $(redact_url "$@")"
   say "See install log: $LOG_FILE"
   tail -40 "$LOG_FILE" >&2 || true
   return "$status"
@@ -270,7 +305,7 @@ should_run_step() {
 }
 mark_step_done() {
   local step="$1"
-  mkdir -p "$STATE_DIR"
+  private_mkdir "$STATE_DIR"
   date -u +"%Y-%m-%dT%H:%M:%SZ" >"$STATE_DIR/step-$step.done"
   printf '%s\n' "$step" >"$STATE_DIR/last-step"
 }
@@ -299,7 +334,12 @@ validate_agent_platforms() {
   local token normalized count mode
   count=0
   mode=""
-  for token in $(printf '%s\n' "$AGENT_PLATFORMS" | tr ',;' '  '); do
+  # Split without globbing so a token such as '*' cannot expand to file names.
+  set -f
+  # shellcheck disable=SC2046
+  set -- $(printf '%s\n' "$AGENT_PLATFORMS" | tr ',;' '  ')
+  set +f
+  for token in "$@"; do
     count=$((count + 1))
     normalized="$(normalize_agent_platform "$token")"
     case "$normalized" in
@@ -323,7 +363,11 @@ validate_agent_platforms() {
 agent_platform_requested() {
   local wanted token normalized
   wanted="$(normalize_agent_platform "$1")"
-  for token in $(printf '%s\n' "$AGENT_PLATFORMS" | tr ',;' '  '); do
+  set -f
+  # shellcheck disable=SC2046
+  set -- $(printf '%s\n' "$AGENT_PLATFORMS" | tr ',;' '  ')
+  set +f
+  for token in "$@"; do
     normalized="$(normalize_agent_platform "$token")"
     case "$normalized" in
       all) return 0 ;;
@@ -688,6 +732,9 @@ remove_previous_global_package() {
     if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -q 'understudy-agent-tools'; then
       say "Removing stale Understudy command at $bin_path"
       rm -f "$bin_path"
+    elif [ -f "$bin_path" ] && [ "$bin_path" != "$global_prefix/bin/understudy" ]; then
+      # Not created by npm or this installer: a user's own wrapper stays.
+      warn "Leaving existing $bin_path in place; if its directory precedes $global_prefix/bin in PATH it will shadow the newly installed understudy command."
     elif [ -f "$bin_path" ] && grep -q 'understudy-agent-tools' "$bin_path" 2>/dev/null; then
       say "Removing stale Understudy command at $bin_path"
       rm -f "$bin_path"
@@ -695,12 +742,24 @@ remove_previous_global_package() {
   done
 }
 
+# Record where this install came from next to package-commit, so a redirected
+# source (env overrides) stays visible afterwards and not only in the log.
+record_install_source() {
+  private_mkdir "$STATE_DIR"
+  {
+    printf 'repo_url=%s\n' "$(redact_url "$INSTALL_REPO_URL")"
+    printf 'ref=%s\n' "$INSTALL_REF"
+    printf 'commit=%s\n' "$INSTALL_COMMIT"
+    printf 'package=%s\n' "$(redact_url "$INSTALL_PACKAGE")"
+  } >"$STATE_DIR/install-source"
+}
+
 install_understudy_package() {
-  local package_commit package_version package_tarball
-  remove_previous_global_package
+  local package_commit package_version package_tarball runtime_deps
+  record_install_source
 
   if [ -n "$INSTALL_PACKAGE" ]; then
-    say "Installing Understudy package from $INSTALL_PACKAGE"
+    warn "Installing Understudy package from a non-default source: $(redact_url "$INSTALL_PACKAGE")"
     run_logged "Install Understudy package" npm install -g "$INSTALL_PACKAGE"
     return 0
   fi
@@ -710,29 +769,74 @@ install_understudy_package() {
     exit 1
   }
 
-  say "Installing Understudy package from $INSTALL_REPO_URL#$INSTALL_REF"
+  if [ "$INSTALL_SOURCE_OVERRIDDEN" = "1" ]; then
+    warn "Installing Understudy package from a non-default source: $(redact_url "$INSTALL_REPO_URL")#$INSTALL_REF"
+  else
+    say "Installing Understudy package from $INSTALL_REPO_URL#$INSTALL_REF"
+  fi
+  # The scratch checkout is deleted before and after the install; never do
+  # that to a path this installer did not create itself.
+  INSTALL_SOURCE_DIR="$(node -e '
+    const fs = require("fs"), path = require("path");
+    const resolve = p => { p = path.resolve(p); return fs.existsSync(p) ? fs.realpathSync(p) : p; };
+    const target = resolve(process.argv[1]);
+    const protectedPaths = process.argv.slice(2).map(resolve);
+    if (protectedPaths.some(p => p === target || p.startsWith(target + path.sep)) || target === path.parse(target).root) process.exit(2);
+    process.stdout.write(target);
+  ' "$INSTALL_SOURCE_DIR" "$HOME" "$LAB" "$PWD")" || {
+    fail_line "Refusing to use the requested path as the scratch checkout."
+    exit 2
+  }
+  case "${INSTALL_SOURCE_DIR%/}" in
+    ""|/|"$HOME")
+      fail_line "Refusing to use $INSTALL_SOURCE_DIR as the scratch checkout."
+      exit 2
+      ;;
+  esac
+  if [ -L "$INSTALL_SOURCE_DIR" ] || { [ -e "$INSTALL_SOURCE_DIR" ] && [ ! -f "$INSTALL_SOURCE_DIR/.understudy-installer-checkout" ]; }; then
+    fail_line "$INSTALL_SOURCE_DIR exists and was not created by this installer; remove it or unset UNDERSTUDY_INSTALL_SOURCE_DIR."
+    exit 2
+  fi
   rm -rf "$INSTALL_SOURCE_DIR"
-  mkdir -p "$(dirname "$INSTALL_SOURCE_DIR")"
-  run_logged "Download Understudy ($INSTALL_REF)" git clone --depth 1 --filter=blob:none --sparse --branch "$INSTALL_REF" "$INSTALL_REPO_URL" "$INSTALL_SOURCE_DIR"
+  private_mkdir "$(dirname "$INSTALL_SOURCE_DIR")"
+  run_logged "Download Understudy ($INSTALL_REF)" env GIT_ALLOW_PROTOCOL="${GIT_ALLOW_PROTOCOL:-https:ssh:file}" git clone --depth 1 --filter=blob:none --sparse --branch "$INSTALL_REF" "$INSTALL_REPO_URL" "$INSTALL_SOURCE_DIR"
+  : >"$INSTALL_SOURCE_DIR/.understudy-installer-checkout"
   run_logged "Select install files" git -C "$INSTALL_SOURCE_DIR" sparse-checkout set \
     .agents .claude-plugin .codex-plugin .cursor-plugin .devin .hermes .opencode \
     docs experiments/desktop-tool-proof runtime-assets schemas scripts skills src
-  package_commit="$(git -C "$INSTALL_SOURCE_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+  package_commit="$(git -C "$INSTALL_SOURCE_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
   say "Understudy package commit: $package_commit"
-  mkdir -p "$STATE_DIR"
+  if [ -n "$INSTALL_COMMIT" ]; then
+    if [[ "$INSTALL_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]] && [ "$package_commit" = "$(printf '%s' "$INSTALL_COMMIT" | tr 'A-F' 'a-f')" ]; then
+      ok "Checkout matches UNDERSTUDY_INSTALL_COMMIT."
+    else
+        fail_line "Checkout of $INSTALL_REF is at $package_commit, not the pinned UNDERSTUDY_INSTALL_COMMIT=$INSTALL_COMMIT."
+        exit 1
+    fi
+  fi
+  private_mkdir "$STATE_DIR"
   printf '%s\n' "$package_commit" >"$STATE_DIR/package-commit"
-  run_logged "Install runtime dependencies" npm install --prefix "$INSTALL_SOURCE_DIR" --omit=dev --ignore-scripts
+  run_logged "Install runtime dependencies" npm ci --prefix "$INSTALL_SOURCE_DIR" --omit=dev --ignore-scripts
   run_logged "Build the CLI" npx --yes --package typescript@5.7.3 tsc \
     -p "$INSTALL_SOURCE_DIR/tsconfig.install.json"
   run_logged "Prepare the CLI" node "$INSTALL_SOURCE_DIR/scripts/ensure-bin-mode.mjs"
-  package_version="$(node -p "require('$INSTALL_SOURCE_DIR/package.json').version")"
+  package_version="$(node -p 'require(process.argv[1] + "/package.json").version' "$INSTALL_SOURCE_DIR")"
   package_tarball="$STATE_DIR/understudylabs-understudy-agent-tools-$package_version.tgz"
   rm -f "$package_tarball"
   # npm pack always runs `prepare` for directory inputs. The installer already
   # produced dist with its no-typecheck build, so remove prepare only from this
   # temporary checkout before packaging it.
   run_logged "Disable redundant package prepare" npm pkg delete scripts.prepare --prefix "$INSTALL_SOURCE_DIR"
-  run_logged "Pack Understudy" npm pack "$INSTALL_SOURCE_DIR" --ignore-scripts --pack-destination "$STATE_DIR"
+  # npm pack drops package-lock.json and `npm install -g <tarball>` would then
+  # re-resolve every dependency range from the registry. Bundling the
+  # lockfile-installed node_modules keeps the installed CLI on the tested tree.
+  runtime_deps="$(node -p 'JSON.stringify(Object.keys(require(process.argv[1] + "/package.json").dependencies || {}))' "$INSTALL_SOURCE_DIR")"
+  run_logged "Bundle pinned runtime dependencies" npm pkg set --prefix "$INSTALL_SOURCE_DIR" --json bundleDependencies="$runtime_deps"
+  # Pack from the checkout: npm's directory-input path can omit bundled
+  # node_modules even when bundleDependencies is set.
+  (cd "$INSTALL_SOURCE_DIR" && run_logged "Pack Understudy" npm pack . --ignore-scripts --pack-destination "$STATE_DIR")
+  # Only now that a replacement tarball exists is the previous CLI removed.
+  remove_previous_global_package
   run_logged "Install the understudy command" npm install -g --ignore-scripts "$package_tarball"
   rm -rf "$INSTALL_SOURCE_DIR"
 }
@@ -778,12 +882,23 @@ prepare_agent_first_signin() {
       say "Keeping the existing Understudy sign-in (--keep-login)."
       return 0
     fi
+    # A --resume retry after the reset already happened in this install must
+    # not sign the user out again (the agent may have signed in since).
+    if [ "$RESUME" = "1" ] && [ -f "$STATE_DIR/login-reset.done" ]; then
+      say "Keeping the current Understudy sign-in; it was already reset earlier in this install (--resume)."
+      return 0
+    fi
     local backup
     backup="$HOME/.understudy/credentials.json.bak-$(date -u +"%Y%m%dT%H%M%SZ")"
+    # Keep a single backup so retries do not accumulate copies of live keys.
+    rm -f "$HOME/.understudy"/credentials.json.bak-*
     mv "$CREDENTIALS_FILE" "$backup"
+    chmod 600 "$backup"
     rm -f "$HOME/.understudy/login-pending.json"
+    private_mkdir "$STATE_DIR"
+    date -u +"%Y-%m-%dT%H:%M:%SZ" >"$STATE_DIR/login-reset.done"
     if [ -n "$KNOWN_EMAIL" ]; then
-      ok "Signed out $KNOWN_EMAIL so the agent can run the sign-up from scratch."
+      say_unlogged "Signed out $KNOWN_EMAIL so the agent can run the sign-up from scratch."
     elif [ -n "$existing_email" ]; then
       ok "Signed out the existing Understudy sign-in so the agent can run the sign-up from scratch."
     else
@@ -828,32 +943,43 @@ compose_initial_prompt() {
   fi
 }
 
+# Where plugin manifests and skills are read from, in order of trust: the
+# directory of this file when the user ran it from a checkout, the current
+# directory only with UNDERSTUDY_INSTALL_FROM_CWD=1 (developer flow), then the
+# installed npm package. `curl | bash` runs inside the user's project, so a
+# skills/ tree planted there must never be picked up on its own.
+repo_candidates() {
+  if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    (cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  fi
+  if [ "${UNDERSTUDY_INSTALL_FROM_CWD:-0}" = "1" ]; then
+    pwd
+  fi
+  printf '%s\n' "$PKG_DIR"
+}
 resolve_plugin_repo() {
-  local manifest_dir="$1" repo="$PKG_DIR"
-  if [ ! -f "$repo/$manifest_dir/plugin.json" ]; then
-    repo="$(cd "$(dirname "$0")" && pwd)"
-  fi
-  if [ ! -f "$repo/$manifest_dir/plugin.json" ]; then
-    repo="$(pwd)"
-  fi
-  if [ ! -f "$repo/$manifest_dir/plugin.json" ]; then
-    return 1
-  fi
-  printf '%s\n' "$repo"
+  local manifest_dir="$1" repo
+  while IFS= read -r repo; do
+    if [ -f "$repo/$manifest_dir/plugin.json" ]; then
+      printf '%s\n' "$repo"
+      return 0
+    fi
+  done <<EOF
+$(repo_candidates)
+EOF
+  return 1
 }
 resolve_skill_repo() {
   local repo
-  repo="$(cd "$(dirname "$0")" && pwd)"
-  if [ ! -f "$repo/skills/understudy/SKILL.md" ]; then
-    repo="$(pwd)"
-  fi
-  if [ ! -f "$repo/skills/understudy/SKILL.md" ]; then
-    repo="$PKG_DIR"
-  fi
-  if [ ! -f "$repo/skills/understudy/SKILL.md" ]; then
-    return 1
-  fi
-  printf '%s\n' "$repo"
+  while IFS= read -r repo; do
+    if [ -f "$repo/skills/understudy/SKILL.md" ]; then
+      printf '%s\n' "$repo"
+      return 0
+    fi
+  done <<EOF
+$(repo_candidates)
+EOF
+  return 1
 }
 
 install_claude_plugin() {
@@ -939,7 +1065,6 @@ install_cursor_plugin() {
     adapter_prereq_missing "cursor" "an existing non-Understudy path occupies $dest"
     return 0
   else
-    rm -rf "$dest"
     ln -s "$repo" "$dest"
     ok "Understudy Cursor plugin linked at $dest."
     record_adapter "cursor" "installed" "plugin linked"
@@ -1111,7 +1236,7 @@ hermes_stable_skills_link() {
 hermes_register_dir() {
   local skills_dir="$1" stable_link current
   stable_link="$(hermes_stable_skills_link)"
-  mkdir -p "$(dirname "$stable_link")"
+  private_mkdir "$(dirname "$stable_link")"
   if [ -L "$stable_link" ]; then
     current="$(readlink "$stable_link" 2>/dev/null || true)"
     if [ "$current" = "$skills_dir" ]; then
@@ -1143,7 +1268,7 @@ install_hermes_adapter() {
     return 0
   fi
 
-  local repo skills_dir register_dir config py
+  local repo skills_dir register_dir config py status
   if ! repo="$(resolve_skill_repo)"; then
     say "Could not find skills/understudy/SKILL.md; skipping Hermes skill registration."
     adapter_prereq_missing "hermes" "skills/understudy/SKILL.md was not found"
@@ -1155,13 +1280,7 @@ install_hermes_adapter() {
 
   say "Registering the Understudy skills with Hermes via $register_dir."
 
-  # Idempotent: Hermes reads skills.external_dirs and skips non-existent or
-  # duplicate paths, so if our path is already present there is nothing to do.
-  # A plain substring check avoids a YAML dependency on the fast path.
-  if [ -f "$config" ] && grep -qF "$register_dir" "$config" 2>/dev/null; then
-    ok "Understudy skills already registered in $config (skills.external_dirs)."
-    record_adapter "hermes" "installed" "already registered"
-  elif [ ! -f "$config" ]; then
+  if [ ! -f "$config" ]; then
     # Fresh Hermes: write a minimal user config. Hermes merges defaults at load
     # and `hermes config migrate` keeps our block, so this is non-destructive.
     mkdir -p "$(dirname "$config")"
@@ -1173,9 +1292,12 @@ install_hermes_adapter() {
     ok "Created $config and registered Understudy skills in skills.external_dirs."
     record_adapter "hermes" "installed" "registered in new config"
   elif py="$(hermes_yaml_python)"; then
-    cp "$config" "$config.understudy.bak-$(date -u +"%Y%m%dT%H%M%SZ")"
-    if "$py" - "$config" "$register_dir" >>"$LOG_FILE" 2>&1 <<'PY'
-import sys, os, yaml
+    # Idempotent: the YAML merge is authoritative. It exits 3 when the path is
+    # already in skills.external_dirs and leaves the file (and its comments)
+    # untouched; it backs the config up only right before rewriting it.
+    status=0
+    "$py" - "$config" "$register_dir" >>"$LOG_FILE" 2>&1 <<'PY' || status=$?
+import sys, os, shutil, yaml
 
 cfg_path, skills_dir = sys.argv[1], sys.argv[2]
 with open(cfg_path, encoding="utf-8") as f:
@@ -1193,20 +1315,33 @@ elif isinstance(dirs, str):
     dirs = [dirs]
 elif not isinstance(dirs, list):
     dirs = []
-if skills_dir not in dirs:
-    dirs.append(skills_dir)
+if skills_dir in dirs:
+    sys.exit(3)
+dirs.append(skills_dir)
 skills["external_dirs"] = dirs
+shutil.copyfile(cfg_path, cfg_path + ".understudy.bak")
 with open(cfg_path, "w", encoding="utf-8") as f:
     yaml.safe_dump(cfg, f, sort_keys=False, default_flow_style=False)
 PY
-    then
-      ok "Registered Understudy skills in $config (skills.external_dirs)."
-      record_adapter "hermes" "installed" "registered"
-    else
-      warn "Could not update $config automatically; continuing with the rest of the install."
-      say "Manual step: add \"$register_dir\" to skills.external_dirs in $config (or run: hermes config edit)."
-      record_adapter_failure "hermes" "could not update $config automatically"
-    fi
+    case "$status" in
+      0)
+        ok "Registered Understudy skills in $config (skills.external_dirs)."
+        record_adapter "hermes" "installed" "registered"
+        ;;
+      3)
+        ok "Understudy skills already registered in $config (skills.external_dirs)."
+        record_adapter "hermes" "installed" "already registered"
+        ;;
+      *)
+        warn "Could not update $config automatically; continuing with the rest of the install."
+        say "Manual step: add \"$register_dir\" to skills.external_dirs in $config (or run: hermes config edit)."
+        record_adapter_failure "hermes" "could not update $config automatically"
+        ;;
+    esac
+  elif grep -qF "$register_dir" "$config" 2>/dev/null; then
+    # Without a YAML-capable Python a substring match is the best signal left.
+    ok "Understudy skills already registered in $config (skills.external_dirs)."
+    record_adapter "hermes" "installed" "already registered"
   else
     warn "No YAML-capable Python found to edit $config safely; leaving it unchanged."
     say "Manual step: add \"$register_dir\" to skills.external_dirs in $config (run: hermes config edit)."
@@ -1297,18 +1432,22 @@ launch_claude_code() {
   say "The Understudy plugin will be loaded for this launch with --plugin-dir."
   say "Claude Code permission mode: $CLAUDE_PERMISSION_MODE."
   say "Claude Code will receive the first prompt automatically:"
-  say "  ${D}$INITIAL_CLAUDE_PROMPT${R}"
+  say_unlogged "  ${D}$INITIAL_CLAUDE_PROMPT${R}"
+  log "  <initial-prompt>"
   say "If you open a separate existing Claude Code session later, run /reload-plugins there once."
   say "Launching Claude Code now. Exit Claude to return to this shell."
   claude_log="$LOG_DIR/claude-$(date -u +"%Y%m%dT%H%M%SZ").log"
   say "Claude Code launch log: $claude_log"
-  log "LAUNCH claude --permission-mode $CLAUDE_PERMISSION_MODE --plugin-dir $PKG_DIR ${UNDERSTUDY_CLAUDE_ARGS:-} <initial-prompt>"
+  log "LAUNCH claude --permission-mode $CLAUDE_PERMISSION_MODE --plugin-dir $PKG_DIR $(redact_url "${UNDERSTUDY_CLAUDE_ARGS:-}") <initial-prompt>"
   if need script; then
     # curl | sh leaves stdin attached to the pipe. `script` gives Claude Code a
     # real pseudo-terminal while also capturing the launch output for debugging.
     # macOS script(1) takes a positional command; Linux script(1) needs -c.
     # shellcheck disable=SC2086
     if [ "$(uname -s)" = "Darwin" ]; then
+      # The transcript records the whole session, including the sign-in code
+      # the user types; keep it private like the rest of ~/.understudy.
+      ( umask 077; : >"$claude_log" )
       script -q "$claude_log" claude --permission-mode "$CLAUDE_PERMISSION_MODE" --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
         local status="$?"
         say "Claude Code exited with status $status."
@@ -1433,7 +1572,13 @@ else
   section "Welcome. We are going to install Understudy for your coding agent."
 fi
 say "This installer bootstraps the CLI and selected coding-agent skills, then drops you back into your coding agent when possible."
-say "Source: $INSTALL_REPO_URL#$INSTALL_REF ${D}(installer commit: $INSTALLER_COMMIT)${R}"
+if [ -n "$INSTALL_PACKAGE" ]; then
+  warn "Source: npm package $(redact_url "$INSTALL_PACKAGE") (UNDERSTUDY_INSTALL_PACKAGE override) ${D}(installer commit: $INSTALLER_COMMIT)${R}"
+elif [ "$INSTALL_SOURCE_OVERRIDDEN" = "1" ]; then
+  warn "Source: $(redact_url "$INSTALL_REPO_URL")#$INSTALL_REF (non-default, set by UNDERSTUDY_INSTALL_* environment) ${D}(installer commit: $INSTALLER_COMMIT)${R}"
+else
+  say "Source: $INSTALL_REPO_URL#$INSTALL_REF ${D}(installer commit: $INSTALLER_COMMIT)${R}"
+fi
 say "Install log: $LOG_FILE"
 say ""
 select_agent_platforms
@@ -1454,6 +1599,9 @@ say ""
 say "Default install does not download weights, start MLX, launch the ladder server, or make frontier calls."
 say "Those actions happen later through the Understudy onboarding skill, where the coding agent can coach the user and ask consent."
 say "This installer writes only under $LAB, $HOME/.understudy, the global npm prefix, and selected coding-agent plugin state."
+if [ -n "${UNDERSTUDY_INSTALL_SOURCE_DIR:-}" ]; then
+  say "Scratch checkout (UNDERSTUDY_INSTALL_SOURCE_DIR): $INSTALL_SOURCE_DIR is deleted before and after the install."
+fi
 confirm "Continue with this Understudy installation?" || exit 1
 
 PKG_DIR="$(npm root -g)/@understudylabs/understudy-agent-tools"

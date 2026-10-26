@@ -36,8 +36,9 @@ The current implementation is `src/optimize-workload.ts`: it generates
 `uv run --no-project` for approved named optimizer adapters such as
 `eval-input-gepa` and `dspy-gepa`.
 
-The live DSPy adapter installs exactly `dspy==3.3.0` and
-`gepa[dspy]==0.1.1` plus `cloudpickle==3.1.2`, verifies the installed distribution versions, and records
+The live DSPy adapter installs exactly `dspy==3.4.1` and
+`gepa[dspy]==0.1.4` plus `cloudpickle==3.1.2` and a bounded
+`litellm>=1.83,<2` on a pinned Python 3.13, verifies the installed distribution versions, and records
 them in an owner-only package receipt. Its optional `--program-bridge` is a
 workload file contract, not another package: a provider-free admission hook
 binds exact adapter/data/tool-schema/package hashes before separate metered

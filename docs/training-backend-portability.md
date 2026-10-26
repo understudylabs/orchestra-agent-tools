@@ -100,7 +100,8 @@ this constant is the single place to update.
 
 ## Known gaps left open
 
-- The desktop's Rust `compile_remote_training_backends`
+- (Retired with the desktop app, see [`desktop-deprecation.md`](desktop-deprecation.md).)
+  The desktop's Rust `compile_remote_training_backends`
   (`apps/homescreen/src-tauri/src/remote_training.rs`) still derives
   `adapter_implemented` from the portable recipe registry alone, so its panel
   can claim an implemented adapter for a recipe with no executor. It should be
