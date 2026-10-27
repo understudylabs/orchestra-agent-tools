@@ -184,8 +184,8 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Ignoring GitHub noreply email from existing Understudy credentials/);
-    assert.match(result.stdout, /Signed out the existing Understudy sign-in/);
+    assert.match(result.stdout, /Ignoring GitHub noreply email from existing Orchestra credentials/);
+    assert.match(result.stdout, /Signed out the existing Orchestra sign-in/);
     assert.doesNotMatch(result.stdout, /users\.noreply\.github\.com/);
   });
 
@@ -268,7 +268,7 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Keeping the existing Understudy sign-in/);
+    assert.match(result.stdout, /Keeping the existing Orchestra sign-in/);
     assert.equal(existsSync(join(understudyDir, "credentials.json")), true);
   });
 
@@ -343,7 +343,7 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Understudy Cursor plugin linked/);
+    assert.match(result.stdout, /Orchestra Cursor plugin linked/);
     assert.equal(existsSync(join(home, ".cursor", "plugins", "local", "understudy")), true);
   });
 
@@ -433,7 +433,7 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Understudy Codex marketplace registered/);
+    assert.match(result.stdout, /Orchestra Codex marketplace registered/);
     assert.match(readFileSync(calls, "utf8"), /plugin marketplace add /);
   });
 
@@ -524,7 +524,7 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Understudy OpenCode skills linked/);
+    assert.match(result.stdout, /Orchestra OpenCode skills linked/);
     assert.equal(existsSync(join(home, ".config", "opencode", "skills", "understudy", "SKILL.md")), true);
     assert.match(
       readlinkSync(join(home, ".config", "opencode", "skills", "understudy")),
@@ -645,7 +645,7 @@ describe("install.sh", () => {
 
     const first = spawnSync("bash", args, { cwd: process.cwd(), input: script, encoding: "utf8", env });
     assert.equal(first.status, 0, first.stderr || first.stdout);
-    assert.match(first.stdout, /registered Understudy skills in skills\.external_dirs/);
+    assert.match(first.stdout, /registered Orchestra skills in skills\.external_dirs/);
     // A durable ~/.understudy/skills symlink points at the resolved skills tree.
     assert.equal(readlinkSync(stableLink), realSkills);
     // The config registers the stable symlink path, not the resolved checkout path.
@@ -706,10 +706,10 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Understudy plugin installed/);
-    assert.match(result.stdout, /Understudy Cursor plugin linked/);
-    assert.match(result.stdout, /Understudy Codex marketplace registered/);
-    assert.match(result.stdout, /Understudy OpenCode skills linked/);
+    assert.match(result.stdout, /Orchestra plugin installed/);
+    assert.match(result.stdout, /Orchestra Cursor plugin linked/);
+    assert.match(result.stdout, /Orchestra Codex marketplace registered/);
+    assert.match(result.stdout, /Orchestra OpenCode skills linked/);
     const callsText = readFileSync(calls, "utf8");
     assert.match(callsText, /claude plugin marketplace add /);
     assert.match(callsText, /claude plugin install understudy@understudy-skills/);
@@ -720,7 +720,7 @@ describe("install.sh", () => {
     const script = readFileSync("install.sh", "utf8");
 
     assert.match(script, /Choose Coding Agent/);
-    assert.match(script, /Where should Understudy install its agent plugin/);
+    assert.match(script, /Where should Orchestra install its agent plugin/);
     assert.match(script, /Install target/);
     assert.match(script, /All detected coding agents/);
     assert.match(script, /CLI only, no coding-agent plugins/);

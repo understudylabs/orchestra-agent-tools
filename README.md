@@ -1,6 +1,6 @@
 <div align="center">
 
-# Understudy Agent Tools
+# Orchestra Agent Tools
 
 **Type `/understudy:onboard` in Claude Code — or the matching onboarding
 command in your agent — and it walks your LLM app from captured traces to a
@@ -17,10 +17,11 @@ Works with **Claude Code** · **Cursor** · **Codex** · **OpenCode** · **Herme
 
 ---
 
-Understudy is a public, MIT-licensed skill library plus a thin CLI. It gives
-your coding agent the playbooks to evaluate an AI workload locally, optimize
-it, and route it to a better-value model — **local-first, with no uploads, no
-provider calls, and nothing spent by default**.
+Orchestra (formerly Understudy) maintains this public, MIT-licensed skill
+library plus a thin CLI. It gives your coding agent the playbooks to evaluate
+an AI workload locally, optimize it, and route it to a better-value model —
+**local-first, with no uploads, no provider calls, and nothing spent by
+default**. The CLI, plugin, and skill names still use `understudy`.
 
 ## Get started (30 seconds)
 
@@ -37,7 +38,7 @@ builds and packs the CLI locally, installs the resulting tarball, and removes
 the temporary checkout. You do not need a published npm package.
 
 The default install uses the smaller Vercel conversation backend. The optional
-Pi backend can be added later without reinstalling Understudy:
+Pi backend can be added later without reinstalling:
 
 ```bash
 npm install -g @earendil-works/pi-ai@0.80.6 @earendil-works/pi-coding-agent@0.80.6
@@ -94,7 +95,7 @@ node dist/bin.js --help
 
 </details>
 
-## Update Understudy
+## Update Orchestra Agent Tools
 
 Rerun the same installer. It replaces the managed GitHub checkout with the
 current `main` branch, rebuilds the CLI, and refreshes the selected agent
@@ -140,7 +141,7 @@ commands remain outside this public CLI until intentionally extracted.
 
 ## How it's built
 
-Understudy is **agent-platform-neutral at the skill layer**. All six
+Orchestra Agent Tools is **agent-platform-neutral at the skill layer**. All six
 supported coding agents share the same [`skills/`](skills/) tree and differ
 only in a thin adapter: manifest, install path, reload step, and onboarding
 invocation. The adapter registry lives in
@@ -241,7 +242,7 @@ migration ledger.
 <summary><b>Skill design notes: handoff-only skills, optimizer boundary, benchmarks</b></summary>
 
 `prepare-verifier-handoff` is intentionally handoff-only. It is for workloads
-that need a future Understudy verifier/RL-environment release or an external
+that need a future Orchestra verifier/RL-environment release or an external
 partner path after local validation and prompt optimization are insufficient.
 Prime Intellect Verifiers is the current preferred referral for that rung.
 
@@ -259,7 +260,7 @@ the public-benchmark on-ramp in
 It points agents at public upstream benchmarks such as
 [Zapier AutomationBench](https://github.com/zapier/AutomationBench) and
 [Harvey LAB](https://github.com/harveyai/harvey-labs). Keep benchmark harnesses
-upstream; use Understudy for capture, splits, baselines, optimization, and
+upstream; use Orchestra for capture, splits, baselines, optimization, and
 conservative claims.
 
 </details>
@@ -295,12 +296,12 @@ timezones, inspecting candidates, and exporting selected matches.
 
 `routes set` writes control-plane route config: your application keeps calling
 the normal gateway while a percentage of traffic goes to the selected
-Understudy model and the rest remains passthrough/frontier.
+Orchestra model and the rest remains passthrough/frontier.
 
 <details>
 <summary><b>How login, doctor, probes, captures, and routes behave</b></summary>
 
-`login --email` uses the Understudy email-code registration flow. In an
+`login --email` uses the Orchestra email-code registration flow. In an
 interactive terminal it prompts for the code inline; in a non-TTY shell (a
 coding agent, a script) it sends the code and exits, and `login --code`
 completes the pending sign-in — so an agent can drive sign-up as two plain
@@ -329,7 +330,7 @@ UTC calendar day. There is no unbounded `--all` trace scan. Explicit traces
 write a private `trace.json` membership manifest, per-request files, and batch
 failure manifests. Workload days write only a final ordered
 `source/index.jsonl` and `source/summary.json` after success. `models list`
-shows public Understudy model IDs and
+shows public Orchestra model IDs and
 display names only.
 
 If the coding agent has an approved native email connector, it may complete the
@@ -350,7 +351,7 @@ for every command in the journey above.
 For agents that read loose `.claude/skills/` directories but not plugins,
 `understudy setup` remains as the legacy fallback: it copies the onboarding
 skill into `./.claude/skills/` (`--global` for `~/.claude/skills/`). Either
-way, then ask the coding agent to convert the current repo to Understudy or
+way, then ask the coding agent to convert the current repo to Orchestra or
 add a thin GEPA/DSPy optimizer. The installed onboarding skill starts by
 checking `understudy status --json` and stops with a clear login instruction
 if the user is not authenticated.
