@@ -10,7 +10,6 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { localSftEvaluationRuntimeSource } from "./runtime-source.js";
@@ -18,6 +17,7 @@ import {
   type VerifiedPortableTrainingPlan,
   verifyPortableTrainingPlan,
 } from "../training-plan/index.js";
+import { globalConfigDir } from "../config/paths.js";
 
 export const DEFAULT_LOCAL_SFT_MODEL = "mlx-community/Qwen3-0.6B-4bit";
 export const LOCAL_SFT_RUNTIME_PACKAGES = ["mlx-lm==0.31.3"] as const;
@@ -414,7 +414,7 @@ export function startLocalSftTraining(options: StartLocalSftTrainingOptions): Lo
   const eventsPath = join(runRoot, "events.jsonl");
   const manifestPath = join(runRoot, "run.json");
   const configPath = join(runRoot, "config.yaml");
-  const runtimeRoot = options.runtimeRoot ?? join(homedir(), ".understudy", "runtime", "local-sft");
+  const runtimeRoot = options.runtimeRoot ?? join(globalConfigDir(), "runtime", "local-sft");
   const pack = prepareRuntimePack(runtimeRoot, options.runtimePackages ?? LOCAL_SFT_RUNTIME_PACKAGES);
   const generatedAt = (options.now ?? new Date()).toISOString();
   const uvBinary = options.uvBinary ?? "uv";

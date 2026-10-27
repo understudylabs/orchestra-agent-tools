@@ -14,6 +14,7 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { globalConfigDir } from "./config/paths.js";
 
 export type SnapshotModelInfo = {
   sessionUrl: string;
@@ -102,8 +103,8 @@ function resolveModelHome(raw: string): string {
 export const DEFAULT_MODELS_DIR =
   process.env.UNDERSTUDY_MODEL_HOME && process.env.UNDERSTUDY_MODEL_HOME.trim() !== ""
     ? resolveModelHome(process.env.UNDERSTUDY_MODEL_HOME)
-    : join(homedir(), ".understudy", "models");
-export const DEFAULT_MODEL_LOG_DIR = join(homedir(), ".understudy", "agent-tools", "logs");
+    : join(globalConfigDir(), "models");
+export const DEFAULT_MODEL_LOG_DIR = join(globalConfigDir(), "agent-tools", "logs");
 
 export const DEFAULT_CATALOG_URL = "https://models.understudylabs.com/catalog";
 export const CATALOG_SCHEMA_VERSION = "understudy.model_catalog.v1";

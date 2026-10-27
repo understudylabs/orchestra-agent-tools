@@ -15,16 +15,16 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Command } from "commander";
+import { globalConfigDir } from "../config/paths.js";
 
 const DEFAULT_LLM_URL = "http://127.0.0.1:8877/v1/chat/completions";
 const LLM_MODEL = "default_model";
 
 export function exploreDir(): string {
-  const dir = process.env.UNDERSTUDY_EXPLORE_DIR ?? join(homedir(), ".understudy", "explore");
+  const dir = process.env.UNDERSTUDY_EXPLORE_DIR ?? join(globalConfigDir(), "explore");
   mkdirSync(dir, { recursive: true });
   return dir;
 }

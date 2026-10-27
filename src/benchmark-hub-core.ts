@@ -8,7 +8,6 @@
  * and `understudy benchmarks mcp` reads/writes through the exact same code.
  */
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { validateBenchmarkManifest } from "./benchmark.js";
 // Shared writer/reader codecs — the same module the executor/foundry write with.
@@ -73,6 +72,7 @@ import type {
   SourceDag,
 } from "./benchmark-hub-types.js";
 import { REVIEW_DECISIONS, type ReviewDecision } from "./benchmark-hub-types.js";
+import { globalConfigDir } from "./config/paths.js";
 
 export type { CalibrationSummary } from "./benchmark-hub-types.js";
 
@@ -119,7 +119,7 @@ function slugRoots(): { prefix: string; root: string; source: HubEntry["source"]
   } else {
     roots.push({
       prefix: "local",
-      root: path.join(os.homedir(), ".understudy", "benchmarks"),
+      root: path.join(globalConfigDir(), "benchmarks"),
       source: "data-dir",
       readOnly: false,
     });

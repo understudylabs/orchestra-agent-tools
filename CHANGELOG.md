@@ -17,6 +17,14 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Added
 
+- **`~/.orchestra` home directory.** The first `orchestra` run moves
+  `~/.understudy` to `~/.orchestra` and leaves a `~/.understudy` symlink,
+  so the installer, Python helpers, skills, and older scripts keep working
+  unchanged. The move is skipped (and `~/.understudy` kept) when another
+  tool already owns `~/.orchestra`, when `~/.understudy` is a user-managed
+  symlink, on Windows, under `node --test`, or with
+  `UNDERSTUDY_HOME_MIGRATION=0`. The installer triggers it right after
+  installing the CLI. Project-level `.understudy/` folders are unchanged.
 - **`orchestra` command.** The CLI now installs as `orchestra`; `understudy`
   stays installed as an alias and behaves identically. Help, hints, the
   installer, skills, and docs now say `orchestra <command>`. Environment

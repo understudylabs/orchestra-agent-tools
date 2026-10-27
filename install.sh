@@ -1617,6 +1617,12 @@ if should_run_step 1; then
   section "Step 1/3 · Install the CLI"
   install_understudy_package
   PKG_DIR="$(npm root -g)/@understudylabs/understudy-agent-tools"
+  # First CLI run moves ~/.understudy to ~/.orchestra and leaves a symlink,
+  # so do it now rather than mid-session inside the coding agent; every path
+  # this installer writes later goes through the symlink.
+  if need orchestra; then
+    orchestra --version >/dev/null 2>&1 || true
+  fi
   mark_step_done 1
 else
   say "Skipping step 1/3: install the CLI."

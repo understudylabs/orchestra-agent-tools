@@ -10,13 +10,13 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { z } from "zod";
 
 import { assertCustomerScope, resolveAuth } from "../internal/http.js";
 import { packagePath } from "../internal/package-root.js";
+import { globalConfigDir } from "../config/paths.js";
 
 export const TIEBREAKER_MODEL = "glm-5.2";
 export const TIEBREAKER_SCHEMA = "understudy.supervision.tiebreaker_analysis.v1";
@@ -249,7 +249,7 @@ export function parseTiebreakerDecision(raw: string): ParsedDecision {
 function analysisRoot(explicit?: string): string {
   return resolve(
     explicit ?? process.env.UNDERSTUDY_TIEBREAKER_ROOT
-      ?? join(homedir(), ".understudy", "supervision-tiebreaker"),
+      ?? join(globalConfigDir(), "supervision-tiebreaker"),
   );
 }
 

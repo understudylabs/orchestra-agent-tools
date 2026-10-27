@@ -28,10 +28,11 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createServer } from "node:net";
-import { homedir, totalmem } from "node:os";
+import { totalmem } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
 import { mlxVlmRuntimeStatus } from "./runtime/mlx-vlm/lifecycle.js";
+import { globalConfigDir } from "./config/paths.js";
 
 type Obj = Record<string, any>;
 const asObject = (value: unknown): Obj => (value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Obj) : {});
@@ -181,7 +182,7 @@ export type MachineMemory = { memory_gb: number | null; source: "profile" | "os_
  * probe. Unknown only when both fail.
  */
 export function readMachineMemoryGb(env: NodeJS.ProcessEnv = process.env): MachineMemory {
-  const file = env.UNDERSTUDY_PROFILE_FILE?.trim() || join(homedir(), ".understudy", "profile.json");
+  const file = env.UNDERSTUDY_PROFILE_FILE?.trim() || join(globalConfigDir(), "profile.json");
   const profile = readJsonIfPresent(file);
   const fromProfile = Number(asObject(profile?.machine).memory_gb);
   if (Number.isFinite(fromProfile) && fromProfile > 0) return { memory_gb: fromProfile, source: "profile" };
@@ -237,7 +238,7 @@ export function estimateArtifactMemoryGb(ref: string): number | null {
       const base = artifactBaseModel(root);
       const rung = LOCAL_MODEL_LADDER.find((r) => r.id === base);
       if (rung) return rung.approx_gb + bytes / 1024 ** 3;
-      const cached = join(homedir(), ".understudy", "models", base);
+      const cached = join(globalConfigDir(), "models", base);
       if (existsSync(cached)) bytes += weightBytes(cached);
       else return null; // base weights not measurable locally — unknown, not unfit
     }
@@ -347,7 +348,7 @@ export function servingModelPath(arm: ResolvedLocalArm): { model: string; adapte
   // adapter rides the bundle.
   const adapterDir = [join(arm.ref, "model", "adapter"), join(arm.ref, "adapter"), arm.ref].find((dir) => existsSync(join(dir, "adapter_config.json")) || existsSync(join(dir, "adapters.safetensors"))) ?? null;
   const base = arm.artifact.base_model;
-  const cached = join(homedir(), ".understudy", "models", base);
+  const cached = join(globalConfigDir(), "models", base);
   return { model: existsSync(cached) ? cached : base, adapterPath: adapterDir };
 }
 

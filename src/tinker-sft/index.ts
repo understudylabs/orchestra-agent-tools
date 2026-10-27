@@ -7,7 +7,6 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 
@@ -17,6 +16,7 @@ import {
   type VerifiedPortableTrainingPlan,
   verifyPortableTrainingPlan,
 } from "../training-plan/index.js";
+import { globalConfigDir } from "../config/paths.js";
 
 export const TINKER_SFT_RUNTIME_PACKAGES = ["tinker==0.23.1", "tinker-cookbook==0.5.2"] as const;
 export const TINKER_SFT_MAX_RUNTIME_SECONDS = 15 * 60;
@@ -469,7 +469,7 @@ export function startTinkerSftTraining(options: StartTinkerSftTrainingOptions): 
   const eventsPath = join(runRoot, "events.jsonl");
   const manifestPath = join(runRoot, "run.json");
   const requestPath = join(runRoot, "request.json");
-  const runtimeRoot = options.runtimeRoot ?? join(homedir(), ".understudy", "runtime", "tinker-sft");
+  const runtimeRoot = options.runtimeRoot ?? join(globalConfigDir(), "runtime", "tinker-sft");
   const pack = prepareRuntimePack(runtimeRoot, options.runtimePackages ?? TINKER_SFT_RUNTIME_PACKAGES);
   const request = {
     schema_version: "understudy.tinker_sft.request.v1",

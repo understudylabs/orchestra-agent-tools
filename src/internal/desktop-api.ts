@@ -1,9 +1,9 @@
 import { lstatSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { pidAlive, probeDaemonHealth } from "./daemon.js";
 import { packagePath } from "./package-root.js";
+import { globalConfigDir } from "../config/paths.js";
 
 export const DESKTOP_API_SCHEMA = "understudy.desktop_api.v2";
 export const DESKTOP_API_OPENAPI_VERSION = "2.2.0";
@@ -50,7 +50,7 @@ export interface DesktopSlotProviderTarget {
 
 export function desktopApiPath(): string {
   return process.env.UNDERSTUDY_DESKTOP_API_FILE ??
-    join(homedir(), ".understudy", "desktop-api.json");
+    join(globalConfigDir(), "desktop-api.json");
 }
 
 function loopbackBaseUrl(value: unknown): string {
