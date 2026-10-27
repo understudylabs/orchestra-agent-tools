@@ -1,6 +1,6 @@
 {
   "name": "@orchestraai/agent-tools",
-  "version": "0.6.41",
+  "version": "0.7.0",
   "description": "Public Understudy agent tools CLI and skill library.",
   "type": "module",
   "bin": {
