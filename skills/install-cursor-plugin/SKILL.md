@@ -26,7 +26,7 @@ dest="$HOME/.cursor/plugins/local/orchestra"
 mkdir -p "$(dirname "$dest")"
 if [ ! -f "$REPO/.cursor-plugin/plugin.json" ]; then
   echo "not an Understudy checkout: $REPO"
-elif [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*orchestra-agent-tools|*understudy-agent-tools) true ;; *) false ;; esac; then
+elif [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*/@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools) true ;; *) false ;; esac; then
   # Refresh only a symlink Understudy created; never delete a real directory.
   rm -f "$dest" && ln -s "$REPO" "$dest"
 elif [ -e "$dest" ] || [ -L "$dest" ]; then

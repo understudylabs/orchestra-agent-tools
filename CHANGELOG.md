@@ -17,10 +17,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Added
 
-- **`orchestra-agent-tools` package and repo.** The package is now
-  `orchestra-agent-tools` (was `@understudylabs/understudy-agent-tools`) and
-  the repo is `understudylabs/orchestra-agent-tools`; old GitHub URLs redirect.
-  Rerunning the installer removes the old global package and its commands,
+- **`@orchestraai/agent-tools` package and `orchestra-agent-tools` repo.** The
+  package is now `@orchestraai/agent-tools` (was
+  `@understudylabs/understudy-agent-tools`, and briefly the unscoped
+  `orchestra-agent-tools`) and the repo is
+  `understudylabs/orchestra-agent-tools`; old GitHub URLs redirect.
+  Rerunning the installer removes earlier global packages and their commands,
   and moves the Claude Code and Codex marketplaces, Cursor link, OpenCode
   skills and Hermes skills link to the new package folder. Paths that aren't an
   Orchestra install are left alone. The Devin adapter now installs with the

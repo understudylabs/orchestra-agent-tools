@@ -49,7 +49,7 @@ REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
 dest="$HOME/.cursor/plugins/local/orchestra"
 ls "$REPO/.cursor-plugin/plugin.json" "$REPO/skills/understudy/SKILL.md"
 mkdir -p "$(dirname "$dest")"
-if [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*orchestra-agent-tools|*understudy-agent-tools) true ;; *) false ;; esac; then
+if [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*/@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools) true ;; *) false ;; esac; then
   # Refresh only a symlink Understudy created; never delete a real directory.
   rm -f "$dest" && ln -s "$REPO" "$dest"
 elif [ -e "$dest" ] || [ -L "$dest" ]; then
@@ -145,7 +145,7 @@ for skill in "$REPO"/skills/*; do
   name="$(basename "$skill")"
   dest="$HOME/.config/opencode/skills/$name"
   if [ -e "$dest" ] || [ -L "$dest" ]; then
-    if [ -L "$dest" ] && readlink "$dest" | grep -qE '(orchestra|understudy)-agent-tools/skills/'; then
+    if [ -L "$dest" ] && readlink "$dest" | grep -qE '(@orchestraai/agent-tools|(orchestra|understudy)-agent-tools)/skills/'; then
       rm -f "$dest"
     else
       echo "skip existing OpenCode skill: $dest"
@@ -155,7 +155,7 @@ for skill in "$REPO"/skills/*; do
   ln -s "$skill" "$dest"
 done
 command_dest="$HOME/.config/opencode/commands/orchestra-onboard.md"
-if [ -L "$command_dest" ] && readlink "$command_dest" | grep -qE '(orchestra|understudy)-agent-tools/.opencode/commands/'; then
+if [ -L "$command_dest" ] && readlink "$command_dest" | grep -qE '(@orchestraai/agent-tools|(orchestra|understudy)-agent-tools)/.opencode/commands/'; then
   rm -f "$command_dest"
 fi
 [ -e "$command_dest" ] || [ -L "$command_dest" ] || \
@@ -183,7 +183,7 @@ ls "$HOME/.config/opencode/commands/orchestra-onboard.md"
 Uninstall Understudy-owned symlinks:
 
 ```bash
-find "$HOME/.config/opencode/skills" -type l \( -lname '*/orchestra-agent-tools/skills/*' -o -lname '*/understudy-agent-tools/skills/*' \) -delete
+find "$HOME/.config/opencode/skills" -type l \( -lname '*/@orchestraai/agent-tools/skills/*' -o -lname '*/orchestra-agent-tools/skills/*' -o -lname '*/understudy-agent-tools/skills/*' \) -delete
 rm -f "$HOME/.config/opencode/commands/orchestra-onboard.md"
 ```
 
@@ -340,5 +340,5 @@ updates the managed checkout, CLI, and skills from GitHub `main`.
 Uninstall:
 
 ```bash
-npm uninstall -g orchestra-agent-tools
+npm uninstall -g @orchestraai/agent-tools
 ```
