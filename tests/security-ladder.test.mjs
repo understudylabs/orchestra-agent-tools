@@ -100,11 +100,17 @@ print(json.dumps(out))
 
   it("defaults the --agent smoke command to a gateway model that is still served", () => {
     const out = runPython(`${loadServe}
-print(json.dumps({"first_gateway": next((m for m, s in module.MODELS.items() if s[0] == "gateway"), None),
-                  "has_glm51": "glm-5.1" in module.MODELS}))
+import sys
+sys.argv = ["serve.py", "--agent"]
+module._cli_agent = lambda task, model: print(json.dumps({
+    "model": model, "lane": module.MODELS[model][0],
+    "has_retired": any(mid in module.MODELS for mid in ["glm-5.1", "glm-5.2", "nemotron-3-super"])
+}))
+module.main()
 `);
-    assert.equal(out.first_gateway, "glm-5.2");
-    assert.equal(out.has_glm51, false);
+    assert.equal(out.model, "beam-501b-a23b");
+    assert.equal(out.lane, "gateway");
+    assert.equal(out.has_retired, false);
   });
 });
 
