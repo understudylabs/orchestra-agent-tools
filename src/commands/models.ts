@@ -183,7 +183,7 @@ async function runList(cmd: Command, opts: OrgOpt): Promise<void> {
   }
 
   if (res.data.models.length === 0) {
-    process.stdout.write(`${kleur.gray("No public Understudy models are currently available for this org.")}\n`);
+    process.stdout.write(`${kleur.gray("No public Orchestra models are currently available for this org.")}\n`);
     return;
   }
 

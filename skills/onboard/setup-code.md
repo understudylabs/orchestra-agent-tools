@@ -1,7 +1,7 @@
 # Setup Code
 
 Use this recipe when `orchestra setup-code` routes here or when the developer
-asks an agent to convert application code to Understudy gateway inference.
+asks an agent to convert application code to Orchestra gateway inference.
 
 The CLI no longer rewrites source files directly. The coding agent owns the
 patch using the repo's language, framework, tests, and style.

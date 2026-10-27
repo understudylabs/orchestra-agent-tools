@@ -1,4 +1,4 @@
-# Use Understudy Gateway — reference
+# Use Orchestra Gateway — reference
 
 Depth for [`SKILL.md`](SKILL.md). This worker is the inference/routing/capture/
 deploy stage. The cross-cutting framing — intake, objective menus, the
@@ -85,7 +85,7 @@ anything that the developer has not approved.
    the repo read-only for model clients, prompt strings, eval suites, and trace
    exports. Do not duplicate that scan here; carry its inventory forward.
 2. **Determine whether gateway routing is already present.** Check whether calls
-   already go through an Understudy gateway base URL / the `orchestra run`
+   already go through an Orchestra gateway base URL / the `orchestra run`
    wrapper, or hit a provider SDK directly. This decides whether capture is a
    config flip or needs a collector in front of the existing client.
 

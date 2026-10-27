@@ -45,7 +45,7 @@ posture.
 
 Not for: choosing a *model*
 ([`../compare-model-sweep/SKILL.md`](../compare-model-sweep/SKILL.md)), the
-authenticated Understudy gateway
+authenticated Orchestra gateway
 ([`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md)),
 or running the job itself.
 
@@ -83,7 +83,7 @@ Ask only for what the job type needs:
 - **Data size**: training tokens D (≈ examples × avg tokens × epochs), or for
   inference/rollouts: num_prompts × rollouts × avg output tokens.
 - **Hardware on hand**: chip + unified memory (local), or target GPU (cloud).
-  The Understudy profile at `~/.understudy/profile.json` often has the local
+  The Orchestra profile at `~/.understudy/profile.json` often has the local
   machine.
 
 ## The estimate
@@ -138,7 +138,7 @@ the band and the dominant assumption. Recommend the route with the best expected
 progress under the real time, quality, and budget constraints—not local merely
 because its marginal dollar cost is zero. Cloud is often the correct answer when
 local wall-clock, capacity, or iteration speed blocks the objective (typical for
-RL training and large-scale rollouts — the Understudy local-SFT / cloud-RL
+RL training and large-scale rollouts — the Orchestra local-SFT / cloud-RL
 split). When the answer is cloud, continue to the routing below.
 
 ## The routing decision

@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Use as the engaging first-run experience right after the Understudy plugin is installed, or whenever a developer says "get started", "set me up", "I'm new to this", "onboard me", or asks what Understudy is and where to begin. Backgrounds a small open-model download while it profiles the machine, detects ML tooling, interviews the user to gauge experience and goals, and writes a durable ~/.understudy/profile.json so every later skill can meet the user where they are. Hands off to the understudy orchestrator.
+description: Use as the engaging first-run experience right after the Orchestra plugin is installed, or whenever a developer says "get started", "set me up", "I'm new to this", "onboard me", or asks what Orchestra is and where to begin. Backgrounds a small open-model download while it profiles the machine, detects ML tooling, interviews the user to gauge experience and goals, and writes a durable ~/.understudy/profile.json so every later skill can meet the user where they are. Hands off to the understudy orchestrator.
 metadata:
   understudy:
     mode: interactive
@@ -8,11 +8,11 @@ metadata:
     cli_required: false
 ---
 
-# Understudy Onboarding
+# Orchestra Onboarding
 
 The first thing a new user experiences. Goal: in a few minutes, leave them with
 (1) a small open model **running locally on their own machine**, (2) a clear
-sense of what Understudy is and why it matters, and (3) a saved profile so you
+sense of what Orchestra is and why it matters, and (3) a saved profile so you
 never re-ask what you already learned.
 
 Run this after [`install-agent-adapter`](../install-agent-adapter/SKILL.md). It follows the
@@ -52,8 +52,8 @@ and build an opportunity ledger before any code edits or provider calls.
 1. **Start the slow thing first (background).** Detect the model runtime
    (`mlx_vlm`, `mlx_lm`, `ollama`, `llama-server`, `lms`). On Apple Silicon, the
    opinionated first out-of-box target is the smallest verified Gemma 4 local
-   Understudy: the **QAT-derived** `gemma-4-e2b-it-qat-mlx-vlm-understudy` —
-   `google/gemma-4-E2B-it` QAT weights converted by Understudy to MLX 4-bit at
+   Orchestra: the **QAT-derived** `gemma-4-e2b-it-qat-mlx-vlm-understudy` —
+   `google/gemma-4-E2B-it` QAT weights converted by Orchestra to MLX 4-bit at
    `group_size=32` (matching Q4_0's block structure). The verified snapshot is
    stored at
    `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`.
@@ -66,7 +66,7 @@ and build an opportunity ledger before any code edits or provider calls.
    ```bash
    orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
    ```
-   This caches the first Understudy under
+   This caches the first specialist model under
    `~/.understudy/models/gemma-4-e2b-it-qat-mlx-vlm-understudy` and logs progress/ETA under
    `~/.understudy/agent-tools/logs/`. If the MLX runtime is missing, the slow
    step is *install MLX + pull* — get one quick approval, then background it.
@@ -107,10 +107,10 @@ and build an opportunity ledger before any code edits or provider calls.
    Only refresh the card yourself as a **fallback when the app isn't installed
    or running**, recording live runtime facts: the local model, endpoint,
    serving process, companion status, and the exact command or URL for talking
-   to the local Understudy. If `~/.understudy/companion.json` points at a dead
+   to the local specialist model. If `~/.understudy/companion.json` points at a dead
    pid, clear it and record the stale pid in the card.
 
-6. **Land the quick win: show the local Understudy exists.** Once the snapshot is
+6. **Land the quick win: show the local specialist model exists.** Once the snapshot is
    cached, route through [`../ladder/SKILL.md`](../ladder/SKILL.md) and start the
    onboarding climb:
     ```bash

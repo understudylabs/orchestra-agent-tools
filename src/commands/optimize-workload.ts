@@ -79,7 +79,7 @@ export function registerOptimizeWorkloadCommand(program: Command): void {
     .option("--reflection-input-usd-per-million <amount>", "Input-token price basis for reflection calls (give both reflection prices or neither)")
     .option("--reflection-output-usd-per-million <amount>", "Output-token price basis for reflection calls")
     .option("--model-price <model=input,output>", "Price basis for one model in USD per million tokens (repeatable)", collect, [] as string[])
-    .option("--prices-from-gateway <mode>", "auto, off, or require: use prices the Understudy gateway publishes for gateway-routed models", "auto")
+    .option("--prices-from-gateway <mode>", "auto, off, or require: use prices the Orchestra gateway publishes for gateway-routed models", "auto")
     .option("--no-spend-ledger", "Record usage without a spend cap (no --budget-usd; not for program bridges)")
     .option("--score-objective <name>", "exact_match, tool_call, or mixed", "exact_match")
     .option("--reflection-minibatch-size <number>", "GEPA reflection minibatch size", "1")

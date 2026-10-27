@@ -1,6 +1,6 @@
 ---
 name: share-savings
-description: Use when a developer wants to share how much Understudy saved them, submit an anonymous "lower my Anthropic bill" result, prepare a leaderboard receipt, or send savings metrics back to Understudy. Builds a metrics-only payload from value-report or claim artifacts, redacts identity by construction, and posts only after explicit approval.
+description: Use when a developer wants to share how much Orchestra saved them, submit an anonymous "lower my Anthropic bill" result, prepare a leaderboard receipt, or send savings metrics back to Orchestra. Builds a metrics-only payload from value-report or claim artifacts, redacts identity by construction, and posts only after explicit approval.
 metadata:
   understudy:
     mode: interactive
@@ -10,8 +10,8 @@ metadata:
 
 # Share Savings
 
-Turn a measured Understudy savings result into an anonymous, metrics-only report
-for Understudy. This is for the lower-Anthropic-bill path and future leaderboard
+Turn a measured Orchestra savings result into an anonymous, metrics-only report
+for Orchestra. This is for the lower-Anthropic-bill path and future leaderboard
 receipts.
 
 ## Safety Gates

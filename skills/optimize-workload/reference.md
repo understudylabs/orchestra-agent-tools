@@ -43,7 +43,7 @@ GEPA uses two models. Keep them distinct:
   for exploration, but a weak reflection model is a silent quality cap.
 
 Both run on the developer's own provider keys (local-first); neither requires an
-Understudy account. Pick the student before optimizing and freeze it in the
+Orchestra account. Pick the student before optimizing and freeze it in the
 candidate artifact.
 
 ## Feedback Function
@@ -98,7 +98,7 @@ regression risk. State, for the workload: current route, token shape / volume,
 latency target vs observed, cost/request, quality gate + acceptable regression
 band, and the candidate route. A small live comparison only when replay can't
 answer the economic question (and only under the approval gate). Inference for
-evaluation follows the same Understudy-first default as optimization.
+evaluation follows the same Orchestra-first default as optimization.
 
 **Optimize (highest-leverage intervention first).** Consider prompt
 prefill/repair, parser/schema repair, context trimming, route/candidate swap, and
@@ -158,7 +158,7 @@ Optimization may need inference. Never inspect or print secret values. A named
 activated workflow may run its declared provider calls without repeated
 confirmation. Use
 `orchestra login --email <developer-email>` plus
-`orchestra run -- <local command>` for the Understudy inference path, or
+`orchestra run -- <local command>` for the Orchestra inference path, or
 record BYO provider-key readiness only as redacted presence/source metadata.
 Keep the selected provider, model, budget, and data class in the run artifact.
 
@@ -179,7 +179,7 @@ Three ways to optimize, picked by commitment and workload shape:
 3. **Program lane (opt-in).** The agent can scaffold a reusable DSPy program
    from local samples using the program-scaffold pattern, verify parity, then
    run the approval-gated `adapter run --adapter dspy-gepa --execute` path
-   against the Understudy gateway with exact `dspy==3.4.1` and
+   against the Orchestra gateway with exact `dspy==3.4.1` and
    `gepa[dspy]==0.1.4` plus `cloudpickle==3.1.2`, separate student/reflection deployments, an explicit
    dollar cap, and a conservative input/output token-price basis. A
    `--program-bridge` may provide a multi-component student, trainset, valset,

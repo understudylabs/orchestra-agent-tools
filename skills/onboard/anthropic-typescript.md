@@ -69,7 +69,7 @@ Key points:
 
 - The `baseURL` has **no trailing `/v1`**. The Anthropic SDK appends
   `/v1/messages` itself.
-- `apiKey` is now the Understudy `sk_*`, read from `UNDERSTUDY_API_KEY`.
+- `apiKey` is now the Orchestra `sk_*`, read from `UNDERSTUDY_API_KEY`.
   This becomes the primary auth header the SDK sends.
 - `defaultHeaders["x-understudy-upstream-key"]` carries the user's real
   Anthropic key — the gateway reads it and forwards it to

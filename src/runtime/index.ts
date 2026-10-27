@@ -28,7 +28,7 @@ export function requireUnderstudyEnv(): UnderstudyEnv {
   if (!config) {
     throw new Error(
       [
-        "No Understudy config found.",
+        "No Orchestra config found.",
         "Run `orchestra login` in your project root to create .understudy/config.json.",
       ].join(" "),
     );
@@ -38,7 +38,7 @@ export function requireUnderstudyEnv(): UnderstudyEnv {
   if (!credentials) {
     throw new Error(
       [
-        "No Understudy credentials found.",
+        "No Orchestra credentials found.",
         "Run `orchestra login` to create ~/.understudy/credentials.json.",
       ].join(" "),
     );

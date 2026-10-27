@@ -152,7 +152,7 @@ function buildCandidateRoutes(card: WorkloadCard): CandidateRoute[] {
       kind: "understudy",
       provider: "understudy",
       model: "auto",
-      why_try: "Use Understudy managed cloud to select the strongest cost-efficient compatible model.",
+      why_try: "Use Orchestra managed cloud to select the strongest cost-efficient compatible model.",
       approval_required: false,
       pricing_source: null,
       supplier_profile: null,

@@ -207,7 +207,7 @@ export function classifyShellToolCall(toolName: string, input: unknown): Command
 }
 
 export function commandGuardBlockMessage(decision: Exclude<CommandGuardDecision, { decision: "allow" }>): string {
-  return `Blocked by Understudy command guard [${decision.rule_id}]: ${decision.reason} Review and run this command manually if the destructive action is intentional.`;
+  return `Blocked by Orchestra command guard [${decision.rule_id}]: ${decision.reason} Review and run this command manually if the destructive action is intentional.`;
 }
 
 export function enforceShellToolCall(toolName: string, input: unknown): void {

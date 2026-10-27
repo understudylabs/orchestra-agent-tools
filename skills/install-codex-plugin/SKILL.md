@@ -1,6 +1,6 @@
 ---
 name: install-codex-plugin
-description: Compatibility shim for Codex installs. Use when a developer asks to install, update, enable, reinstall, remove, or verify the Understudy Codex plugin - "install Understudy in Codex", "add the Codex plugin", "make Codex see the skills". Route to install-agent-adapter with platform codex.
+description: Compatibility shim for Codex installs. Use when a developer asks to install, update, enable, reinstall, remove, or verify the Orchestra Codex plugin - "install Orchestra in Codex", "add the Codex plugin", "make Codex see the skills". Route to install-agent-adapter with platform codex.
 metadata:
   understudy:
     mode: automatic
@@ -8,7 +8,7 @@ metadata:
     cli_required: false
 ---
 
-# Install the Understudy Codex plugin
+# Install the Orchestra Codex plugin
 
 This skill is a compatibility shim. The consolidated setup surface is
 [`install-agent-adapter`](../install-agent-adapter/SKILL.md).
@@ -33,7 +33,7 @@ Activation is in Codex:
 Choose `orchestra-skills`, install or enable `orchestra`, then ask:
 
 ```text
-Use the Understudy onboarding skill for this project.
+Use the Orchestra onboarding skill for this project.
 ```
 
 ## Safety Gates
@@ -48,7 +48,7 @@ model weights, start hosted jobs, or make provider calls.
 
 ## Resolve CLI
 
-No Understudy CLI command is required. Use `codex plugin marketplace add` when
+No Orchestra CLI command is required. Use `codex plugin marketplace add` when
 available; otherwise show the manual `/plugins` activation path from
 `install-agent-adapter/reference.md`.
 

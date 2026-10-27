@@ -1,4 +1,4 @@
-# Understudy Skill Library
+# Orchestra Skill Library
 
 This library gives agents capability playbooks for optimizing application AI
 workloads. Use progressive disclosure: start with the entrypoint, then load one
@@ -21,7 +21,7 @@ group it belongs to.
 ## Setup & First Run
 
 - [`install-agent-adapter`](install-agent-adapter/SKILL.md) installs, refreshes,
-  verifies, or removes Understudy from the developer's coding-agent surface:
+  verifies, or removes Orchestra from the developer's coding-agent surface:
   Claude Code, Cursor, Codex, or OpenCode. It owns platform detection, local
   install paths, reload steps, uninstall commands, and the handoff into
   onboarding.
@@ -46,7 +46,7 @@ group it belongs to.
   onboarding "climb"; reach for `compare-model-sweep` once you have your own eval.
   (Architecture, the tool-call dialects, adding/swapping tasks, and the demo→RL
   export path in its [`reference.md`](ladder/reference.md).)
-- [`product-knowledge`](product-knowledge/SKILL.md) explains what Understudy is
+- [`product-knowledge`](product-knowledge/SKILL.md) explains what Orchestra is
   and how its product surfaces (Desktop app, local serving, Fusion sidekick,
   evals, candidate results, rollout labs) work, for onboarding copy, agent-facing
   help, and UI feature descriptions. (Company identity and the durable product
@@ -65,7 +65,7 @@ group it belongs to.
   writes a local hotspot ledger without prompts, traces, secrets, or account
   mutations.
 - [`share-savings`](share-savings/SKILL.md) turns a measured value report into
-  an anonymous, metrics-only lower-Anthropic-bill receipt for Understudy and
+  an anonymous, metrics-only lower-Anthropic-bill receipt for Orchestra and
   the coming leaderboard. It never sends prompts, traces, repo names, company
   names, or contact details, and posts only after approval.
 - [`understand-workload`](understand-workload/SKILL.md) decomposes and explains
@@ -75,7 +75,7 @@ group it belongs to.
   [`references/tool-trace-forensics.md`](understand-workload/references/tool-trace-forensics.md).
 - [`instrument`](instrument/SKILL.md) is the zero-friction on-ramp for
   developers whose app is running but has no traces yet: it detects the
-  provider SDK, redirects it through the Understudy gateway (capture on by
+  provider SDK, redirects it through the Orchestra gateway (capture on by
   default) via env vars with no app-code changes, verifies with a test call
   that a capture actually landed (`orchestra instrument --check` for the
   local sanity check), and hands off to `ingest-traces`/`capture-evidence`

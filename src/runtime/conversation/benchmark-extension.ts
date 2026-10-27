@@ -214,7 +214,7 @@ export function benchmarkGuardBlockMessage(
   decision: Exclude<BenchmarkGuardDecision, { decision: "allow" }>,
 ): string {
   return (
-    `Blocked by Understudy benchmark guard [${decision.rule_id}]: ${decision.reason} ` +
+    `Blocked by Orchestra benchmark guard [${decision.rule_id}]: ${decision.reason} ` +
     `The current trust posture is below "bounded_experiments". ONE action fixes this for every future call ` +
     `(no per-call dialogs): have the user run \`${raiseTrustHint("bounded_experiments")}\` once — visible and ` +
     `reversible. Alternatively, for this single call only, retry with confirm: true after the user explicitly consented in chat.`

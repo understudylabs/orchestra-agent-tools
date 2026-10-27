@@ -136,7 +136,7 @@ that another local smoke will not change the decision:
   prototype dependencies until pinned, audited, and smoked in an isolated env.
   Use this when the reward is cheap enough to run many times locally.
 - **First-party rebuild**: if GRPO becomes core, prefer a narrow reward-runner
-  adapter that consumes Understudy artifacts over vendor-locking a broad
+  adapter that consumes Orchestra artifacts over vendor-locking a broad
   training CLI.
 
 ## Training boundary

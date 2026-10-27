@@ -73,9 +73,9 @@ export function registerWorkloadsCommand(program: Command): void {
 
   addProjectOptions(workloads.command("route <workload>")
     .description("Set or clear an Orchestra model traffic route for a workload.")
-    .option("--model-id <id>", "Public Understudy model id from `orchestra models list`.")
-    .option("--traffic-pct <0-100>", "Percent of traffic to send to the selected Understudy model.", "10")
-    .option("--clear", "Clear the Understudy model route and return to passthrough/frontier."))
+    .option("--model-id <id>", "Public Orchestra model id from `orchestra models list`.")
+    .option("--traffic-pct <0-100>", "Percent of traffic to send to the selected Orchestra model.", "10")
+    .option("--clear", "Clear the Orchestra model route and return to passthrough/frontier."))
     .action(async function (this: Command, workload: string, opts: RouteOpts) {
       await runAction(this, () => runRoute(this, workload, opts));
     });
@@ -259,7 +259,7 @@ function printRouteResult(clear: boolean | undefined, workload: Workload, modelI
     return;
   }
   process.stdout.write(`${kleur.green("✓")} Routed ${kleur.bold(`${trafficPct ?? 10}%`)} of workload ${kleur.bold(workload.name)} (${workload.id}) to ${kleur.bold(String(modelId))}\n`);
-  process.stdout.write(`${kleur.gray("Inference calls keep using the normal Understudy gateway path.")}\n`);
+  process.stdout.write(`${kleur.gray("Inference calls keep using the normal Orchestra gateway path.")}\n`);
 }
 
 function printRows(rows: Array<Record<string, string>>, headers: string[]): void {

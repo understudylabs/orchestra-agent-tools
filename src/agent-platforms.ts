@@ -50,7 +50,7 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     ],
     reload: "Restart Cursor or run Developer: Reload Window.",
     uninstall: ['rm -f "$HOME/.cursor/plugins/local/orchestra"'],
-    onboarding: "Ask Cursor Agent: Use the Understudy onboarding skill for this project.",
+    onboarding: "Ask Cursor Agent: Use the Orchestra onboarding skill for this project.",
     notes: [
       "Uses Cursor's local plugin loader rather than a VSIX wrapper.",
       "A future VS Code/Cursor extension can call Cursor's plugin path API against the same plugin directory.",
@@ -68,7 +68,7 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     ],
     reload: "Open /plugins in Codex, install or enable the orchestra plugin, then start a new thread if needed.",
     uninstall: ["codex plugin marketplace remove orchestra-skills"],
-    onboarding: "Ask Codex: Use the Understudy onboarding skill for this project.",
+    onboarding: "Ask Codex: Use the Orchestra onboarding skill for this project.",
     notes: [
       "The CLI registers the marketplace; the Codex plugin browser owns final install/enable.",
       "AGENTS.md remains repo guidance, but the plugin is the reusable distribution unit.",
@@ -91,9 +91,9 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
       'find "$HOME/.config/opencode/skills" -type l \\( -lname "*/@orchestraai/agent-tools/skills/*" -o -lname "*/orchestra-agent-tools/skills/*" -o -lname "*/understudy-agent-tools/skills/*" \\) -delete',
       'rm -f "$HOME/.config/opencode/commands/orchestra-onboard.md"',
     ],
-    onboarding: "Run /orchestra-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project.",
+    onboarding: "Run /orchestra-onboard, or ask OpenCode: Use the Orchestra onboarding skill for this project.",
     notes: [
-      ".opencode/adapter.json is an Understudy version/staleness sentinel, not an OpenCode plugin manifest.",
+      ".opencode/adapter.json is an Orchestra version/staleness sentinel, not an OpenCode plugin manifest.",
       "OpenCode JS/TS plugins are for lifecycle hooks; this adapter intentionally uses native skills and commands.",
       "OpenCode loads SKILL.md definitions natively; no copied skill content or provider calls are required.",
       "The installer links every public skill because OpenCode skill names are global and sibling skill references must stay intact.",
@@ -121,9 +121,9 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
       `python3 -c "import sys,os,yaml;p,d=sys.argv[1],sys.argv[2];c=(yaml.safe_load(open(p)) or {}) if os.path.exists(p) else {};s=c.get('skills') if isinstance(c.get('skills'),dict) else {};e=s.get('external_dirs') or [];e=[e] if isinstance(e,str) else (e if isinstance(e,list) else []);s['external_dirs']=[x for x in e if x!=d];yaml.safe_dump(c,open(p,'w'),sort_keys=False)" "$CONFIG" "$LINK"`,
       '[ -L "$LINK" ] && rm -f "$LINK"',
     ],
-    onboarding: "In Hermes run /onboard, or ask Hermes: Use the Understudy onboarding skill for this project.",
+    onboarding: "In Hermes run /onboard, or ask Hermes: Use the Orchestra onboarding skill for this project.",
     notes: [
-      ".hermes/adapter.json is an Understudy version/staleness sentinel, not a Hermes plugin manifest.",
+      ".hermes/adapter.json is an Orchestra version/staleness sentinel, not a Hermes plugin manifest.",
       "Hermes discovers SKILL.md skills natively; registering skills/ via skills.external_dirs needs no copies and keeps the shared tree as the single source of truth.",
       "The installer registers a stable ~/.understudy/skills symlink so the config entry survives checkout/package moves; a reinstall just re-points the link. external_dirs expands ~ and ${VAR} and silently skips missing paths.",
       "Edits to ~/.hermes/config.yaml are idempotent and back up the file first; /reload-skills rescans without a restart.",
@@ -144,9 +144,9 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     uninstall: [
       "npm uninstall -g @orchestraai/agent-tools",
     ],
-    onboarding: "Ask Devin: Use the Understudy onboarding skill for this project.",
+    onboarding: "Ask Devin: Use the Orchestra onboarding skill for this project.",
     notes: [
-      ".devin/adapter.json is an Understudy version/staleness sentinel, not a manifest consumed by Devin.",
+      ".devin/adapter.json is an Orchestra version/staleness sentinel, not a manifest consumed by Devin.",
       "Devin is cloud-based: each session boots from a snapshot, so the install is a global npm package rather than a local plugin registration.",
       "Devin reads AGENTS.md automatically as a repository rule; the shared skills/ tree is accessible from the cloned repo without additional linking.",
       "For persistent installs, add the npm install to the Devin environment blueprint so every session starts with the CLI on PATH.",

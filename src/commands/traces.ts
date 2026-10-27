@@ -16,7 +16,7 @@ export function registerTracesCommand(program: Command): void {
     .option("--source <path>", "Local capture file or directory", ".understudy/captures")
     .option("--output <path>", "Private viewer output directory", ".understudy/trace-viewer")
     .option("--trace-id <id>", "Trace ID to select when the source contains multiple traces")
-    .option("--label <text>", "Local label shown above the trace ID", "Local Understudy captures")
+    .option("--label <text>", "Local label shown above the trace ID", "Local Orchestra captures")
     .action((options: { source: string; output: string; traceId?: string; label: string }) => {
       const result = renderTraceViewer(
         resolve(options.source),

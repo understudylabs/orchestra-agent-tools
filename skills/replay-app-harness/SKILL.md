@@ -32,7 +32,7 @@ node dist/bin.js runs execute --benchmark <benchmark-dir>
   commands in `app-harness.json` that the developer showed you or approved;
   never invent entrypoints. Show the drafted sidecar and get approval before
   the first run.
-- **LLM traffic is pinned to the Understudy gateway.** The executor's
+- **LLM traffic is pinned to the Orchestra gateway.** The executor's
   redirect env vars win over the harness's `env` — do not attempt to route
   around them, and say so if the app hard-codes a provider base URL.
 - **The app may mutate real state.** Before queueing, confirm with the

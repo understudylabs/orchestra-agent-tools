@@ -35,7 +35,7 @@ The public template lives at
 The CLI always copies it into the private output directory; never edit the
 template to embed a real trace.
 
-The viewer understands Understudy capture envelope aliases for timestamps,
+The viewer understands Orchestra capture envelope aliases for timestamps,
 workloads, models, request bodies, response bodies, and normalized trace rows.
 It unwraps bounded layers of JSON encoding, reassembles OpenAI- and
 Anthropic-style SSE response events, and reads the normalized response

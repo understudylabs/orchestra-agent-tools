@@ -62,7 +62,7 @@ export function renderScorecardGallery(entries: ScorecardEntry[]): string {
   const cards = entries.length
     ? entries.map((entry) => `<a class="card" href="/b/${encodeURIComponent(entry.slug)}/"><span>${escapeHtml(entry.name)}</span><b>${entry.rollouts} rollouts</b><small>${escapeHtml(entry.benchmark_id)} · Prime ${escapeHtml(entry.verifier_version)}</small></a>`).join("")
     : '<div class="empty">No scorecards found. Run <code>orchestra benchmarks build-scorecard &lt;config&gt;</code>.</div>';
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Understudy Benchmark Gallery</title><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Orchestra Benchmark Gallery</title><style>
   :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#030303;color:#e8e8e6;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}main{max-width:1100px;margin:0 auto;padding:48px 24px}h1{font-size:22px;font-weight:500;margin:0 0 8px}.sub{color:#777;margin-bottom:32px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.card{display:block;border:1px solid #252525;border-radius:12px;padding:18px;color:inherit;text-decoration:none;background:#080808}.card:hover{border-color:#4de49a}.card span,.card b,.card small{display:block}.card b{margin:18px 0 5px;color:#4de49a;font-size:18px}.card small,.empty{color:#777}code{color:#bbb}</style></head><body><main><h1>Benchmark Gallery</h1><div class="sub">Private Prime-native scorecards · ${entries.length} benchmark${entries.length === 1 ? "" : "s"}</div><div class="grid">${cards}</div></main></body></html>`;
 }
 

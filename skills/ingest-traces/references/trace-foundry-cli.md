@@ -3,7 +3,7 @@
 Use these helpers instead of rewriting normalization, DAG construction,
 benchmark manifests, review application, environment packages, or replay loops.
 
-When the source is a named workload already captured by Understudy, the
+When the source is a named workload already captured by Orchestra, the
 one-command front door downloads one exact raw workload day before handing the
 source to the coding agent and this compiler locally:
 
@@ -111,7 +111,7 @@ orchestra traces author-tasks \
 
 The contract is deterministic-evidence + LLM-authoring + grounding-verification:
 
-- One structured-output call per task (Understudy gateway ONLY — key from
+- One structured-output call per task (Orchestra gateway ONLY — key from
   `UNDERSTUDY_API_KEY` or `~/.understudy/credentials.json`; the command refuses
   to run against any other provider) produces
   `understudy.task_authoring.v1`: statement, success_criteria,

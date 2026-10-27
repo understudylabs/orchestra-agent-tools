@@ -432,7 +432,7 @@ function emitWorkloadBuildResult(cmd: Command, output: string, project: Workload
     kind: "coding_agent_prompt" as const,
     command: { executable: "understudy", args: checkArgs },
     prompt: [
-      `Use the Understudy capture-evidence skill to build a provisional eval from the one-day raw traces at ${output}.`,
+      `Use the Orchestra capture-evidence skill to build a provisional eval from the one-day raw traces at ${output}.`,
       `Reconcile ${project.source.skipped_count} skipped captures recorded at ${skippedPath} before making coverage claims.`,
       "Infer the workload goal, output contract, success criteria, execution modes, and failure taxonomy from these traces and the current repository.",
       "Explain your evidence and ask only targeted questions whose answers would materially change the metric, environment, or case selection.",

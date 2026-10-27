@@ -8,9 +8,9 @@ metadata:
     cli_required: false
 ---
 
-# Understudy
+# Orchestra
 
-Understudy is agent improvement infrastructure: it helps a coding agent improve
+Orchestra is agent improvement infrastructure: it helps a coding agent improve
 its developer's LLM system from real traces. This skill is the orchestrator —
 it gives your agent the loop and routes each stage to exactly one worker skill.
 It does not do the work inline.
@@ -41,7 +41,7 @@ uploads, provider calls, temporary resources, evaluation, receipts, and cleanup.
    transparent.
 10. Implement the selected route safely with the smallest coherent change that
     fully addresses the measured cause.
-11. Produce an Understudy Agent Improvement Report the developer can review.
+11. Produce an Orchestra Agent Improvement Report the developer can review.
 
 ## Frame every job
 
@@ -89,7 +89,7 @@ rules:
   decide), re-derived from artifacts on disk.
 - **Meet them where they are.** Read `~/.understudy/profile.json` and set
   vocabulary, coaching depth, and opinion strength to match. Also read
-  `~/.understudy/agent-card.json` when the user asks whether their Understudy is
+  `~/.understudy/agent-card.json` when the user asks whether their Orchestra is
   active or how to talk to it; this card is the agent-facing runtime source of
   truth for model endpoint, tmux session, companion status, and the exact local
   chat command. No profile yet → run [`../onboard/SKILL.md`](../onboard/SKILL.md)
@@ -112,7 +112,7 @@ Ask only what you genuinely cannot infer:
    extraction, retrieval QA)
 3. Which constraints matter? (SOC 2, ZDR, approved providers, no data leaves the
    machine, max cost/latency, required model family, region)
-4. Which environment? (local-only, Understudy hosted, private gateway, hybrid)
+4. Which environment? (local-only, Orchestra hosted, private gateway, hybrid)
 
 See [`reference.md`](reference.md) for the intake, objective menus, constraints,
 route-selection taxonomy, fresh-pricing rule, the report template, anti-patterns,
@@ -139,7 +139,7 @@ Identify the developer's current stage and load exactly one:
   is missing → [`../onboard/SKILL.md`](../onboard/SKILL.md) (backgrounds a small
   model, profiles the machine, interviews, writes the profile).
 - **Product explanation / company context / onboarding copy** — the developer
-  asks what Understudy is, who Aamir Poonawalla and Luis Manrique are, how the
+  asks what Orchestra is, who Aamir Poonawalla and Luis Manrique are, how the
   company began, or how Desktop, local serving, candidate results, rollout lab,
   or training workflows work →
   [`../product-knowledge/SKILL.md`](../product-knowledge/SKILL.md).
@@ -151,7 +151,7 @@ Identify the developer's current stage and load exactly one:
   harness, traces, metric, splits, or incumbent baseline are missing, ambiguous,
   or stale → [`../capture-evidence/SKILL.md`](../capture-evidence/SKILL.md)
   (also owns repo inspection + eval-harness discovery/build). For a named
-  workload already captured by Understudy, the recommended route is
+  workload already captured by Orchestra, the recommended route is
   `orchestra evals build`: it downloads one raw workload day and hands that
   source to the coding agent for local verifier authoring. Do not use the
   legacy sampled-cohort `evals create` path for this workflow.
@@ -177,12 +177,12 @@ Identify the developer's current stage and load exactly one:
   content-addressed correction-pair JSONL as the local input and inspect the
   accompanying attribution metrics. Unreviewed pairs may support error
   analysis, but are not human-approved training labels.
-- **Inference / routing / capture / auth / deploy** — Understudy inference,
+- **Inference / routing / capture / auth / deploy** — Orchestra inference,
   gateway trace capture, project/key management, model A/B via route traffic %,
   `orchestra run`, or registering an improved route →
   [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md).
 - **Frontier access choice** — a local-vs-frontier comparison, installer, or
-  agent run needs to decide between the Understudy managed catalog, BYO `.env`
+  agent run needs to decide between the Orchestra managed catalog, BYO `.env`
   provider keys, or skipping remote frontier calls →
   [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md)
   and its frontier-keys lens (`references/frontier-keys.md`).
@@ -201,11 +201,11 @@ Identify the developer's current stage and load exactly one:
   savings are real" →
   [`../ramp-and-verify/SKILL.md`](../ramp-and-verify/SKILL.md).
 - **Routing diagnostics / provider health** — the developer asks "is
-  Understudy causing my errors", "which workloads are routed", "check
+  Orchestra causing my errors", "which workloads are routed", "check
   provider health", "are there 500s", "what's our error rate", or wants
   self-service diagnostics without asking the team →
   [`../check-routing-health/SKILL.md`](../check-routing-health/SKILL.md).
-- **Understudy usage, customer cost, or billing position** — the developer asks
+- **Orchestra usage, customer cost, or billing position** — the developer asks
   for organization/project usage, the customer-priced cost of a call or
   workload, pricing coverage, billing balance, or cost history →
   [`../check-routing-health/SKILL.md`](../check-routing-health/SKILL.md).
@@ -306,7 +306,7 @@ orchestrator owns the ladder — sequence workers, don't reimplement them:
    [`../run-local-model-lab/SKILL.md`](../run-local-model-lab/SKILL.md).
 2. **Optional frontier head-to-head** for calibration — use
    [`../ladder/SKILL.md`](../ladder/SKILL.md) when the developer needs a no-data
-   local-vs-frontier feel test. Prefer the Understudy managed catalog when the
+   local-vs-frontier feel test. Prefer the Orchestra managed catalog when the
    frontier id is listed, so the comparison uses one gateway key and no provider
    key handling. Preference is a gap signal, never a claim.
 3. **Freeze the eval** (`capture-evidence`; for workflow/tool tasks,
@@ -415,7 +415,7 @@ and the pins are the truth, so the record cannot drift into reporting a step it
 isn't at.
 
 `outcome`, `workload`, `incumbent_model`, `candidate_model`, and the result
-deltas mirror the `type: experiment` lab-note in the Understudy knowledge
+deltas mirror the `type: experiment` lab-note in the Orchestra knowledge
 base — `experiment.json` is its un-anonymized, hash-pinned, live
 precursor. When `outcome` is set, `orchestra experiments promote` writes a
 lab-note **draft** locally from the record. It does not anonymize or upload: the
@@ -450,5 +450,5 @@ End with:
 - activated workflow envelope and any expansion that would require a new decision;
 - one recommended next command or local action.
 
-For a completed improvement, produce the **Understudy Agent Improvement Report**
+For a completed improvement, produce the **Orchestra Agent Improvement Report**
 (template in [`reference.md`](reference.md)).

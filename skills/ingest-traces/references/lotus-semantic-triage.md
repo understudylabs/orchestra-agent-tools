@@ -109,7 +109,7 @@ Decision rules that follow:
 
 - **Semantic operators read message bodies.** That is their job — so the
   model they run on determines whether bodies leave the machine. Default to a
-  **local model** (MLX-served, below). Pointing LOTUS at the Understudy
+  **local model** (MLX-served, below). Pointing LOTUS at the Orchestra
   gateway or any provider sends trace bodies to that endpoint: that is an
   upload, and it needs the developer's explicit approval for that exact
   source in the current thread.

@@ -254,7 +254,7 @@ git clone https://github.com/alexzhang13/rlm.git .understudy/research/rlm
 ```
 
 Do not vendor RLM, Prime Intellect, or generated Python environments into this
-repo. Public Understudy skills can point to setup commands and artifact shapes;
+repo. Public Orchestra skills can point to setup commands and artifact shapes;
 product code remains TypeScript-backed unless there is a deliberate architecture
 change.
 

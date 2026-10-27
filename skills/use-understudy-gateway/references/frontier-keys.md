@@ -2,13 +2,13 @@
 
 Use this lens before any local-vs-frontier duel, gateway A/B, or first-run
 installer step that needs a remote frontier model. Default to the managed
-catalog when the model is available there: it uses the developer's Understudy
+catalog when the model is available there: it uses the developer's Orchestra
 account key, keeps provider keys out of the local project, and lets the same
 gateway run compare frontier and open-weight candidates.
 
 The user may still choose one of three frontier routes:
 
-1. **Understudy managed catalog** — use the developer's Understudy
+1. **Orchestra managed catalog** — use the developer's Orchestra
    account/gateway route, with no local provider key read by the installer or
    agent. This is the default for supported Anthropic, OpenAI, and open-weight
    catalog models.
@@ -32,11 +32,11 @@ The user may still choose one of three frontier routes:
   `ANTHROPIC_MODEL`, `FRONTIER_MODEL`, `AI_GATEWAY_MODEL`.
 - If the user chooses the managed catalog, clear local provider-key env vars for
   the duel and set `UNDERSTUDY_FALLBACK_MODEL=gpt-5.5` unless they choose another
-  public Understudy model from `orchestra models list --json`.
+  public Orchestra model from `orchestra models list --json`.
 - If the user chooses BYO, state that the key stays local but the selected
   upstream provider receives the prompts used in the comparison.
 - If the user chooses the managed catalog, state that no local provider key is
-  read and the comparison goes through the Understudy gateway route.
+  read and the comparison goes through the Orchestra gateway route.
 - Do not describe the signup credit as a hard synchronous spend cap. New
   accounts get prepaid credit and the gateway enforces suspension from the
   async billing state; agents should still set a row count, max-token, and
@@ -54,11 +54,11 @@ The user may still choose one of three frontier routes:
 
 1. Explain the decision in one sentence:
    "The local model stays on your Mac; the right-side frontier should use the
-   Understudy managed catalog when available, with BYO provider keys only for
+   Orchestra managed catalog when available, with BYO provider keys only for
    unsupported models or provider-specific needs."
 2. Ask which route they want: managed catalog, BYO shell/`.env`, or skip. Lead
    with managed catalog unless the user's stated model is not catalogued.
-3. For managed catalog, verify the user has an Understudy login and a priceable
+3. For managed catalog, verify the user has an Orchestra login and a priceable
    model id:
    ```bash
    orchestra status --json
@@ -122,7 +122,7 @@ UNDERSTUDY_FRONTIER_KEY_MODE=zdr \
 
 `zdr` is the legacy installer flag name for the managed-catalog path. In agent
 conversation, call the choice `managed catalog` so users understand the product
-behavior: no local provider key, catalog-priced models through the Understudy
+behavior: no local provider key, catalog-priced models through the Orchestra
 gateway.
 
 The installer stores logs under `~/.understudy/agent-tools/logs` and the

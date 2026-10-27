@@ -28,7 +28,7 @@ The gateway exposes two endpoints:
 
 Almost everything in the LLM ecosystem speaks one of these two shapes.
 Your task is to identify the wire shape the code uses, then rewrite the
-client's configuration so it sends to Understudy's URL with the BYO
+client's configuration so it sends to Orchestra's URL with the BYO
 headers.
 
 ## How to find the patch site
@@ -82,7 +82,7 @@ If the client requires a non-empty string at construction time and you
 want a graceful fallback when `UNDERSTUDY_API_KEY` is unset, use
 `process.env.UNDERSTUDY_API_KEY ?? process.env.OPENAI_API_KEY` (or the
 matching upstream var). That lets the app keep working in dev when the
-user hasn't set up Understudy yet.
+user hasn't set up Orchestra yet.
 
 ### 3. The upstream-key header
 
@@ -243,7 +243,7 @@ const res = await fetch("$UNDERSTUDY_GATEWAY_URL/v1/chat/completions", {
 
 - The code uses a wire shape that isn't Anthropic or OpenAI (e.g.
   native Cohere, native Gemini, Mistral *without* compat mode, AWS
-  Bedrock SDK). The Understudy gateway can't proxy those today —
+  Bedrock SDK). The Orchestra gateway can't proxy those today —
   stop and tell the user that.
 - There are multiple client constructions for genuinely different
   upstream providers in the same file (not a refactor target — out of

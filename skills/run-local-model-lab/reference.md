@@ -53,7 +53,7 @@ does not support Gemma 4.
 VENV=.understudy/venvs/mlx/bin
 # Text-only / mlx-community quants (e.g. gemma-4-31b-it-8bit):
 $VENV/python -m mlx_lm.server --model mlx-community/gemma-4-31b-it-8bit --port 8080
-# Understudy certified QAT snapshots use mlx-vlm (multimodal serving path):
+# Orchestra certified QAT snapshots use mlx-vlm (multimodal serving path):
 orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
 $VENV/python -m mlx_vlm.server \
   --model ~/.understudy/models/gemma-4-e2b-it-qat-mlx-vlm-understudy \
@@ -64,7 +64,7 @@ $VENV/python -m mlx_vlm.server \
 ```
 
 Prefer the `-understudy` suffixed snapshot ids in this lab — they are the
-certified QAT conversions Understudy trains and stands behind (each ships an
+certified QAT conversions Orchestra trains and stands behind (each ships an
 `understudy.serving.json` with the exact serve flags). Do not silently replace
 one with a vanilla artifact when a catalog or download error occurs; surface
 the mismatch and repair the supported rung (provenance and smoke-test details:

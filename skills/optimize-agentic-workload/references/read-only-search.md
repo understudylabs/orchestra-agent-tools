@@ -2,7 +2,7 @@
 
 Deep detail for [`SKILL.md`](../SKILL.md), for the **read-only** lens: agentic
 web/retrieval/lookup loops where no tool mutates state. Read this when you
-actually wire a verifiers environment into the Understudy artifact contract and
+actually wire a verifiers environment into the Orchestra artifact contract and
 run the model A/B. See also
 [`../../optimize-workload/reference.md`](../../optimize-workload/reference.md)
 (GEPA, feedback functions, validator kinds) and
@@ -194,7 +194,7 @@ scraped third-party content or anything proprietary.
 
 Use this intervention when the attributed gap is model capability or
 provider/runtime behavior. Swap the policy model with tools held fixed; a
-provider-native or application runner may replace the Understudy commands below
+provider-native or application runner may replace the Orchestra commands below
 when it preserves the same comparison contract. Procedure:
 
 1. `orchestra models list --json` — enumerate public model options.
@@ -230,7 +230,7 @@ during the experiment. Configure it through the normal gateway/project setup in
 [`../../use-understudy-gateway/SKILL.md`](../../use-understudy-gateway/SKILL.md);
 this skill does not describe the internal plumbing.
 
-The selected backend is part of the activated workflow. Understudy managed
+The selected backend is part of the activated workflow. Orchestra managed
 routing, provider-native runs, and BYO provider routes are all eligible when
 they fit the declared destination, spend, retention, and data-class envelope.
 Keep provider, model, budget, and data class in the run artifact.

@@ -15,6 +15,16 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Changed
+
+- **Orchestra wording.** Installer messages, CLI help and messages, and skill
+  copy now say Orchestra instead of Understudy, and say "specialist model"
+  where they meant the trained model. Schema IDs, `UNDERSTUDY_*` env vars,
+  skill names, `~/.understudy` paths and "Understudy Desktop" are unchanged;
+  onboarding and product questions still recognize the old name. The Devin
+  hint now says to run the installer in the environment blueprint instead of
+  an `npm install` that never worked.
+
 ### Added
 
 - **`@orchestraai/agent-tools` package and `orchestra-agent-tools` repo.** The

@@ -67,7 +67,7 @@ installed, use the headless CLI, which covers everything in this skill.
    free disk. (`ollama list`; Hugging Face cache scan; MLX/LM Studio dirs — see
    [`reference.md`](reference.md).) Surface total disk used by weights.
 2. **Separate the bootstrap model from the workload candidate.** For onboarding
-   on Apple Silicon, be prescriptive: start with Understudy's verified
+   on Apple Silicon, be prescriptive: start with Orchestra's verified
    `google/gemma-4-e2b-it` MLX-VLM 4-bit snapshot as the fast product smoke. It
    is not the default workload recommendation. Pick the workload model from task
    fit, evidence, hardware, and time; skip directly to a stronger rung when a
@@ -83,7 +83,7 @@ installed, use the headless CLI, which covers everything in this skill.
 3. **Choose source + format for the runtime.** Ollama library (simplest, GGUF,
    no HF token for Gemma); Hugging Face GGUF (llama.cpp / LM Studio); MLX builds
    (Apple Silicon). Quantization/format primer in [`reference.md`](reference.md).
-4. **Confirm the size, then use the CLI pull command.** For the Understudy
+4. **Confirm the size, then use the CLI pull command.** For the Orchestra
    verified MLX ladder, use the product command after approval:
    ```bash
    orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
@@ -100,7 +100,7 @@ installed, use the headless CLI, which covers everything in this skill.
    The command downloads signed per-file URLs from
    `models.understudylabs.com`, writes into `~/.understudy/models`, verifies
    sizes and hashes when present, and logs progress/ETA to
-   `~/.understudy/agent-tools/logs/model-pull-*.log`. For non-Understudy
+   `~/.understudy/agent-tools/logs/model-pull-*.log`. For non-Orchestra
    sources, use the native runtime pull (`ollama pull`, `hf download`, LM
    Studio) and keep the same approval boundary.
 5. **Serve from the manifest, not from memory.** Each verified artifact ships an

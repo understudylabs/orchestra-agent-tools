@@ -56,7 +56,7 @@ export function readProjectConfig(startDir?: string): ProjectConfig | null {
 export function writeProjectConfig(path: string, config: ProjectConfig): void {
   if (isGlobalProjectConfigPath(path)) {
     throw new Error(
-      "Refusing to write project config to ~/.understudy/config.json — that is the global Understudy config dir, not a project. cd into your project repo and retry.",
+      "Refusing to write project config to ~/.understudy/config.json — that is the global Orchestra config dir, not a project. cd into your project repo and retry.",
     );
   }
   ProjectConfigSchema.parse(config);

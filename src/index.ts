@@ -173,7 +173,7 @@ function readSkillSummaries(): SkillSummary[] {
       }
       const text = readFileSync(skillPath, "utf8");
       const description =
-        text.match(/^description:\s*(.+)$/m)?.[1]?.trim() ?? "Understudy public skill.";
+        text.match(/^description:\s*(.+)$/m)?.[1]?.trim() ?? "Orchestra public skill.";
       return {
         name: entry.name,
         path: relative(repoRoot, skillPath),
@@ -190,7 +190,7 @@ function printSkillList(): void {
     console.log("No public skills found.");
     return;
   }
-  console.log("Public Understudy skills:");
+  console.log("Public Orchestra skills:");
   for (const skill of skills) {
     console.log(`- ${skill.name} (${skill.path})`);
     console.log(`  ${skill.description}`);
@@ -319,7 +319,7 @@ function printPlatforms(json: boolean, inspect?: string): void {
     printJson({ adapters });
     return;
   }
-  console.log("Understudy agent platform adapters:");
+  console.log("Orchestra agent platform adapters:");
   for (const adapter of adapters) {
     console.log(`- ${adapter.id} (${adapter.status})`);
     console.log(`  ${adapter.displayName}: ${adapter.discovery}`);

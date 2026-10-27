@@ -1,6 +1,6 @@
 ---
 name: install-opencode-plugin
-description: Compatibility shim for OpenCode installs. Use when a developer asks to install, update, enable, reinstall, remove, or verify Understudy in OpenCode - "install Understudy in OpenCode", "add the OpenCode skills", "make OpenCode see the skills". Route to install-agent-adapter with platform opencode.
+description: Compatibility shim for OpenCode installs. Use when a developer asks to install, update, enable, reinstall, remove, or verify Orchestra in OpenCode - "install Orchestra in OpenCode", "add the OpenCode skills", "make OpenCode see the skills". Route to install-agent-adapter with platform opencode.
 metadata:
   understudy:
     mode: automatic
@@ -8,7 +8,7 @@ metadata:
     cli_required: false
 ---
 
-# Install the Understudy OpenCode skills
+# Install the Orchestra OpenCode skills
 
 This skill is a compatibility shim. The consolidated setup surface is
 [`install-agent-adapter`](../install-agent-adapter/SKILL.md).
@@ -45,7 +45,7 @@ Local-first and free: installing the OpenCode adapter only links local skills. I
 must not authenticate, upload data, inspect secret values, download model
 weights, start hosted jobs, or make provider calls.
 
-- Do not overwrite existing non-Understudy OpenCode skills or commands.
+- Do not overwrite existing non-Orchestra OpenCode skills or commands.
 - Do not copy private traces, keys, or `.understudy/` state into OpenCode config.
 - Use symlinks back to this repo's shared `skills/` tree.
 - If OpenCode asks before reading symlinked external resources, let the user
@@ -53,7 +53,7 @@ weights, start hosted jobs, or make provider calls.
 
 ## Resolve CLI
 
-No Understudy CLI command is required. Use shell to create symlinks after
+No Orchestra CLI command is required. Use shell to create symlinks after
 confirming the repo contains `skills/understudy/SKILL.md`.
 
 ## Output Standard

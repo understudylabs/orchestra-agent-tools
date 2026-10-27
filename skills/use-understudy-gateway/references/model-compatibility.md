@@ -23,7 +23,7 @@ that documentation when using another model or diagnosing changed behavior.
   the evaluation contract, report a separate diagnostic rather than silently
   treating the arms as equivalent.
 
-Understudy has a native managed OpenAI Responses relay at `/v1/responses` and
+Orchestra has a native managed OpenAI Responses relay at `/v1/responses` and
 `/v1/responses/compact`. Availability is account/configuration dependent; the
 Chat catalog alone does not prove Responses access. Probe the intended endpoint
 with a small synthetic request under the authorized run budget. Do not silently

@@ -95,7 +95,7 @@ Stages 1–2 are local-only engineering: synthetic state only, no live side
 effects, and the frozen dev/holdout rows never enter the RL train pool. Each
 stage reference carries its own specific gates.
 
-Do not imply Understudy currently provides hosted training as an executable OSS
+Do not imply Orchestra currently provides hosted training as an executable OSS
 CLI workflow. Mark the final result as a **partner handoff**.
 
 ## Stage 1 — Author the RL environment

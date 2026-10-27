@@ -50,16 +50,16 @@ dest="$HOME/.cursor/plugins/local/orchestra"
 ls "$REPO/.cursor-plugin/plugin.json" "$REPO/skills/understudy/SKILL.md"
 mkdir -p "$(dirname "$dest")"
 if [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*/@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools) true ;; *) false ;; esac; then
-  # Refresh only a symlink Understudy created; never delete a real directory.
+  # Refresh only a symlink Orchestra created; never delete a real directory.
   rm -f "$dest" && ln -s "$REPO" "$dest"
 elif [ -e "$dest" ] || [ -L "$dest" ]; then
-  echo "skip: existing non-Understudy path at $dest (move it aside, then rerun)"
+  echo "skip: existing non-Orchestra path at $dest (move it aside, then rerun)"
 else
   ln -s "$REPO" "$dest"
 fi
 ```
 
-Only replace an Understudy-owned symlink at that exact path; leave any other
+Only replace an Orchestra-owned symlink at that exact path; leave any other
 file, directory, or symlink there unchanged and tell the developer. Do not edit
 Cursor's internal settings databases.
 
@@ -72,7 +72,7 @@ Developer: Reload Window
 Then ask Cursor Agent:
 
 ```text
-Use the Understudy onboarding skill for this project.
+Use the Orchestra onboarding skill for this project.
 ```
 
 Uninstall:
@@ -108,7 +108,7 @@ Choose the `orchestra-skills` marketplace, install or enable the `orchestra`
 plugin, then start a new thread if needed. Next ask:
 
 ```text
-Use the Understudy onboarding skill for this project.
+Use the Orchestra onboarding skill for this project.
 ```
 
 Uninstall: remove the plugin from `/plugins`, then remove the marketplace:
@@ -125,13 +125,13 @@ to `../skills`.
 
 This is a native OpenCode skills/commands adapter, not an OpenCode JS/TS plugin.
 OpenCode plugins are hook modules for lifecycle events and custom behavior. For
-Understudy, the documented and community-style pattern is simpler: keep one
+Orchestra, the documented and community-style pattern is simpler: keep one
 durable checkout/package, symlink each `skills/<name>/` directory into
 `~/.config/opencode/skills`, and link a small markdown command into
 `~/.config/opencode/commands`.
 
 The `.opencode/adapter.json` file is not consumed by OpenCode. It is an
-Understudy-owned version/staleness sentinel used by `orchestra doctor` and the
+Orchestra-owned version/staleness sentinel used by `orchestra doctor` and the
 release checklist.
 
 Global install:
@@ -180,7 +180,7 @@ ls "$HOME/.config/opencode/skills/understudy/SKILL.md"
 ls "$HOME/.config/opencode/commands/orchestra-onboard.md"
 ```
 
-Uninstall Understudy-owned symlinks:
+Uninstall Orchestra-owned symlinks:
 
 ```bash
 find "$HOME/.config/opencode/skills" -type l \( -lname '*/@orchestraai/agent-tools/skills/*' -o -lname '*/orchestra-agent-tools/skills/*' -o -lname '*/understudy-agent-tools/skills/*' \) -delete
@@ -199,7 +199,7 @@ path durability, but that points at the one shared tree; it is not a fork.)
 
 This is not a Hermes plugin (`~/.hermes/plugins/` with `plugin.yaml` + Python)
 and not a Skills Hub install. The `.hermes/adapter.json` file is not consumed by
-Hermes; it is an Understudy-owned version/staleness sentinel for
+Hermes; it is an Orchestra-owned version/staleness sentinel for
 `orchestra doctor` and the release checklist.
 
 Register through a stable symlink, not the raw checkout path. The installer
@@ -264,12 +264,12 @@ Activation — Hermes rescans `skills.external_dirs` in-session, no restart need
 Then, if you prefer natural language, ask Hermes:
 
 ```text
-Use the Understudy onboarding skill for this project.
+Use the Orchestra onboarding skill for this project.
 ```
 
 A few generically named skills (e.g. `onboard`, `review`) may be shadowed by
 Hermes bundled skills of the same name, since local `~/.hermes/skills/` wins on
-conflicts; the Understudy-specific skills are unique and unaffected.
+conflicts; the Orchestra-specific skills are unique and unaffected.
 
 Verify:
 
@@ -308,7 +308,7 @@ there is no persistent local plugin registration. The public installer clones
 the GitHub source, builds it, and links the CLI globally. Devin discovers the
 skills through `AGENTS.md` (which it reads as an injected repository rule) and
 the shared `skills/` tree in that checkout. `.devin/adapter.json` is an
-Understudy version/staleness sentinel for `orchestra doctor`, not a manifest
+Orchestra version/staleness sentinel for `orchestra doctor`, not a manifest
 consumed by Devin.
 
 Install (typically done once in the Devin environment blueprint so every
@@ -330,7 +330,7 @@ ls "$(git rev-parse --show-toplevel)/skills/understudy/SKILL.md"
 Activation — no reload step needed; Devin reads `AGENTS.md` automatically:
 
 ```text
-Use the Understudy onboarding skill for this project.
+Use the Orchestra onboarding skill for this project.
 ```
 
 For persistent installs across sessions, add the installer command to the

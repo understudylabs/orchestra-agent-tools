@@ -80,7 +80,7 @@ describe("findProjectRoot and the global config dir", () => {
           org_id: "org_x",
           project_slug: "some-project",
         }),
-      /global Understudy config dir/,
+      /global Orchestra config dir/,
     );
     assert.ok(!existsSync(globalPath));
 

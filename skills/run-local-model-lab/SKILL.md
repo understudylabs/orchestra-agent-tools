@@ -10,7 +10,7 @@ metadata:
 
 # Run Local Model Lab
 
-Run a local model against an existing Understudy workload/eval to determine the
+Run a local model against an existing Orchestra workload/eval to determine the
 best route for the objective. Local inference is $0 and private, and it may be
 the only legal path under ZDR / SOC2 / local-only constraints, but do not use a
 weak local result to avoid an informative remote anchor when remote evaluation
@@ -163,5 +163,5 @@ spend posture when choosing between a longer local run and a paid remote anchor.
 End with: hardware + runtime found; candidate tier(s) and why; the frozen
 contract used; local vs remote scores with latency/cost/quality; the route
 decision and its trigger to revisit; and any approval still needed (download,
-upload, deploy). Fold results into the Understudy Agent Improvement Report
+upload, deploy). Fold results into the Orchestra Agent Improvement Report
 ([`../understudy/reference.md`](../understudy/reference.md)).

@@ -1,6 +1,6 @@
 ---
 name: install-plugin
-description: Compatibility shim for Claude Code installs. Use when a developer asks to install, update, enable, reinstall, remove, or verify the Understudy Claude Code plugin - "install Understudy in Claude", "add the Understudy skills", "why can't Claude see the skill". Route to install-agent-adapter with platform claude-code.
+description: Compatibility shim for Claude Code installs. Use when a developer asks to install, update, enable, reinstall, remove, or verify the Orchestra Claude Code plugin - "install Orchestra in Claude", "add the Orchestra skills", "why can't Claude see the skill". Route to install-agent-adapter with platform claude-code.
 metadata:
   understudy:
     mode: automatic
@@ -8,7 +8,7 @@ metadata:
     cli_required: false
 ---
 
-# Install the Understudy Claude Code plugin
+# Install the Orchestra Claude Code plugin
 
 This skill is a compatibility shim. The consolidated setup surface is
 [`install-agent-adapter`](../install-agent-adapter/SKILL.md).
@@ -44,7 +44,7 @@ model weights, start hosted jobs, or make provider calls.
 
 ## Resolve CLI
 
-No Understudy CLI command is required. Prefer the `claude plugin` CLI when
+No Orchestra CLI command is required. Prefer the `claude plugin` CLI when
 available; otherwise show the interactive `/plugin ...` commands from
 `install-agent-adapter/reference.md`.
 

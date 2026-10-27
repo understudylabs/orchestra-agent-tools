@@ -29,7 +29,7 @@ const SKILL_NAME = "understudy-onboard";
  * pre-plugin frontmatter ("convert to Understudy", "add GEPA", ...).
  */
 const INSTALLED_DESCRIPTION =
-  'Use as the engaging first-run experience right after installing Understudy — whenever a developer says "get started", "set me up", "I\'m new to this", "onboard me", or asks what Understudy is and where to begin — and to convert an existing application to route LLM calls through the Understudy gateway or add thin Understudy cookbooks such as a DSPy-style GEPA prompt optimizer. Use when the user asks to "convert to Understudy", "set up Understudy in this repo", "route through Understudy", "siphon traffic to Understudy", "add GEPA", "optimize this prompt", "improve this eval", or any similar phrasing about wiring up Understudy or using an Understudy API key from an agent. Onboarding profiles the machine and the developer, writes a durable ~/.understudy/profile.json, and hands off to the understudy orchestrator; conversion detects the SDK or framework in use (raw Anthropic SDK, raw OpenAI SDK, Mastra, Vercel AI SDK, LangChain, LlamaIndex, DSPy/GEPA, or anything else that speaks Anthropic/OpenAI wire shape) and applies the matching recipe.';
+  'Use as the engaging first-run experience right after installing Orchestra — whenever a developer says "get started", "set me up", "I\'m new to this", "onboard me", or asks what Orchestra is and where to begin — and to convert an existing application to route LLM calls through the Orchestra gateway or add thin Orchestra cookbooks such as a DSPy-style GEPA prompt optimizer. Use when the user asks to "convert to Orchestra", "set up Orchestra in this repo", "route through Orchestra", "siphon traffic to Orchestra", the same requests using the former name Understudy ("convert to Understudy", "route through Understudy"), "add GEPA", "optimize this prompt", "improve this eval", or any similar phrasing about wiring up Orchestra or using an Orchestra API key from an agent. Onboarding profiles the machine and the developer, writes a durable ~/.understudy/profile.json, and hands off to the understudy orchestrator; conversion detects the SDK or framework in use (raw Anthropic SDK, raw OpenAI SDK, Mastra, Vercel AI SDK, LangChain, LlamaIndex, DSPy/GEPA, or anything else that speaks Anthropic/OpenAI wire shape) and applies the matching recipe.';
 
 /**
  * Routing section appended to the installed SKILL.md body. The plugin build
@@ -38,10 +38,11 @@ const INSTALLED_DESCRIPTION =
  * files it ships with.
  */
 const CONVERSION_ROUTING = `
-## Converting a repo to Understudy
+## Converting a repo to Orchestra
 
-For "convert this to Understudy", "route through Understudy", "add GEPA", or
-any other request about wiring an application to the Understudy gateway,
+For "convert this to Orchestra" (or "to Understudy", its former name), "route
+through Orchestra", "add GEPA", or
+any other request about wiring an application to the Orchestra gateway,
 follow [setup-code.md](setup-code.md) in this directory. Its dispatch table
 picks the matching per-stack recipe shipped alongside this file:
 [anthropic-typescript.md](anthropic-typescript.md),
@@ -151,7 +152,7 @@ async function runSetup(cmd: Command, opts: SetupOpts): Promise<void> {
 
   const scopeLabel = opts.global ? "globally" : "in this repo";
   process.stdout.write(
-    `\n${kleur.green("✓")} Installed the Understudy onboarding skill ${scopeLabel}.\n\n`,
+    `\n${kleur.green("✓")} Installed the Orchestra onboarding skill ${scopeLabel}.\n\n`,
   );
   process.stdout.write(`  ${kleur.bold(skillPath)}\n`);
   for (const ref of referencePaths) {
@@ -160,7 +161,7 @@ async function runSetup(cmd: Command, opts: SetupOpts): Promise<void> {
   process.stdout.write(
       `\n${kleur.bold("Next step")}\n` +
       `  Open this repo in Claude Code or another agent that reads .claude/skills/\n` +
-      `  and say: ${kleur.cyan('"convert this to Understudy"')}\n\n` +
+      `  and say: ${kleur.cyan('"convert this to Orchestra"')}\n\n` +
       `  For Claude Code, Cursor, Codex, or OpenCode adapter setup, prefer\n` +
       `  ${kleur.cyan("install.sh --agents ...")} or the ${kleur.cyan("install-agent-adapter")} skill.\n\n` +
       `  The agent will read the skill, detect your SDK, and apply the matching\n` +

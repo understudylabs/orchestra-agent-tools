@@ -65,8 +65,8 @@ directory and read the catalogs — never trust `local_models` as current.
 ## The agent runtime card (`~/.understudy/agent-card.json`)
 
 Agent-level, not user-interview memory. This is the single file a fresh coding
-agent reads when the user asks, "is my Understudy active?" or "talk to my
-Understudy." It captures live local runtime facts that do not belong in the
+agent reads when the user asks, "is my specialist model active?" or "talk to my
+Orchestra." It captures live local runtime facts that do not belong in the
 profile. Never put secrets, prompts, outputs, or customer data in it.
 
 **Ownership: the Understudy desktop app (deprecated, see
@@ -203,7 +203,7 @@ Default first pull is the smallest verified Gemma 4 MLX chat model, served
 through MLX on Apple Silicon (see
 [`../../docs/open-model-spotlight.md`](../../docs/open-model-spotlight.md)):
 
-- **Apple Silicon first rung** — Understudy-verified QAT-derived
+- **Apple Silicon first rung** — Orchestra-verified QAT-derived
   `gemma-4-e2b-it-qat-mlx-vlm-understudy` (`google/gemma-4-E2B-it` QAT weights,
   MLX 4-bit at `group_size=32`), served with `mlx_vlm.server`. Snapshot:
   `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`.
@@ -233,7 +233,7 @@ through MLX on Apple Silicon (see
   repair flow. Do not make an uncertified model the invisible fallback.
 - **Stock Gemma 4 MLX caveat** — `mlx-community/Gemma4-E2B-IT-Text-int4` and
   `mlx-community/gemma-4-e2b-it-4bit` failed on the tested stack with a Gemma 4
-  shared-KV weight/config mismatch. The Understudy snapshot exists to give users
+  shared-KV weight/config mismatch. The Orchestra snapshot exists to give users
   a known-good first rung instead of sending them into loader debugging.
 - **Do not use `*-assistant` Gemma 4 repos as the first model.** They are MTP
   draft models for speculative decoding, not standalone chat models.

@@ -91,7 +91,7 @@ export function registerTrainingCommand(program: Command): void {
 
   training.command("goal-card")
     .description("Render a local pre-run Goal Card and validated environment proposal.")
-    .requiredOption("--plan <path>", "Portable Understudy training plan.")
+    .requiredOption("--plan <path>", "Portable Orchestra training plan.")
     .option("--preview <count>", "Bounded TRAIN-only example preview (0-3).", "0")
     .action(async function (this: Command, options: GoalCardOptions) {
       await runAction(this, async () => {
@@ -136,7 +136,7 @@ export function registerTrainingCommand(program: Command): void {
 
   training.command("compile-backend")
     .description("Compile one portable plan for a real backend without uploading or spending.")
-    .requiredOption("--plan <path>", "Portable Understudy training plan.")
+    .requiredOption("--plan <path>", "Portable Orchestra training plan.")
     .requiredOption("--backend <id>", "Backend: mlx-local, fireworks, or tinker.")
     .option("--output <path>", "Private compile receipt inside the plan root.")
     .action(async function (this: Command, options: CompileBackendOptions) {
@@ -163,7 +163,7 @@ export function registerTrainingCommand(program: Command): void {
 
   training.command("run-local-sft")
     .description("Run a supported chat SFT recipe locally with MLX and zero provider spend.")
-    .requiredOption("--plan <path>", "Portable Understudy training plan.")
+    .requiredOption("--plan <path>", "Portable Orchestra training plan.")
     .requiredOption("--run-id <id>", "Immutable local training run identifier.")
     .option("--model <id>", "Cached MLX model id or local model path.", DEFAULT_LOCAL_SFT_MODEL)
     .option("--output-root <path>", "Private local training-run root.")
@@ -215,7 +215,7 @@ export function registerTrainingCommand(program: Command): void {
 
   training.command("run-tinker-sft")
     .description("Run a supported portable SFT recipe with the real Tinker SDK.")
-    .requiredOption("--plan <path>", "Portable Understudy training plan.")
+    .requiredOption("--plan <path>", "Portable Orchestra training plan.")
     .requiredOption("--run-id <id>", "Immutable remote training run identifier.")
     .option("--model <id>", "Tinker model id; otherwise resolve from the live provider catalog.")
     .option("--maximum-spend-usd <usd>", "Fail-closed spend cap, never above the immutable plan cap.")

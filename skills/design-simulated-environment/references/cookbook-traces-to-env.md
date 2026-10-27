@@ -45,7 +45,7 @@ RL via `prepare-verifier-handoff`.
   of those spans as JSONL from the team's own backend is a first-class
   capture source — the converter reads Vercel AI SDK and GenAI-semconv span
   attributes directly (shape D), alongside gateway capture exports, provider
-  logs, and the input/expected pairs from existing test scripts. (Understudy
+  logs, and the input/expected pairs from existing test scripts. (Orchestra
   gateway capture retrieval is moving to self-service; until then the team's
   own telemetry export is usually the fastest path.) **Redact first** via
   [`../../ingest-traces/SKILL.md`](../../ingest-traces/SKILL.md) — everything

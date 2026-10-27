@@ -231,7 +231,7 @@ test("concurrency pool authors every task exactly once with bounded parallelism"
 });
 
 test("refuses to run without gateway credentials (never another provider)", () => {
-  assert.throws(() => resolveGatewayAuth({}, "/nonexistent/credentials.json"), /Understudy gateway/);
+  assert.throws(() => resolveGatewayAuth({}, "/nonexistent/credentials.json"), /Orchestra gateway/);
 });
 
 // ---------------------------------------------------------------------------

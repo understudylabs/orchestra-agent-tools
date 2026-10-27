@@ -44,7 +44,7 @@ export function registerRoutesCommand(program: Command): void {
 
   addProjectOptions(routes.command("set <workload>")
     .description("Route a small traffic percentage to an Orchestra model.")
-    .requiredOption("--model-id <id>", "Public Understudy model id.")
+    .requiredOption("--model-id <id>", "Public Orchestra model id.")
     .option("--traffic-pct <0-100>", "Traffic percentage.", "10"))
     .action(async function (this: Command, workload: string, opts: SetOpts) {
       await runAction(this, () => runSet(this, workload, opts));
@@ -106,7 +106,7 @@ async function runSet(cmd: Command, workloadValue: string, opts: SetOpts): Promi
   }
   process.stdout.write(`${kleur.green("✓")} Route set for ${workload.name} (${workload.id})\n`);
   process.stdout.write(`route: ${payload.model_id} at ${payload.route_traffic_pct}%\n`);
-  process.stdout.write(`${kleur.gray("Inference calls keep using the normal Understudy gateway path.")}\n`);
+  process.stdout.write(`${kleur.gray("Inference calls keep using the normal Orchestra gateway path.")}\n`);
 }
 
 async function runClear(cmd: Command, workloadValue: string, opts: RouteOpts): Promise<void> {

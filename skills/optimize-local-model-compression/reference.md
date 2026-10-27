@@ -106,7 +106,7 @@ workflows, and coding agents) and 42% non-tool (prose, reasoning, code).
 3. Mix with general-domain samples (prose, reasoning, code) at ~40% of total.
 4. Target 24+ samples total for stable sensitivity measurement.
 
-The Understudy tool-heavy calibration was built from AutomationBench
+The Orchestra tool-heavy calibration was built from AutomationBench
 next-tool-call traces — real CRM automation scenarios with concrete tool
 schemas.
 
