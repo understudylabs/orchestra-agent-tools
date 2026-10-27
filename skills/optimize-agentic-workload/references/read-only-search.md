@@ -143,7 +143,7 @@ can prove freshness.
 ```json
 {
   "schema_version": "understudy.baseline.v1",
-  "command": "understudy run -- vf-eval agentic-web-search-synthetic --model gpt-5.x -n 8",
+  "command": "orchestra run -- vf-eval agentic-web-search-synthetic --model gpt-5.x -n 8",
   "split": "holdout",
   "sample_size": 8,
   "quality": 0.75,
@@ -197,14 +197,14 @@ provider/runtime behavior. Swap the policy model with tools held fixed; a
 provider-native or application runner may replace the Understudy commands below
 when it preserves the same comparison contract. Procedure:
 
-1. `understudy models list --json` — enumerate public model options.
+1. `orchestra models list --json` — enumerate public model options.
 2. For each candidate, route the workload to it and run the frozen harness
    through the gateway:
 
    ```sh
-   understudy workloads route <workload-id> --project-id <project-id> \
+   orchestra workloads route <workload-id> --project-id <project-id> \
      --model-id glm-5.1 --traffic-pct 100
-   understudy run -- vf-eval agentic-web-search-synthetic --model glm-5.1 -n 8
+   orchestra run -- vf-eval agentic-web-search-synthetic --model glm-5.1 -n 8
    ```
 
 3. Read quality from the rubric and latency/cost from the `ToolEnv` rollout
@@ -218,7 +218,7 @@ when it preserves the same comparison contract. Procedure:
 5. Clear routes you are done with:
 
    ```sh
-   understudy workloads route <workload-id> --project-id <project-id> --clear
+   orchestra workloads route <workload-id> --project-id <project-id> --clear
    ```
 
 **A/B fallback prerequisite (generic).** A traffic split sends only the routed

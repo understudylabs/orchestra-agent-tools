@@ -16,7 +16,7 @@ git ls-files
   `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
   `.opencode/adapter.json`, `.hermes/adapter.json`, and `.devin/adapter.json` on
   any release that changes the skill catalog or CLI surface — installed
-  adapters have no other staleness signal; `understudy doctor --json` fails if
+  adapters have no other staleness signal; `orchestra doctor --json` fails if
   they drift;
 - the CLI package and every adapter manifest advance on every ConversationRuntime
   release, even when no command surface changed: the CLI distributes the canonical

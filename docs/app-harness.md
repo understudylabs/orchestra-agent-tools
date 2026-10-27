@@ -82,7 +82,7 @@ honest beats fake-complete.
 - `incumbent_models` is rejected on app-replay runs: an app replay is a
   regression check on current code, **not** an incumbent claim, and its rows
   never feed `calibration.json`.
-- Execute with `understudy runs execute --benchmark <dir> --watch` (the
+- Execute with `orchestra runs execute --benchmark <dir> --watch` (the
   runner is wired in automatically; `--runner` still selects the model-arm
   runner for ordinary requests).
 

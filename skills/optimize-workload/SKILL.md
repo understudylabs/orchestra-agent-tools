@@ -80,8 +80,8 @@ validator kinds in [`reference.md`](reference.md):
 - **Models** — student = a cheap candidate; `reflection_lm` = a strong frontier
   model (optional, but a weak one caps quality). **Inference defaults to
   Understudy** within the activated workflow:
-  `understudy login --email <developer-email>`, then
-  `understudy run -- <local command>`. Fall back to the developer's own
+  `orchestra login --email <developer-email>`, then
+  `orchestra run -- <local command>`. Fall back to the developer's own
   provider keys only if they choose BYO. See reference.md → Inference.
 - **Scope boundary** — optimizing the prompt, route, or parser of a workload's
   policy model is in scope, including an *agentic / tool-use* policy. Treat one
@@ -196,10 +196,10 @@ directory (see the Experiment section of
 .understudy/experiments/<exp-id>/      # experiment.json, candidate.json, claim.json
 ```
 
-Open or reuse an experiment before optimizing with `understudy experiments new`
+Open or reuse an experiment before optimizing with `orchestra experiments new`
 (it pins the current baseline); `experiments/active` names it. On
 `optimize-workload adapter run --execute` the produced candidate is frozen into
-the active experiment directory automatically; `understudy experiments freeze`
+the active experiment directory automatically; `orchestra experiments freeze`
 does it explicitly and also freezes a `--claim-from <path>`. The optimizer's
 working artifacts (`eval-input-candidate.json`, `proof-packet.json`, adapter
 outputs) stay under `.understudy/optimize-workload/`. Run `understudy next` to
@@ -214,14 +214,14 @@ proxy-only validation.
 Use the CLI guide before creating a local optimizer env:
 
 ```bash
-understudy skills --search gepa
-understudy optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
+orchestra skills --search gepa
+orchestra optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
 ```
 
 If approved, let the named adapter create its exact ignored `uv` runtime:
 
 ```bash
-understudy optimize-workload adapter run --repo . --adapter dspy-gepa --help
+orchestra optimize-workload adapter run --repo . --adapter dspy-gepa --help
 ```
 
 Do not preinstall a floating DSPy/GEPA environment; the adapter pins and

@@ -34,7 +34,7 @@ flow below. For a before/after task comparison, use
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. In this repository checkout:
+Prefer the installed `orchestra` binary. In this repository checkout:
 
 ```sh
 npm run build
@@ -51,7 +51,7 @@ Use `node dist/bin.js` in place of `understudy` below when necessary.
 2. For redacted metadata, run:
 
    ```sh
-   understudy traces export <trace-id> \
+   orchestra traces export <trace-id> \
      --project <project> \
      --out .understudy/traces/<trace-id>
    ```
@@ -59,7 +59,7 @@ Use `node dist/bin.js` in place of `understudy` below when necessary.
 3. For an explicitly requested full trace, run:
 
    ```sh
-   understudy traces export <trace-id> \
+   orchestra traces export <trace-id> \
      --project <project> \
      --out .understudy/traces/<trace-id> \
      --include-payload --yes
@@ -81,7 +81,7 @@ Use `node dist/bin.js` in place of `understudy` below when necessary.
    private viewer:
 
    ```sh
-   understudy traces build-viewer \
+   orchestra traces build-viewer \
      --source .understudy/traces/<trace-id> \
      --trace-id <trace-id> \
      --output .understudy/trace-viewer/<trace-id>
@@ -96,7 +96,7 @@ Resolve one exact organization/project/workload. With authorization for full
 payloads, export a completed UTC calendar day:
 
 ```sh
-understudy traces export --org <org-id> --project-id <project-id> \
+orchestra traces export --org <org-id> --project-id <project-id> \
   --workload <name-or-id> --date <YYYY-MM-DD> \
   --out .understudy/traces/<run> --include-payload --yes
 ```

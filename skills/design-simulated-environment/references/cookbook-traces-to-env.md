@@ -1,7 +1,7 @@
 # Cookbook: from prior traces to a verifiers environment
 
 The path from "I have traces" to "any model change runs through a simulator
-before prod" is `understudy traces build-benchmark`, followed by review import
+before prod" is `orchestra traces build-benchmark`, followed by review import
 and bounded replays. Use
 [`../../ingest-traces/references/trace-foundry-cli.md`](../../ingest-traces/references/trace-foundry-cli.md).
 The event-categorizer example below is retained only for legacy v0 workloads;
@@ -12,7 +12,7 @@ do not copy it for a new trace-derived environment.
 For new work:
 
 ```sh
-understudy traces build-benchmark --source .understudy/captures \
+orchestra traces build-benchmark --source .understudy/captures \
   --output .understudy/benchmarks/latest --workload <name> \
   --max-age-days 3 --batch-size 10
 ```

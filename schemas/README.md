@@ -7,7 +7,7 @@ app, skills, CLI, ladder). One spine, adopted everywhere.
 
 The `understudy.eval-project.v2`, execution-index-row, metric,
 coverage, harness, environment, splits, check-fixtures, check-report, and approval schemas define the private
-coding-agent workspace checked by `understudy evals check`. The workload
+coding-agent workspace checked by `orchestra evals check`. The workload
 profile remains Markdown; its exact bytes are bound by both intent approval and
 the deterministic check-input hash. These contracts require a provider-free
 local environment replay, independent good/wrong evidence, explicit lineage
@@ -105,7 +105,7 @@ is the OpenAPI 3.1 contract for agents operating a running Understudy Desktop
 app. It documents only the authenticated v2 operations currently implemented;
 the extension metadata distinguishes model controls already available through
 authenticated MCP/CLI from operations not yet versioned in REST.
-`understudy desktop contract --json` prints the packaged document without
+`orchestra desktop contract --json` prints the packaged document without
 requiring Desktop to be running.
 
 ## `understudy.experiment.v1`
@@ -213,7 +213,7 @@ hosted training that consumes the projected pool is authorized separately via a
 
 [`understudy.route_decision_packet.v1.schema.json`](understudy.route_decision_packet.v1.schema.json)
 is the route decision for one workload — written by the CLI planner
-(`src/route-decision.ts`) and validated by `understudy routes promote` before
+(`src/route-decision.ts`) and validated by `orchestra routes promote` before
 any field is consumed. `decision: "evaluate-first"` / `"local-only"` packets
 must never mutate hosted traffic; promotion-grade packets should cite their
 eval evidence (an app export packet path + `eval_results_sha256`, or a
@@ -292,7 +292,7 @@ to, reason}` — env changes bump MAJOR (rerun), verifier changes MINOR
 (regrade), meta changes PATCH (reuse). Legacy split-freeze-only lines (no
 `version`/`task_bumps`) stay valid; consumers ignore unknown fields.
 Producers: first promote stamps the initial line (`src/trace-foundry.ts`);
-`understudy benchmarks upgrade` appends one line per version bump
+`orchestra benchmarks upgrade` appends one line per version bump
 (`src/benchmark-upgrade.ts`). Consumers: the hub's leaderboard staleness
 (`src/benchmark-staleness.ts`) and the rigor CI contamination check.
 

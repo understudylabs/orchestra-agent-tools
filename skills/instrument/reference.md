@@ -44,10 +44,10 @@ grep -rnE 'baseURL|base_url|api\.openai\.com|api\.anthropic\.com|openrouter|api_
 
 1. Trigger exactly one call you can recognize (a distinctive prompt string
    helps).
-2. `understudy captures list --json` — the newest capture's timestamp/model
-   should match the test call. `understudy captures get <request-id>` shows
+2. `orchestra captures list --json` — the newest capture's timestamp/model
+   should match the test call. `orchestra captures get <request-id>` shows
    the redacted summary.
-3. `understudy instrument --check --json` — local, no network: reports which
+3. `orchestra instrument --check --json` — local, no network: reports which
    redirect env vars are set, whether credentials exist, and whether any
    local captures are present under `.understudy/captures`.
 4. Only after 2 (or a local file for the log-export path) confirms the trace,

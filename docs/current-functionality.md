@@ -22,56 +22,56 @@ for:
 The TypeScript CLI currently executes:
 
 ```bash
-understudy spine
-understudy skills --list
-understudy skills --search gateway
-understudy skills --inspect understudy
-understudy doctor
-understudy doctor --hosted
-understudy models list --json
-understudy workloads list
-understudy workloads create classify --capture
-understudy workloads create --from-card .understudy/workload-discovery/workload-card.json --project-id <project-id>
-understudy workloads show classify
-understudy workloads update classify --capture off
-understudy workloads route <workload-id> --project-id <project-id> --model-id glm-5.1 --traffic-pct 10
-understudy workloads route <workload-id> --project-id <project-id> --clear
-understudy gateway health
-understudy gateway probe --provider anthropic --project rehearsal --workload classify
-understudy reporting summary --window 7d --group-by workload
-understudy reporting usage --project rehearsal --window 7d --group-by workload,day
-understudy reporting workload-status --project rehearsal --window 24h
-understudy reporting cost <request-or-upstream-id>
-understudy reporting cost-breakdown --project rehearsal --window 7d
-understudy billing balance
-understudy billing summary --from 2026-08-01T00:00:00Z --to 2026-09-01T00:00:00Z
-understudy billing trend --from 2026-08-01T00:00:00Z --to 2026-09-01T00:00:00Z
-understudy captures list --project rehearsal --workload classify
-understudy captures get <request-id> --project rehearsal --workload classify
-understudy captures export <request-id> --out .understudy/captures/<request-id>.json
-understudy captures export --request-ids-file request-ids.txt --project rehearsal --out .understudy/capture-batch --include-payload --yes
-understudy traces export <trace-id> --project rehearsal --out .understudy/trace-exports --include-payload --yes
-understudy traces export --trace-ids-file trace-ids.txt --project rehearsal --out .understudy/trace-exports --include-payload --yes
-understudy traces export --project rehearsal --workload classify --date 2026-08-29 --out .understudy/trace-exports/day --include-payload --yes
-understudy evals build --project rehearsal --workload classify --name classification-day --out .understudy/evals/classification-day --yes
-understudy routes show classify --project rehearsal
-understudy routes set classify --project rehearsal --model-id glm-5.1 --traffic-pct 10
-understudy routes clear classify --project rehearsal
-understudy routes rollback classify --project rehearsal
-understudy setup-code --client openai --file src/client.ts --json
-understudy capture-import scan --repo .
-understudy capture-import compile --source ./local-file-or-folder --json
-understudy capture-import preview --repo . --limit 10
-understudy capture-import workload-card --repo .
-understudy capture-evidence check --repo .
-understudy capture-evidence workload-card --repo .
-understudy route-decision plan --workload-card .understudy/workload-discovery/workload-card.json
-understudy skills --search gepa
-understudy optimize-workload check --repo .
-understudy optimize-workload dry-run --repo .
-understudy optimize-workload adapter run --repo . --adapter dspy-gepa --samples samples.json --input-keys question --output-keys answer --model student-model --reflection-model reflection-model --budget-usd <approved-usd> --input-usd-per-million <conservative-input-price> --output-usd-per-million <conservative-output-price> --num-threads 1 --execute
-understudy optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
-understudy value report --workload-card .understudy/workload-discovery/workload-card.json --route-decision .understudy/route-decision/route-decision-packet.json --requests-per-month 10000
+orchestra spine
+orchestra skills --list
+orchestra skills --search gateway
+orchestra skills --inspect understudy
+orchestra doctor
+orchestra doctor --hosted
+orchestra models list --json
+orchestra workloads list
+orchestra workloads create classify --capture
+orchestra workloads create --from-card .understudy/workload-discovery/workload-card.json --project-id <project-id>
+orchestra workloads show classify
+orchestra workloads update classify --capture off
+orchestra workloads route <workload-id> --project-id <project-id> --model-id glm-5.1 --traffic-pct 10
+orchestra workloads route <workload-id> --project-id <project-id> --clear
+orchestra gateway health
+orchestra gateway probe --provider anthropic --project rehearsal --workload classify
+orchestra reporting summary --window 7d --group-by workload
+orchestra reporting usage --project rehearsal --window 7d --group-by workload,day
+orchestra reporting workload-status --project rehearsal --window 24h
+orchestra reporting cost <request-or-upstream-id>
+orchestra reporting cost-breakdown --project rehearsal --window 7d
+orchestra billing balance
+orchestra billing summary --from 2026-08-01T00:00:00Z --to 2026-09-01T00:00:00Z
+orchestra billing trend --from 2026-08-01T00:00:00Z --to 2026-09-01T00:00:00Z
+orchestra captures list --project rehearsal --workload classify
+orchestra captures get <request-id> --project rehearsal --workload classify
+orchestra captures export <request-id> --out .understudy/captures/<request-id>.json
+orchestra captures export --request-ids-file request-ids.txt --project rehearsal --out .understudy/capture-batch --include-payload --yes
+orchestra traces export <trace-id> --project rehearsal --out .understudy/trace-exports --include-payload --yes
+orchestra traces export --trace-ids-file trace-ids.txt --project rehearsal --out .understudy/trace-exports --include-payload --yes
+orchestra traces export --project rehearsal --workload classify --date 2026-08-29 --out .understudy/trace-exports/day --include-payload --yes
+orchestra evals build --project rehearsal --workload classify --name classification-day --out .understudy/evals/classification-day --yes
+orchestra routes show classify --project rehearsal
+orchestra routes set classify --project rehearsal --model-id glm-5.1 --traffic-pct 10
+orchestra routes clear classify --project rehearsal
+orchestra routes rollback classify --project rehearsal
+orchestra setup-code --client openai --file src/client.ts --json
+orchestra capture-import scan --repo .
+orchestra capture-import compile --source ./local-file-or-folder --json
+orchestra capture-import preview --repo . --limit 10
+orchestra capture-import workload-card --repo .
+orchestra capture-evidence check --repo .
+orchestra capture-evidence workload-card --repo .
+orchestra route-decision plan --workload-card .understudy/workload-discovery/workload-card.json
+orchestra skills --search gepa
+orchestra optimize-workload check --repo .
+orchestra optimize-workload dry-run --repo .
+orchestra optimize-workload adapter run --repo . --adapter dspy-gepa --samples samples.json --input-keys question --output-keys answer --model student-model --reflection-model reflection-model --budget-usd <approved-usd> --input-usd-per-million <conservative-input-price> --output-usd-per-million <conservative-output-price> --num-threads 1 --execute
+orchestra optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
+orchestra value report --workload-card .understudy/workload-discovery/workload-card.json --route-decision .understudy/route-decision/route-decision-packet.json --requests-per-month 10000
 ```
 
 The Node package validates itself with:

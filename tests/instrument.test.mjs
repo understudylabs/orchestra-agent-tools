@@ -130,8 +130,8 @@ describe("instrument skill catalog registration", () => {
     // The skill must not promise a local capture proxy the CLI does not ship.
     assert.match(skill, /No local capture proxy exists/i);
     // It must verify before declaring success and hand off downstream.
-    assert.match(skill, /understudy captures list --json/);
-    assert.match(skill, /understudy instrument --check/);
+    assert.match(skill, /orchestra captures list --json/);
+    assert.match(skill, /orchestra instrument --check/);
     assert.match(skill, /ingest-traces\/SKILL\.md/);
     assert.match(skill, /capture-evidence\/SKILL\.md/);
     assert.match(skill, /use-understudy-gateway\/SKILL\.md/);

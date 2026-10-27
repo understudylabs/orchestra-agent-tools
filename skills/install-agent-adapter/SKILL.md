@@ -117,12 +117,12 @@ model weights, start hosted jobs, or make provider calls.
 No Understudy CLI command is required. The platform registry is inspectable with:
 
 ```bash
-understudy platforms
-understudy platforms --inspect claude-code
-understudy platforms --inspect cursor
-understudy platforms --inspect codex
-understudy platforms --inspect opencode
-understudy platforms --inspect devin
+orchestra platforms
+orchestra platforms --inspect claude-code
+orchestra platforms --inspect cursor
+orchestra platforms --inspect codex
+orchestra platforms --inspect opencode
+orchestra platforms --inspect devin
 ```
 
 Use platform CLIs only when available (`claude`, `codex`, `opencode`). Cursor and

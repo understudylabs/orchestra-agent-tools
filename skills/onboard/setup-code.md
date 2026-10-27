@@ -1,6 +1,6 @@
 # Setup Code
 
-Use this recipe when `understudy setup-code` routes here or when the developer
+Use this recipe when `orchestra setup-code` routes here or when the developer
 asks an agent to convert application code to Understudy gateway inference.
 
 The CLI no longer rewrites source files directly. The coding agent owns the
@@ -8,9 +8,9 @@ patch using the repo's language, framework, tests, and style.
 
 ## Flow
 
-1. Run `understudy status --json`.
+1. Run `orchestra status --json`.
 2. If not authenticated, stop with:
-   `Run 'understudy login' once, then re-run me.`
+   `Run 'orchestra login' once, then re-run me.`
 3. Inspect the target file if one was provided by `setup-code --file`.
 4. Otherwise search for SDK construction and explicit provider base URLs:
    `OpenAI`, `Anthropic`, `baseURL`, `base_url`, `api.openai.com`,
@@ -39,4 +39,4 @@ End with:
 - files changed;
 - command used to verify;
 - whether auth is configured;
-- exact command the developer or agent should run through `understudy run`.
+- exact command the developer or agent should run through `orchestra run`.

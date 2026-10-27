@@ -131,7 +131,7 @@ durable checkout/package, symlink each `skills/<name>/` directory into
 `~/.config/opencode/commands`.
 
 The `.opencode/adapter.json` file is not consumed by OpenCode. It is an
-Understudy-owned version/staleness sentinel used by `understudy doctor` and the
+Understudy-owned version/staleness sentinel used by `orchestra doctor` and the
 release checklist.
 
 Global install:
@@ -200,7 +200,7 @@ path durability, but that points at the one shared tree; it is not a fork.)
 This is not a Hermes plugin (`~/.hermes/plugins/` with `plugin.yaml` + Python)
 and not a Skills Hub install. The `.hermes/adapter.json` file is not consumed by
 Hermes; it is an Understudy-owned version/staleness sentinel for
-`understudy doctor` and the release checklist.
+`orchestra doctor` and the release checklist.
 
 Register through a stable symlink, not the raw checkout path. The installer
 points a durable `~/.understudy/skills` symlink at the resolved `skills/` tree
@@ -308,7 +308,7 @@ there is no persistent local plugin registration. The public installer clones
 the GitHub source, builds it, and links the CLI globally. Devin discovers the
 skills through `AGENTS.md` (which it reads as an injected repository rule) and
 the shared `skills/` tree in that checkout. `.devin/adapter.json` is an
-Understudy version/staleness sentinel for `understudy doctor`, not a manifest
+Understudy version/staleness sentinel for `orchestra doctor`, not a manifest
 consumed by Devin.
 
 Install (typically done once in the Devin environment blueprint so every
@@ -322,7 +322,7 @@ curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-too
 Verify:
 
 ```bash
-understudy platforms --inspect devin
+orchestra platforms --inspect devin
 ls "$(git rev-parse --show-toplevel)/.devin/adapter.json"
 ls "$(git rev-parse --show-toplevel)/skills/understudy/SKILL.md"
 ```

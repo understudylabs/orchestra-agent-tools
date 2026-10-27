@@ -69,7 +69,7 @@ inject them into the child process only.
 
 ## Resolve CLI When Using An Understudy Route
 
-Prefer the installed `understudy` binary. If it is unavailable inside a
+Prefer the installed `orchestra` binary. If it is unavailable inside a
 checkout:
 
 ```sh
@@ -126,7 +126,7 @@ single-output optimization does not need a tool environment.
 
    If Desktop produced `understudy.environment_proposal.v1` from a JSONL drop,
    treat `status: executable` as meaningful only after
-   `understudy training validate-environment-proposal --proposal <path>` passes.
+   `orchestra training validate-environment-proposal --proposal <path>` passes.
    An Understudy draft with `status: needs_verifier` is a proposal, not a
    harness or score; author the missing parser/environment/oracle/sentinels and
    rerun deterministic validation before any model comparison.
@@ -183,14 +183,14 @@ single-output optimization does not need a tool environment.
    Understudy CLI is one route:
 
    ```sh
-   understudy models list --json
-   understudy workloads route <workload-id> --project-id <project-id> \
+   orchestra models list --json
+   orchestra workloads route <workload-id> --project-id <project-id> \
      --model-id glm-5.1 --traffic-pct 100
-   understudy run -- <harness command>
+   orchestra run -- <harness command>
    ```
 
    List public model options, route the project workload to a chosen model,
-   then run the frozen harness through the gateway with `understudy run`; a
+   then run the frozen harness through the gateway with `orchestra run`; a
    provider-native or existing application runner is equally valid when it
    preserves the same rows, prompt, tools, metric, seed/reset, and data
    boundary.
@@ -216,9 +216,9 @@ single-output optimization does not need a tool environment.
 
    ```sh
    # terminal 1 — the only thing that executes models
-   understudy runs execute --benchmark <benchmark-dir> --watch
+   orchestra runs execute --benchmark <benchmark-dir> --watch
    # terminal 2 — proposes, queues override arms, waits, scores
-   understudy benchmarks evolve <benchmark-dir> --model <candidate-id> --budget-runs 6
+   orchestra benchmarks evolve <benchmark-dir> --model <candidate-id> --budget-runs 6
    ```
 
    `evolve` is GEPA-style prompt evolution over `prompt_overrides` run arms:
@@ -245,7 +245,7 @@ single-output optimization does not need a tool environment.
    without touching the app: queue a run whose request carries
    `prompt_overrides` — each `{arm_label, model, system_prompt_suffix}` arm
    appends the suffix file's text to every task's system prompt at rollout
-   time (`understudy runs queue --prompt-override
+   time (`orchestra runs queue --prompt-override
    <arm_label>=<model>=<suffix-file>`). The canonical use is the SOP-suffix
    experiment: distill the workload's standard operating procedure (order of
    operations, argument conventions, termination rules) into a short suffix

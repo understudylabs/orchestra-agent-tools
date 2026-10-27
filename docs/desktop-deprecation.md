@@ -32,11 +32,11 @@ this repo moves the `latest` marker the installed app resolves.
 
 ## What replaces it
 
-- The CLI: `understudy status`, `understudy models ...`, `understudy benchmarks
-  ...`, `understudy runs ...`, and the rest of `understudy --help`.
+- The CLI: `orchestra status`, `orchestra models ...`, `orchestra benchmarks
+  ...`, `orchestra runs ...`, and the rest of `orchestra --help`.
 - The agent skills in `skills/`, starting from `skills/understudy/SKILL.md`.
 
-The `understudy desktop` command group remains for now so that existing
+The `orchestra desktop` command group remains for now so that existing
 installs can still be inspected. It prints a one-line deprecation warning to
 stderr on every invocation and will be removed in a follow-up release, together
 with the CLI-side desktop code in `src/`.

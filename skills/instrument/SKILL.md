@@ -23,7 +23,7 @@ approval."
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. If it is unavailable inside a repo
+Prefer the installed `orchestra` binary. If it is unavailable inside a repo
 checkout, run through the package script:
 
 ```sh
@@ -40,7 +40,7 @@ node dist/bin.js instrument --check --json
 - **Redirecting traffic through the gateway is an external write of the
   developer's prompts and completions** (that is what capture *is*). State
   this plainly and get explicit approval before the first redirected call.
-- Never print, commit, or write `sk_*` values. Use `understudy run -- <cmd>`
+- Never print, commit, or write `sk_*` values. Use `orchestra run -- <cmd>`
   to inject credentials into the child process only (see
   [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md)).
 - Set redirect env vars in the launch command or the developer's shell
@@ -73,9 +73,9 @@ there is nothing to capture yet.
 
 Reuse the login/key flow in
 [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md) —
-do not duplicate it here. In short: `understudy status --json`; if not signed
-in, the two-phase `understudy login --email` / `--code` flow; then confirm
-`understudy projects list --json`. Gateway capture is on by default for
+do not duplicate it here. In short: `orchestra status --json`; if not signed
+in, the two-phase `orchestra login --email` / `--code` flow; then confirm
+`orchestra projects list --json`. Gateway capture is on by default for
 gateway traffic, so no extra capture toggle is needed.
 
 ## Step 3 — Redirect with zero code changes
@@ -86,17 +86,17 @@ process only, and set the SDK base-URL env var inline:
 
 ```sh
 # Anthropic SDK app (note: no trailing /v1 — the SDK appends it)
-ANTHROPIC_BASE_URL="$UNDERSTUDY_GATEWAY_URL" understudy run -- <your app command>
+ANTHROPIC_BASE_URL="$UNDERSTUDY_GATEWAY_URL" orchestra run -- <your app command>
 
 # OpenAI SDK app (OpenAI-shape wants the /v1 suffix)
 OPENAI_BASE_URL="${UNDERSTUDY_GATEWAY_URL:-https://api.understudylabs.com}/v1" \
-  understudy run -- <your app command>
+  orchestra run -- <your app command>
 ```
 
-`understudy run` resolves the stored credentials, so inside the child process
+`orchestra run` resolves the stored credentials, so inside the child process
 `$UNDERSTUDY_GATEWAY_URL` is set; the SDK's own env var points it there. The
 provider API key env var can stay as-is — the gateway authenticates with the
-Understudy key that `understudy run` injects (see the gateway skill for
+Understudy key that `orchestra run` injects (see the gateway skill for
 key-header details per shape).
 
 ## Step 4 — Verify a trace is actually flowing (do not skip)
@@ -105,11 +105,11 @@ Trigger exactly one real call through the app, then confirm the capture
 landed before saying anything succeeded:
 
 ```sh
-understudy captures list --json          # newest capture should match the test call
-understudy instrument --check --json     # local sanity: env redirect + capture presence
+orchestra captures list --json          # newest capture should match the test call
+orchestra instrument --check --json     # local sanity: env redirect + capture presence
 ```
 
-If `captures list` shows nothing new: check `understudy doctor --hosted`,
+If `captures list` shows nothing new: check `orchestra doctor --hosted`,
 re-grep for a hardcoded `baseURL` shadowing the env var, and confirm the app
 process actually inherited the env (a daemon started earlier did not).
 

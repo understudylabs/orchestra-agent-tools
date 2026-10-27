@@ -47,15 +47,15 @@ locations and registry links are in [`reference.md`](reference.md).
 **If the Understudy desktop app is running, prefer its daemon.** Check
 `~/.understudy/agent-card.json` and trust the `app` block only after a pid
 check on `app.pid` plus a health probe of `<app.base_url>/health`
-(`understudy daemon status` does exactly this; then run
-`understudy desktop capabilities`; schema in
+(`orchestra daemon status` does exactly this; then run
+`orchestra desktop capabilities`; schema in
 [`../onboard/reference.md`](../onboard/reference.md)). A running app can
 start/poll/cancel verified snapshot downloads into the same
 `~/.understudy/models` cache and already serves warm slots
-(`app.warm_models`) and exposes them through `understudy desktop chat` with
+(`app.warm_models`) and exposes them through `orchestra desktop chat` with
 canonical runtime evidence — reuse it instead of spawning your own MLX servers
 or a second download of the same weights. The concrete verbs:
-`understudy desktop model list` / `model catalog` (cached snapshots and the
+`orchestra desktop model list` / `model catalog` (cached snapshots and the
 bundled certified catalog), `slot list|add|assign` (residency),
 `download list|start` (managed downloads), and `chat --slot <id>`. The desktop
 app is deprecated (see `docs/desktop-deprecation.md`); if it is not already
@@ -86,16 +86,16 @@ installed, use the headless CLI, which covers everything in this skill.
 4. **Confirm the size, then use the CLI pull command.** For the Understudy
    verified MLX ladder, use the product command after approval:
    ```bash
-   understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
+   orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
    ```
    Use `--dry-run` first when you need to show destination/log paths without
    downloading:
    ```bash
-   understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy --dry-run
+   orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy --dry-run
    ```
    To cache every verified snapshot currently listed in the CLI catalog, use:
    ```bash
-   understudy models pull --all
+   orchestra models pull --all
    ```
    The command downloads signed per-file URLs from
    `models.understudylabs.com`, writes into `~/.understudy/models`, verifies

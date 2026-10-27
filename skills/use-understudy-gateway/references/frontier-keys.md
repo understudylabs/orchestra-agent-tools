@@ -32,7 +32,7 @@ The user may still choose one of three frontier routes:
   `ANTHROPIC_MODEL`, `FRONTIER_MODEL`, `AI_GATEWAY_MODEL`.
 - If the user chooses the managed catalog, clear local provider-key env vars for
   the duel and set `UNDERSTUDY_FALLBACK_MODEL=gpt-5.5` unless they choose another
-  public Understudy model from `understudy models list --json`.
+  public Understudy model from `orchestra models list --json`.
 - If the user chooses BYO, state that the key stays local but the selected
   upstream provider receives the prompts used in the comparison.
 - If the user chooses the managed catalog, state that no local provider key is
@@ -47,7 +47,7 @@ The user may still choose one of three frontier routes:
   no capture, no routing, and any "gateway vs frontier" comparison is silently
   measuring the wrong path. This has happened in real onboarding. Before
   trusting a comparison run, verify the requests actually arrived:
-  `understudy captures list` (or `understudy status --json`) should show them;
+  `orchestra captures list` (or `orchestra status --json`) should show them;
   if it doesn't, find the direct-wired key before re-running.
 
 ## Flow
@@ -61,10 +61,10 @@ The user may still choose one of three frontier routes:
 3. For managed catalog, verify the user has an Understudy login and a priceable
    model id:
    ```bash
-   understudy status --json
-   understudy models list --json
+   orchestra status --json
+   orchestra models list --json
    ```
-   If not signed in, ask them to run `understudy login` or skip the remote duel.
+   If not signed in, ask them to run `orchestra login` or skip the remote duel.
 4. For keyless managed-catalog comparisons, use an unrouted workload and vary
    the request-body `model`. Unknown model ids get a clean catalog-miss 404
    rather than falling through to arbitrary provider passthrough.

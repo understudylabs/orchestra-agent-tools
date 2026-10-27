@@ -28,12 +28,12 @@ and failure taxonomy from the traces and repository before asking targeted gap
 questions. Reconcile any capture references recorded in
 `source/skipped.jsonl` before making coverage claims. Even without owner
 confirmation, continue to an explicitly
-provisional local draft and run `understudy evals check --draft`.
+provisional local draft and run `orchestra evals check --draft`.
 Do not run the incumbent baseline, null floor, a provider model, or a hosted
-EvalWorkspace on that branch. Strict `understudy evals check`, final approval,
+EvalWorkspace on that branch. Strict `orchestra evals check`, final approval,
 and publication are later, separate steps reserved for an owner-confirmed
 release; publication still requires its own explicit upload permission. This
-hosted branch stops after `understudy evals check --draft`.
+hosted branch stops after `orchestra evals check --draft`.
 
 ## Safety Gates
 
@@ -203,7 +203,7 @@ validators as part of the harness.
 For a named hosted workload, prefer:
 
 ```sh
-understudy evals build \
+orchestra evals build \
   --project <project> \
   --workload <workload> \
   --name <eval-name> \

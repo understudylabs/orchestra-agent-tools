@@ -34,8 +34,8 @@ future Python-native ports from `understudy-agent`.
 Use `uv` when possible:
 
 ```bash
-understudy skills --search gepa
-understudy optimize-workload adapter run --repo . --adapter dspy-gepa --help
+orchestra skills --search gepa
+orchestra optimize-workload adapter run --repo . --adapter dspy-gepa --help
 ```
 
 The named adapter owns its exact `uv run --no-project` package set; do not
@@ -123,9 +123,9 @@ packages and executes the selected adapter.
 Future TypeScript commands should follow this behavior:
 
 ```bash
-understudy optimize-workload dry-run --repo .
-understudy optimize-workload adapter run --repo . --adapter dspy-gepa --samples samples.json --input-keys question --output-keys answer --model student-model --reflection-model reflection-model --budget-usd <approved-usd> --input-usd-per-million <conservative-input-price> --output-usd-per-million <conservative-output-price> --num-threads 1 --execute
-understudy optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
+orchestra optimize-workload dry-run --repo .
+orchestra optimize-workload adapter run --repo . --adapter dspy-gepa --samples samples.json --input-keys question --output-keys answer --model student-model --reflection-model reflection-model --budget-usd <approved-usd> --input-usd-per-million <conservative-input-price> --output-usd-per-million <conservative-output-price> --num-threads 1 --execute
+orchestra optimize-workload adapter run --repo . --adapter eval-input-gepa --manifest eval-input-manifest.json --execute
 ```
 
 `dspy-gepa` streams its progress while it runs and supports warm starts, climb

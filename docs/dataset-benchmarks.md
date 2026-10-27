@@ -1,6 +1,6 @@
 # Dataset benchmarks — labeled rows on the benchmark spine
 
-`understudy benchmarks from-dataset` is the dataset entrance to the benchmark
+`orchestra benchmarks from-dataset` is the dataset entrance to the benchmark
 foundry: a labeled dataset (JSONL/CSV/TSV/XLSX) becomes a first-class benchmark
 directory, so classification workloads (the und-289 Instacart Shopper Stage-4
 shape) land on exactly the same spine as trace-derived benchmarks — same
@@ -16,14 +16,14 @@ know whether a cheaper model can do the labeling. He is not an eval engineer.
 ### 1. Drop → benchmark
 
 ```bash
-understudy benchmarks from-dataset segments.csv \
+orchestra benchmarks from-dataset segments.csv \
   --output ~/.understudy/benchmarks/shopper-stage4 \
   --label-column l3 --input-column segment_text --group-column raw_review \
   --taxonomy shopper_taxonomy_map.json
 ```
 
 Input/label columns are inferred when not given (the same heuristics as
-`understudy capture-import inspect-csv`); flags override. What comes out:
+`orchestra capture-import inspect-csv`); flags override. What comes out:
 
 - **One task per kept row.** The task prompt is the row's input text under an
   authored (`--system-prompt`, `@file` supported) or derived system prompt
@@ -63,14 +63,14 @@ Input/label columns are inferred when not given (the same heuristics as
 Dataset tasks follow the same born-accepted inbox semantics as trace tasks:
 with no `review-policy.json`, generated tasks are accepted by default and
 machine signals render as attention flags. Nothing new to learn; the hub and
-`understudy benchmarks review` work unchanged.
+`orchestra benchmarks review` work unchanged.
 
 ### 3. Run — floors first
 
 ```bash
-understudy runs queue --benchmark <dir> \
+orchestra runs queue --benchmark <dir> \
   --models gemma-4-e2b,claude-sonnet --trivial-arms null_agent,majority_class --split dev
-understudy runs execute --benchmark <dir>
+orchestra runs execute --benchmark <dir>
 ```
 
 The majority_class arm answers the most frequent TRAIN-split label on every
@@ -79,7 +79,7 @@ its accuracy means anything; the curation report says so in Derek's language.
 
 ### 4. Rigor + per-class metrics
 
-`understudy benchmarks rigor <dir>` now adds, for classification-shaped
+`orchestra benchmarks rigor <dir>` now adds, for classification-shaped
 benchmarks:
 
 - a **Majority-class floor** checklist row next to the null/spam floors;
@@ -104,7 +104,7 @@ curation-report.md). A training run on this dataset records it in
 `experiments.jsonl` (understudy.experiment.v1):
 
 ```bash
-understudy benchmarks experiment create <dir> --input '{
+orchestra benchmarks experiment create <dir> --input '{
   "hypothesis": "qwen3-8b full SFT reaches 90% exact L3 on the frozen holdout",
   "data_selection": {"selection_hash": "…", "source": "segments.csv",
                       "splits_sha256": "<splits.splits_sha256>"},

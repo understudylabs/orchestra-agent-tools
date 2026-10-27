@@ -101,7 +101,7 @@ Cloudflare delivery note: public installation uses stable session endpoints from
 per-file URLs; publish the session endpoint, not the expiring object URLs. R2
 remains the durable object source.
 
-Publication check: agents should read `understudy models snapshots` rather than
+Publication check: agents should read `orchestra models snapshots` rather than
 guessing a URL. If the live catalog is unavailable, the CLI falls back to the
 same four certified rows. An `unknown model` response is a catalog deployment
 mismatch: surface it and repair or retry; do not silently substitute an
@@ -110,10 +110,10 @@ uncertified artifact.
 CLI snapshot pull:
 
 ```bash
-understudy models snapshots
-understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy --dry-run
-understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
-understudy models pull --all
+orchestra models snapshots
+orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy --dry-run
+orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
+orchestra models pull --all
 ```
 
 Once pulled, serve it with the manifest-driven helper so the required flags
@@ -227,7 +227,7 @@ QAT snapshots.
 
 Remote graduation note: when a local rung is too small, use
 [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md) to
-run `understudy login --email <developer-email>`, store the API key through the
+run `orchestra login --email <developer-email>`, store the API key through the
 CLI, list remote model IDs, and route the workload to larger Gemma/Nemotron
 variants without changing application code.
 

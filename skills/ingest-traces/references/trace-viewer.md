@@ -7,7 +7,7 @@ tool definitions, tool calls, tool results, and raw capture metadata.
 ## Build
 
 ```sh
-understudy traces build-viewer \
+orchestra traces build-viewer \
   --source .understudy/captures \
   --trace-id <trace-id> \
   --output .understudy/trace-viewer/<trace-id>

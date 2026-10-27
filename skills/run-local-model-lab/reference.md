@@ -54,7 +54,7 @@ VENV=.understudy/venvs/mlx/bin
 # Text-only / mlx-community quants (e.g. gemma-4-31b-it-8bit):
 $VENV/python -m mlx_lm.server --model mlx-community/gemma-4-31b-it-8bit --port 8080
 # Understudy certified QAT snapshots use mlx-vlm (multimodal serving path):
-understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
+orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
 $VENV/python -m mlx_vlm.server \
   --model ~/.understudy/models/gemma-4-e2b-it-qat-mlx-vlm-understudy \
   --port 8080 --top-logprobs-k 20
@@ -104,7 +104,7 @@ catalog model, score the objective + latency, and let the route decision fall ou
 
 ```bash
 # remote side: route a workload to a catalog model, then run the eval via the gateway
-understudy workloads route --model-id gemma-4-31b-it --traffic-pct 100
+orchestra workloads route --model-id gemma-4-31b-it --traffic-pct 100
 BASE=https://api.understudylabs.com/v1 KEY="$UNDERSTUDY_SK" MODEL=x  node eval.mjs  # remote
 BASE=http://127.0.0.1:8080/v1          KEY=local             MODEL=x node eval.mjs  # local
 ```

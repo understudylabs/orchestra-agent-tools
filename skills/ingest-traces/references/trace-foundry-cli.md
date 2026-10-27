@@ -8,7 +8,7 @@ one-command front door downloads one exact raw workload day before handing the
 source to the coding agent and this compiler locally:
 
 ```sh
-understudy evals build \
+orchestra evals build \
   --project <project> \
   --workload <workload> \
   --name <eval-name>
@@ -24,7 +24,7 @@ for the service-versus-agent ownership boundary and privacy gates.
 ## Compile or resume
 
 ```sh
-understudy traces build-benchmark \
+orchestra traces build-benchmark \
   --source .understudy/captures \
   --output .understudy/benchmarks/automation \
   --workload automation \
@@ -45,7 +45,7 @@ Serve the viewer instead of opening its file URL directly, so lazy capture
 loading works:
 
 ```sh
-understudy traces serve --benchmark .understudy/benchmarks/automation --port 3003
+orchestra traces serve --benchmark .understudy/benchmarks/automation --port 3003
 ```
 
 ## Apply final judgments
@@ -53,7 +53,7 @@ understudy traces serve --benchmark .understudy/benchmarks/automation --port 300
 Export JSONL from the viewer, then run:
 
 ```sh
-understudy traces import-reviews \
+orchestra traces import-reviews \
   --benchmark .understudy/benchmarks/automation \
   --reviews ~/Downloads/benchmark-reviews.jsonl
 ```
@@ -65,7 +65,7 @@ benchmark status deterministically.
 ## Plan and run replays
 
 ```sh
-understudy traces plan-replays \
+orchestra traces plan-replays \
   --benchmark .understudy/benchmarks/automation \
   --model incumbent-model candidate-model
 ```
@@ -76,7 +76,7 @@ contract, and the GEPA-before-training ladder. It performs no provider calls.
 Run a bounded approved slice only when the user authorizes those model calls:
 
 ```sh
-understudy traces run-replays \
+orchestra traces run-replays \
   --benchmark .understudy/benchmarks/automation \
   --model incumbent-model candidate-model \
   --variant authentic_history errors_and_retries saturation \
@@ -103,7 +103,7 @@ arguments. `author-tasks` adds a human-readable proposal on top of that
 evidence:
 
 ```sh
-understudy traces author-tasks \
+orchestra traces author-tasks \
   --benchmark .understudy/benchmarks/automation \
   --limit 25            # optional bound
   # --model gemma-4-31b-it   (default: a cheap capable model from /v1/models)

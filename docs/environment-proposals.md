@@ -3,7 +3,7 @@
 Dropping a supported JSONL workload produces two local, reviewable artifacts
 before any training starts:
 
-- `understudy training goal-card --plan <plan.json> --preview 0..3 --json`
+- `orchestra training goal-card --plan <plan.json> --preview 0..3 --json`
   renders the detected task and evaluator, immutable train/validation/held-out
   counts, promotion thresholds, compatible backends, privacy boundary, runtime,
   cost cap, and environment status. Preview rows are read from `train.jsonl`
@@ -14,7 +14,7 @@ before any training starts:
   scripted oracle, negative and reward-hacking sentinels, and backend/parser
   compatibility.
 
-`understudy training validate-environment-proposal --proposal <path>` re-reads
+`orchestra training validate-environment-proposal --proposal <path>` re-reads
 the portable plan and artifacts. Deterministic code checks the plan and split
 hashes, oracle reward of 1, sentinel rejection, reset equality, TRAIN-only
 preview boundary, absence of network/live effects, nonconstant useful reward,

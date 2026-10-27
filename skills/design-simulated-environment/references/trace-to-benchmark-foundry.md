@@ -3,7 +3,7 @@
 Turn local traces into stateful, human-adjudicated tasks without making the
 incumbent trajectory the oracle.
 
-Execute this process through `understudy traces build-benchmark`,
+Execute this process through `orchestra traces build-benchmark`,
 `import-reviews`, `plan-replays`, and `run-replays`. Their contracts are in
 [`../../ingest-traces/references/trace-foundry-cli.md`](../../ingest-traces/references/trace-foundry-cli.md).
 Do not implement a parallel compiler inside a customer repository.

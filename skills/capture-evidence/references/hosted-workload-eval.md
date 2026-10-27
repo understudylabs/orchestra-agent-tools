@@ -18,7 +18,7 @@ If no active `understudy.eval-project.v2` exists, explain that the files contain
 prompts, completions, and tool payloads, obtain approval, then run:
 
 ```sh
-understudy evals build \
+orchestra evals build \
   --project <project> \
   --workload <workload> \
   --name <eval-name> \
@@ -61,7 +61,7 @@ Compile the source into the same eval project's benchmark directory; do not use
 the command defaults, which point at global capture/benchmark locations:
 
 ```sh
-understudy traces build-benchmark \
+orchestra traces build-benchmark \
   --source .understudy/evals/<eval-dir>/source/traces \
   --source-index .understudy/evals/<eval-dir>/source/index.jsonl \
   --output .understudy/evals/<eval-dir>/benchmark \
@@ -165,7 +165,7 @@ Keep the environment and verifier trees separate and data-free. See the packaged
 contracts.
 
 ```sh
-understudy evals check --draft --project .understudy/evals/<eval-dir>
+orchestra evals check --draft --project .understudy/evals/<eval-dir>
 ```
 
 The draft command requires the complete authored artifact set, then checks
@@ -208,7 +208,7 @@ fixture needs the same independent basis for why it is wrong. Then run the
 strict check:
 
 ```sh
-understudy evals check --project .understudy/evals/<eval-dir>
+orchestra evals check --project .understudy/evals/<eval-dir>
 ```
 
 The strict command requires confirmed intent and proves the representative
@@ -228,7 +228,7 @@ traces does not authorize it. Only after the owner has recorded the final,
 artifact-bound approval above, prepare the non-uploading preview:
 
 ```sh
-understudy --json evals publish \
+orchestra --json evals publish \
   --project .understudy/evals/<eval-dir> \
   --preview
 ```
@@ -251,7 +251,7 @@ perform the external upload. Only after that separate permission, carry the
 preview's `expected_release_id` into the upload:
 
 ```sh
-understudy evals publish \
+orchestra evals publish \
   --project .understudy/evals/<eval-dir> \
   --expect-release-id <expected_release_id>
 ```

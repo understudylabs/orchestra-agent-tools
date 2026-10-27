@@ -18,12 +18,12 @@ Each adapter answers the same questions:
 The CLI registry is `src/agent-platforms.ts`; inspect it with:
 
 ```bash
-understudy platforms
-understudy --json platforms
-understudy platforms --inspect cursor
-understudy platforms --inspect opencode
-understudy platforms --inspect hermes
-understudy platforms --inspect devin
+orchestra platforms
+orchestra --json platforms
+orchestra platforms --inspect cursor
+orchestra platforms --inspect opencode
+orchestra platforms --inspect hermes
+orchestra platforms --inspect devin
 ```
 
 ## Supported Adapters
@@ -47,7 +47,7 @@ onboarding during the sprint.
 OpenCode calls JS/TS hook modules "plugins." Understudy's OpenCode surface is
 not that kind of plugin; it is a native skills/commands adapter. The
 `.opencode/adapter.json` file is only an Understudy version sentinel for
-`understudy doctor` and release checks.
+`orchestra doctor` and release checks.
 
 Hermes Agent has its own plugin system (`~/.hermes/plugins/` with `plugin.yaml`
 and Python) and a Skills Hub, but Understudy's Hermes surface uses neither. It

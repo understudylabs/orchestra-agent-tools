@@ -77,7 +77,7 @@ group it belongs to.
   developers whose app is running but has no traces yet: it detects the
   provider SDK, redirects it through the Understudy gateway (capture on by
   default) via env vars with no app-code changes, verifies with a test call
-  that a capture actually landed (`understudy instrument --check` for the
+  that a capture actually landed (`orchestra instrument --check` for the
   local sanity check), and hands off to `ingest-traces`/`capture-evidence`
   once traces exist. Per-SDK env-var behavior and fallback paths in its
   [`reference.md`](instrument/reference.md).
@@ -160,7 +160,7 @@ logprobs (which tokens?), and tool-trace forensics (why did this call fail?).
   (auto-accepts, feedback → regenerate-env) → calibration (incumbent gate +
   null/spam trivial floors) → candidate and prompt-override runs → the rigor
   report — plus the run-executor daemon lifecycle
-  (`understudy runs execute --watch`, claiming, capability gates).
+  (`orchestra runs execute --watch`, claiming, capability gates).
 - [`replay-app-harness`](replay-app-harness/SKILL.md) runs the user's own app
   (via an `app-harness.json` sidecar) as an `app_replay` arm on the frozen
   benchmark tasks — the regression verdict after editing the user's code.
@@ -255,7 +255,7 @@ shows headroom, no hosted RL until the local arms plateau.
 
 - [`use-understudy-gateway`](use-understudy-gateway/SKILL.md) handles
   authenticated gateway inference, project/key readiness, public model listing,
-  workload route percentages, `understudy run`, and monitored durable CLI
+  workload route percentages, `orchestra run`, and monitored durable CLI
   execution. The managed-catalog vs BYO provider-key decision (with all
   key-safety rules) is in
   [`references/frontier-keys.md`](use-understudy-gateway/references/frontier-keys.md).

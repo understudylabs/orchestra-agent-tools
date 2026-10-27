@@ -152,7 +152,7 @@ Identify the developer's current stage and load exactly one:
   or stale → [`../capture-evidence/SKILL.md`](../capture-evidence/SKILL.md)
   (also owns repo inspection + eval-harness discovery/build). For a named
   workload already captured by Understudy, the recommended route is
-  `understudy evals build`: it downloads one raw workload day and hands that
+  `orchestra evals build`: it downloads one raw workload day and hands that
   source to the coding agent for local verifier authoring. Do not use the
   legacy sampled-cohort `evals create` path for this workflow.
 - **App is running but no traces exist yet** — the developer wants capture
@@ -173,13 +173,13 @@ Identify the developer's current stage and load exactly one:
   lenses (`references/profile-captures.md` for structure/cost,
   `references/lotus-semantic-triage.md` for content-level bulk triage).
   When the source is Desktop supervisor interventions, first run
-  `understudy desktop supervision export --reviewed-only --json`; use its
+  `orchestra desktop supervision export --reviewed-only --json`; use its
   content-addressed correction-pair JSONL as the local input and inspect the
   accompanying attribution metrics. Unreviewed pairs may support error
   analysis, but are not human-approved training labels.
 - **Inference / routing / capture / auth / deploy** — Understudy inference,
   gateway trace capture, project/key management, model A/B via route traffic %,
-  `understudy run`, or registering an improved route →
+  `orchestra run`, or registering an improved route →
   [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md).
 - **Frontier access choice** — a local-vs-frontier comparison, installer, or
   agent run needs to decide between the Understudy managed catalog, BYO `.env`
@@ -226,7 +226,7 @@ Identify the developer's current stage and load exactly one:
   wants) a trace-compiled benchmark directory and asks to operate it end to
   end: review tasks, apply the auto-accept policy, calibrate with the
   incumbent and null/spam trivial floors, queue candidate or prompt-override
-  runs, keep the run executor (`understudy runs execute --watch`) alive, read
+  runs, keep the run executor (`orchestra runs execute --watch`) alive, read
   `rigor-report.md`, or run an `app_replay` regression after code edits →
   [`../operate-benchmark-lab/SKILL.md`](../operate-benchmark-lab/SKILL.md)
   (MCP tools preferred; CLI verbs otherwise). For only the app-replay slice,
@@ -343,7 +343,7 @@ destination, spend, retention, or production-impact envelope.
 
 Do not ask the developer to register, authenticate, paste secrets, or configure
 provider keys before the local evidence loop has found a concrete need. When that
-need exists, route through `understudy login --email` rather than a pasted key.
+need exists, route through `orchestra login --email` rather than a pasted key.
 
 Follow the public boundary in
 [`../../docs/privacy-and-data-boundaries.md`](../../docs/privacy-and-data-boundaries.md):
@@ -417,19 +417,19 @@ isn't at.
 `outcome`, `workload`, `incumbent_model`, `candidate_model`, and the result
 deltas mirror the `type: experiment` lab-note in the Understudy knowledge
 base — `experiment.json` is its un-anonymized, hash-pinned, live
-precursor. When `outcome` is set, `understudy experiments promote` writes a
+precursor. When `outcome` is set, `orchestra experiments promote` writes a
 lab-note **draft** locally from the record. It does not anonymize or upload: the
 draft carries the real local values behind a review banner, and scrubbing
 `workload` to `workload-NNN`, dropping real paths, and filling the cost/margin
 fields the local record omits are part of the publish review. Publishing to a
 shared repository is an upload — gate it like any other (see Safety Gates).
 
-> `understudy experiments new` opens an experiment and copies the baseline
+> `orchestra experiments new` opens an experiment and copies the baseline
 > hash-chain into `pins`; `understudy next` reads the artifacts on disk plus the
 > active experiment to report the loop step and the command to run next;
-> `understudy experiments outcome` records the verdict. On `optimize-workload
+> `orchestra experiments outcome` records the verdict. On `optimize-workload
 > adapter run --execute` the candidate is frozen into the active experiment
-> directory automatically; `understudy experiments freeze` does it explicitly
+> directory automatically; `orchestra experiments freeze` does it explicitly
 > (and freezes a `--claim-from <path>`). The optimizer's working files stay
 > under `.understudy/optimize-workload/`.
 

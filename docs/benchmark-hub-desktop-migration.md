@@ -1,6 +1,6 @@
 # Shipping the Benchmark Hub — `apps/benchmark-hub` → understudy-desktop
 
-Note: the desktop app this document targets was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The `understudy runs execute` queue it builds on remains current.
+Note: the desktop app this document targets was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The `orchestra runs execute` queue it builds on remains current.
 
 **Status:** scoping v1 — 2026-07-22 (DOC ONLY; no migration code on this branch)
 **Prototype:** `apps/benchmark-hub` (Next 15, standalone dev server on :1421).
@@ -32,7 +32,7 @@ Two facts make this migration *easier* than Explore:
    No ClickHouse proxy, no sqlite. `serde_json` + `std::fs` covers it.
 2. **The hub never executes.** POST `/api/runs` only writes an
    `understudy.run_request.v1` file into `<benchmark>/runs/queue/`;
-   `understudy runs execute --benchmark <dir> --watch` (the CLI executor,
+   `orchestra runs execute --benchmark <dir> --watch` (the CLI executor,
    `src/commands/runs.ts` → `src/run-executor.ts`) is the only thing that runs
    models. The desktop app keeps that separation — it just becomes the
    process manager for the executor instead of a README hint.
@@ -57,7 +57,7 @@ resolver *from dist* — "never forked"). Three options for the desktop:
   legacy-journal bug class all over again (see PR #323's revert).
 - **(b) Rust invoke commands that shell out to the bundled CLI**
   (`build-desktop-cli.mjs` already ships the CLI inside the app, per the
-  Explore plan). Reads become `understudy benchmarks <verb> --json`
+  Explore plan). Reads become `orchestra benchmarks <verb> --json`
   subcommands the CLI grows; Rust is a thin spawn+parse wrapper.
 - **(c) Sidecar Node process** holding the hub's lib/ warm — rejected: a
   long-lived hidden Node server is exactly what "no Node runtime" is for.
@@ -67,7 +67,7 @@ commands (append a flag line, list queue files, tail a journal) go native in
 `benchmarks.rs` for latency, but anything that touches the **scorer or the
 entry loader** goes through the CLI so there is exactly one compiled
 implementation. This means the migration's first PR is CLI-side: a
-`understudy benchmarks` command group exposing today's route logic as JSON
+`orchestra benchmarks` command group exposing today's route logic as JSON
 verbs (`list`, `entry <slug>`, `replay <slug> <task>`, `rollouts`, `captures`,
 `trace-viewer`, `flag`, `review`, `queue-run`, `cancel-run`). The hub's route
 handlers become thin callers of the same functions — proving the extraction
@@ -82,13 +82,13 @@ relative to the benchmark dir under the data home (next section).
 | Hub route (today) | Desktop surface | Reads / writes | Core it must reuse |
 |---|---|---|---|
 | `GET /api/runs?slug` | `benchmarks_runs_list(slug)` — **native** | reads `runs/queue/*.json` (`run_request.v1`) | `runs-core.ts` listing logic is trivial file enumeration; safe to go native |
-| `POST /api/runs` (queue) | `benchmarks_run_queue(slug, models, split, tasks, rollouts_per_task)` — **CLI-backed** (`understudy benchmarks queue-run`) | reads `benchmark.json`, `tasks.jsonl`, `environment/offline-validation.json`, `reviews.jsonl`; writes `runs/queue/<run_id>.json` | `runs-core.ts` validation + `selectTasks` + proposed-task gating (accepted + oracle-validated only). Too much invariant logic to fork |
+| `POST /api/runs` (queue) | `benchmarks_run_queue(slug, models, split, tasks, rollouts_per_task)` — **CLI-backed** (`orchestra benchmarks queue-run`) | reads `benchmark.json`, `tasks.jsonl`, `environment/offline-validation.json`, `reviews.jsonl`; writes `runs/queue/<run_id>.json` | `runs-core.ts` validation + `selectTasks` + proposed-task gating (accepted + oracle-validated only). Too much invariant logic to fork |
 | `POST /api/runs` (cancel) | `benchmarks_run_cancel(slug, run_id)` — **native** | rewrites the request file's `status` | status-flip only; executor honors it between rollouts |
 | `GET /api/runs/live` | **deleted — replaced by Tauri events** (next section) | (today: polls `runs/live/<run>-<model>.jsonl` + re-scores) | `replay-core` accumulation moves into the executor's event emission |
 | `POST /api/flags` | `benchmarks_flag_append(slug, task_id, reason, note)` — **native** | appends one `benchmark_flag.v1` line to `flags.jsonl` | validation constants (`FLAG_REASONS`, note cap) duplicated as Rust consts — acceptable, they're data not logic |
 | `POST /api/reviews` | `benchmarks_review_append(slug, task_id, decision, note)` — **native** | appends one `benchmark_review.v1` line to `reviews.jsonl` | same as flags |
 | `GET /api/models` | **already exists** — reuse the app's model-listing path (`models.rs` / gateway client with `creds.rs`) rather than porting `gateway-core.ts` | outbound gateway `/v1/models`, 5-min cache | none; delete the hub's copy. The sk_ key stays in Rust, never in the webview (same property the route had) |
-| `GET /api/replay?slug&task` | `benchmarks_replay(slug, task)` — **CLI-backed** (`understudy benchmarks replay`) | reads capture bodies (`viewer/data/captures/*.json`), `tasks.jsonl` sidecars, eval rows, `environment/offline-validation.json` | `replay-core.ts` — THE scorer. Never forked |
+| `GET /api/replay?slug&task` | `benchmarks_replay(slug, task)` — **CLI-backed** (`orchestra benchmarks replay`) | reads capture bodies (`viewer/data/captures/*.json`), `tasks.jsonl` sidecars, eval rows, `environment/offline-validation.json` | `replay-core.ts` — THE scorer. Never forked |
 | `GET /api/rollouts?slug&task` | `benchmarks_rollouts(slug, task)` — **CLI-backed** | reads `traces*.jsonl`, eval rows; joins via `trace_ref.branch_leaf` | `benchmark-core.ts` branch extraction + `trajectory-core.ts` |
 | `GET /api/captures?slug&id\|task` | `benchmarks_capture(slug, id)` / `benchmarks_capture_meta(slug, task)` — **CLI-backed** (meta derivation) or native (raw body read) | reads `viewer/data/captures/*.json` via the entry's capture index | `data-core.ts` `captureFilePath` (no client-supplied path ever touches fs — keep that property in Rust argument validation too) |
 | `GET /api/trace-viewer` | `benchmarks_trace_viewer(slug, task, trace?)` — **CLI-backed**; serve the built artifact via Tauri asset protocol or convertFileSrc, keeping the `index.html`/`trace-data.js` allowlist | writes/reads `.trace-viewer-cache/` in the benchmark dir | `trace-viewer-core.ts` → CLI's `renderTraceViewer` (already CLI code) |
@@ -114,7 +114,7 @@ Tauri events; the webview listens. No polling anywhere.
 
 - The executor already has a structured `RunEvent` callback (`onEvent` in
   `executeQueuedRuns`, currently pretty-printed to stderr). Add
-  `understudy runs execute --emit-json` that writes one JSON event per line to
+  `orchestra runs execute --emit-json` that writes one JSON event per line to
   **stdout** (stderr keeps the human format). Rust owns the child process and
   is the *only* reader of that pipe — a pipe, not a shared file, so no torn
   lines, no offsets, no mtime races.
@@ -171,10 +171,10 @@ generation time**:
 
 | Baked-at-generation path | Where | Relocation risk |
 |---|---|---|
-| `execute_hint: "understudy runs execute --benchmark <ABSOLUTE dir> --watch"` | `POST /api/runs` response and the Replay tab's `environment.cli` string | Cosmetic-but-misleading after a move; in the desktop app the hint disappears entirely (the daemon executes) — delete the field from the desktop surface, keep it CLI-only |
+| `execute_hint: "orchestra runs execute --benchmark <ABSOLUTE dir> --watch"` | `POST /api/runs` response and the Replay tab's `environment.cli` string | Cosmetic-but-misleading after a move; in the desktop app the hint disappears entirely (the daemon executes) — delete the field from the desktop surface, keep it CLI-only |
 | `live.journal` on the run-request file | written by `run-executor.ts` — **already benchmark-dir-relative** (`relative(dir, journalPath)`) | none; keep this discipline for any new pointer fields |
 | `source.captures[].capture_id` → `viewer/data/captures/*.json` | foundry output; resolved via the entry's capture index, relative | none |
-| `environment/` (generated verifiers env: `pyproject.toml`, `understudy_trace_env/`, uv venv/lock) | `understudy traces build-benchmark` output | **highest risk**: uv virtualenvs and lockfiles can embed absolute interpreter paths. Moving a benchmark dir after generation may break `uv run … eval` silently. Rule: the environment must be reproducible from its dir (`uv sync` on first run in the new location), and the executor should treat a failed spawn as "environment needs rebuild", not a task failure |
+| `environment/` (generated verifiers env: `pyproject.toml`, `understudy_trace_env/`, uv venv/lock) | `orchestra traces build-benchmark` output | **highest risk**: uv virtualenvs and lockfiles can embed absolute interpreter paths. Moving a benchmark dir after generation may break `uv run … eval` silently. Rule: the environment must be reproducible from its dir (`uv sync` on first run in the new location), and the executor should treat a failed spawn as "environment needs rebuild", not a task failure |
 | `.trace-viewer-cache/` | built lazily by the trace-viewer route | cache keyed by content hashes; safe to nuke on move — document "cache dirs are disposable" |
 | `offline-validation.json`, `benchmark.json`, `rows*.jsonl`, `flags.jsonl`, `reviews.jsonl` | all read relative to the dir | none |
 
@@ -186,7 +186,7 @@ CLI, hub, and desktop — is a prerequisite of Phase 1 below and should land as
 that doc (or fold into this one) before `benchmarks.rs` hardcodes anything.
 
 Migration mechanics: benchmarks generated into repo checkouts move with a
-one-shot `understudy benchmarks adopt <dir>` (copy/move into
+one-shot `orchestra benchmarks adopt <dir>` (copy/move into
 `~/.understudy/benchmarks/<slug>`, verify entry loads, warn on environment/
 staleness). The desktop app only ever scans the home; `BENCHMARK_HUB_DATA_DIR`
 remains a dev override for the standalone hub, which stays alive as the
@@ -196,12 +196,12 @@ HMR-speed prototype harness (same decision as the Moraine viewer).
 
 Today there are two "daemons" adjacent to this feature: the desktop app's own
 agent daemon (`~/.understudy/agent-card.json`, health-probed base_url on
-:17790, surfaced by `understudy daemon status`) and the ad-hoc
-`understudy runs execute --watch` loop a user must remember to start. Fold the
+:17790, surfaced by `orchestra daemon status`) and the ad-hoc
+`orchestra runs execute --watch` loop a user must remember to start. Fold the
 executor into desktop management:
 
 - **Who starts it:** the app. `benchmarks.rs` spawns the bundled CLI
-  (`understudy runs execute --benchmark <dir> --emit-json`) as a managed child
+  (`orchestra runs execute --benchmark <dir> --emit-json`) as a managed child
   — the same managed-job pattern as `residency.rs` model servers and the
   Explore plan's v2 scan job. Preferred mode: **on-demand, per queued run**,
   not an always-on `--watch` poller; the app knows the instant a run is queued
@@ -224,7 +224,7 @@ executor into desktop management:
   The executor's only egress is model inference through the gateway with the
   user's own creds (env / `~/.understudy/credentials.json`) — that is the run
   the user asked for. Everything else is local files. Keep the existing gate
-  pattern: uploads are opt-in flags only (`understudy traces … --push`, off by
+  pattern: uploads are opt-in flags only (`orchestra traces … --push`, off by
   default, per `src/commands/traces.ts`), telemetry is opt-in
   (`docs/telemetry.md`), and per `docs/privacy-and-data-boundaries.md` the
   desktop app must not add any implicit publish path for benchmark dirs,
@@ -239,7 +239,7 @@ hub deliberately has **no write authority** beyond appending review/flag lines
 inside benchmark dirs; the daemon/executor is the thing with hands. Where
 should agent-driven code-edit authority live?
 
-**Option A — daemon verb** (`understudy runs execute` grows a
+**Option A — daemon verb** (`orchestra runs execute` grows a
 workspace-mutation capability: the environment requests edits, the executor
 applies them in a sandbox/worktree):
 - - The executor is a scoring harness; teaching it to edit code turns the
@@ -281,7 +281,7 @@ consent prompt, consistent with the privacy boundary above.
 1. Write `docs/artifact-contracts.md` (doesn't exist yet): `run_request.v1`,
    `run_event.v1` (new), journal line schema, `eval_result.v1`, dir layout,
    the relative-paths-only rule.
-2. `understudy benchmarks` CLI command group wrapping today's `lib/*-core.ts`
+2. `orchestra benchmarks` CLI command group wrapping today's `lib/*-core.ts`
    logic as JSON verbs; hub routes become thin callers (proves extraction;
    hub behavior unchanged). Add `--emit-json` to `runs execute`.
 3. Queue claim field (`claimed_by` + pid check) in `run-executor.ts` —
@@ -298,7 +298,7 @@ consent prompt, consistent with the privacy boundary above.
 ### Phase 2 — managed runs + live events [~2 sessions]
 7. Managed executor spawn per queued run; `benchmarks://run-event` relay;
    live watch UI moves from polling to `listen()`; reattach-on-relaunch.
-8. `understudy benchmarks adopt` + environment-relocation handling
+8. `orchestra benchmarks adopt` + environment-relocation handling
    (`uv sync`-on-first-run, cache-dir disposability).
 
 ### Phase 3 — release + write-authority spike [~1 session + spike]

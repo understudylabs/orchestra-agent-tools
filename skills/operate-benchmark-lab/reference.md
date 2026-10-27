@@ -6,7 +6,7 @@ Source of truth: `docs/agent-operator-surface.md`, `docs/app-harness.md`,
 `src/commands/benchmarks.ts`, `src/commands/daemon.ts`,
 `src/commands/desktop.ts`, `src/run-executor.ts`.
 
-## MCP tools (`understudy benchmarks mcp`)
+## MCP tools (`orchestra benchmarks mcp`)
 
 Ten tools, all backed by the same compiled modules as the hub API (no forked
 format logic):
@@ -26,34 +26,34 @@ format logic):
 
 Guardrails baked in: `queue_run` on a *proposed* benchmark accepts exactly one
 accepted task with a validated environment; full runs require
-`understudy traces promote`. Read-only roots (demo/fixture) reject writes.
+`orchestra traces promote`. Read-only roots (demo/fixture) reject writes.
 Journals are read with line caps; malformed lines are skipped, never fatal.
 
 ## CLI verbs
 
 ```sh
 # Build
-understudy traces build-benchmark ...            # compile traces → benchmark dir + env
-understudy traces author-tasks --benchmark <dir> # LLM task authoring (gateway); --compare-models, --overview
-understudy traces regenerate-env --benchmark <dir>   # rebuild env (also the feedback handoff)
-understudy traces promote ...                    # proposed → promoted (unlocks full runs)
+orchestra traces build-benchmark ...            # compile traces → benchmark dir + env
+orchestra traces author-tasks --benchmark <dir> # LLM task authoring (gateway); --compare-models, --overview
+orchestra traces regenerate-env --benchmark <dir>   # rebuild env (also the feedback handoff)
+orchestra traces promote ...                    # proposed → promoted (unlocks full runs)
 
 # Queue + execute
-understudy runs list --benchmark <dir>
-understudy runs queue --benchmark <dir> --models <ids> \
+orchestra runs list --benchmark <dir>
+orchestra runs queue --benchmark <dir> --models <ids> \
   [--split train|dev|holdout|all] [--tasks <ids>] [--rollouts N] \
   [--incumbent <ids>] [--rollout-timeout <s>] \
   [--prompt-override <arm_label>=<model>=<suffix-file>]   # repeatable
-understudy runs execute --benchmark <dir> [--watch] [--interval 30] \
+orchestra runs execute --benchmark <dir> [--watch] [--interval 30] \
   [--concurrency 2] [--rollout-timeout <s>] [--runner verifiers|oracle]
 
 # Versioning (rerun / regrade / reuse)
-understudy runs regrade --benchmark <dir> \
+orchestra runs regrade --benchmark <dir> \
   [--run <run_id>] [--task <id>...] [--dry-run]  # verifier-only (MINOR) change: re-score retained
                                                  # trajectories offline, write fresh rows under
                                                  # <run>-regrade-<n> + one MINOR versions.jsonl line
                                                  # (source rows go stale); never queues rollouts
-understudy benchmarks upgrade <dir> --against <old-benchmark.json> \
+orchestra benchmarks upgrade <dir> --against <old-benchmark.json> \
   [--note <text>] [--dry-run] [--queue --model <id> --rollouts N]
                                                  # diff current manifest vs the archived previous one;
                                                  # print the minimal rerun/regrade/reuse plan, append one
@@ -61,14 +61,14 @@ understudy benchmarks upgrade <dir> --against <old-benchmark.json> \
                                                  # the rerun set only (queue-only, never executes)
 
 # Rigor + operator surface
-understudy benchmarks rigor <dir>...             # writes rigor-report.md in each dir
-understudy benchmarks rigor <dir>... --ci \
+orchestra benchmarks rigor <dir>...             # writes rigor-report.md in each dir
+orchestra benchmarks rigor <dir>... --ci \
   [--strict] [--changed-only [--base <ref>]]     # gate mode: exit 1 on any hard FAIL (UNKNOWN fatal
                                                  # only with --strict); run before promote/publish
-understudy benchmarks mcp [--root <dir>...]
+orchestra benchmarks mcp [--root <dir>...]
 
 # App instrumentation sanity (before capture-based building)
-understudy instrument --check [--json]
+orchestra instrument --check [--json]
 ```
 
 `--runner oracle` is deterministic and zero-cost (offline validation);
@@ -93,7 +93,7 @@ runner regardless of `--runner`; `incumbent_models` is rejected on them.
 | `runs/live/<run>-<model>.jsonl` | per-arm rollout journals |
 | `rows-*.jsonl` | scored rows (`arm_kind`: model / `null_agent` / `spam_agent` / `prompt_override` label / `app_replay`) |
 | `calibration.json` | incumbent gate + `null_floor`/`spam_floor` (`floor_exceeded` when > 5%, with `passed_task_ids`) |
-| `rigor-report.md` | ABC attestation from `understudy benchmarks rigor` (UNKNOWN rows are honest gaps) |
+| `rigor-report.md` | ABC attestation from `orchestra benchmarks rigor` (UNKNOWN rows are honest gaps) |
 | `versions.jsonl` | append-only `understudy.benchmark_version.v1` lines — one per version bump, with per-task `task_bumps` (major/minor/patch + reason), splits hash, contamination status |
 | `app-harness.json` | `understudy.app_harness.v1` sidecar for app-replay runs |
 
@@ -168,7 +168,7 @@ is already installed and running.
 
 - The **app** owns the local daemon (`~/.understudy/agent-card.json`), warm
   MLX model slots, model downloads, canonical chat runs, and supervision —
-  drive it with `understudy daemon status` then the `understudy desktop`
+  drive it with `orchestra daemon status` then the `orchestra desktop`
   verbs (`contract`, `capabilities`, `status`, `model list|catalog`,
   `slot list|add|assign`, `download list|start`, `chat`, `run cancel|events`,
   `supervision export`, `tool-proof ...`).

@@ -55,7 +55,7 @@ Pick one benchmark and route to the matching worker skill:
 3. Smoke the harness. Run the smallest public smoke path first. For
    AutomationBench, prefer a small `simple` or domain-limited run. For LAB, start
    with the walkthrough task and inspect the generated report.
-4. Capture evidence. Run `understudy capture-evidence check --repo <benchmark>`
+4. Capture evidence. Run `orchestra capture-evidence check --repo <benchmark>`
    and write a workload card from benchmark metadata, harness files, and public
    scoring docs.
 5. Freeze evaluation boundaries. Preserve upstream public/private or

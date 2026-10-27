@@ -154,7 +154,7 @@ lm = LM(model="openai/mlx-community/gemma-3-4b-it-4bit",
 lotus.settings.configure(lm=lm)
 ```
 
-Gateway tier (only with the upload approval above), via `understudy run --`
+Gateway tier (only with the upload approval above), via `orchestra run --`
 so the key is injected, not pasted:
 
 ```python

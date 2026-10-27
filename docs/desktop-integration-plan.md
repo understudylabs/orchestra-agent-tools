@@ -1,6 +1,6 @@
 # Shipping "Explore Data" — Moraine viewer → understudy-desktop
 
-Note: the desktop app this document targets was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The `understudy explore scan` pipeline it builds on remains current.
+Note: the desktop app this document targets was removed; see [`desktop-deprecation.md`](desktop-deprecation.md). The `orchestra explore scan` pipeline it builds on remains current.
 
 **Status:** plan v1 — 2026-07-20 (branch rebased onto main @ desktop 0.3.32)
 **Prototype:** `apps/moraine-viewer` (Next 16, standalone). **Target:** `apps/homescreen` (Tauri + Next 15 static export).
@@ -55,7 +55,7 @@ user-generated data.
 
 The scanner/cluster/commits scripts are bun scripts today. Path to app-managed:
 - MVP: Explore shows "no scan data yet" with a copyable CLI invocation
-  (`understudy explore scan` — port scripts into the agent-tools CLI, which
+  (`orchestra explore scan` — port scripts into the agent-tools CLI, which
   is already bundled with the app via `build-desktop-cli.mjs`).
 - v2: a "scan my history" button — Rust spawns the bundled CLI as a managed
   job (same pattern as residency.rs model servers), pointing at an

@@ -37,7 +37,7 @@ surfaces.
    next to the eval schema in `schemas/`.
 5. **End-to-end proof (required):** run a benchmark matrix in the app (or via
    the wave-5a HTTP endpoints if merged), export, run ramp-and-verify's
-   evidence-reading step against that export, and `understudy routes promote`
+   evidence-reading step against that export, and `orchestra routes promote`
    a decision derived from it in dry-run form against a test workload.
    Document the transcript in the PR body.
 

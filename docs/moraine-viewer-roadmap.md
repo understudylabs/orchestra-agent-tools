@@ -154,6 +154,6 @@ catalog everything downstream stands on.
 ## Open questions
 - Vector store choice for Stage 2 (sqlite-vec vs LanceDB vs ClickHouse-side —
   but never writing to Moraine's schema).
-- How the Understudy MCP composes with the existing understudy gateway/MCP story.
+- How the Understudy MCP composes with the existing Orchestra gateway/MCP story.
 - Schema-drift strategy: pin queries to Moraine versions we've tested; vendored
   MCP tracks upstream tags.

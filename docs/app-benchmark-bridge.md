@@ -11,7 +11,7 @@ exists — no new workflow to learn.
 ## What the app records
 
 **Experiment lineage (`understudy.experiment.v1`).** Every training start
-creates one record via `understudy benchmarks experiment create <dir>
+creates one record via `orchestra benchmarks experiment create <dir>
 --plain-dir` (a small additive CLI mode that writes `experiments.jsonl` next
 to the prepared dataset, before any benchmark exists):
 
@@ -46,9 +46,9 @@ no gate.
 Where a dropped dataset has a benchmark dir (`<artifact_root>/benchmark` by
 convention), the training result view offers **Compare on benchmark**: it
 queues one `understudy.run_request.v1` through the existing file queue
-(`understudy runs queue --local-arm <label>=<adapter> --models <incumbent>
+(`orchestra runs queue --local-arm <label>=<adapter> --models <incumbent>
 --incumbent <incumbent> --trivial-arms majority_class --experiment <id>`) and
-polls `runs list` for status. The app never executes models; `understudy runs
+polls `runs list` for status. The app never executes models; `orchestra runs
 execute --watch` does.
 
 Feature detection, honestly surfaced (`BenchmarkLinkagePane`):
@@ -57,15 +57,15 @@ Feature detection, honestly surfaced (`BenchmarkLinkagePane`):
 - benchmark exists, no servable artifact (e.g. the ModernBERT classifier) →
   an honest "can't take an arm yet" state;
 - no benchmark, but the CLI has `benchmarks from-dataset` (detected at runtime
-  via `understudy benchmarks --help`; the verb ships separately) → "Build
+  via `orchestra benchmarks --help`; the verb ships separately) → "Build
   benchmark from this dataset";
 - neither → the benchmark entrance landing state.
 
 ## Additive CLI surface
 
-- `understudy benchmarks experiment create|update … --plain-dir` — lineage in
+- `orchestra benchmarks experiment create|update … --plain-dir` — lineage in
   a plain directory (validation unchanged; `list`/`show` already work there).
-- `understudy runs queue --experiment <id>` — cross-links a queued run to an
+- `orchestra runs queue --experiment <id>` — cross-links a queued run to an
   experiment, with the same must-already-exist check the hub/MCP queue path
   enforces. When queueing against a benchmark whose `experiments.jsonl` lacks
   the record, the app copies the dataset-side record in first.

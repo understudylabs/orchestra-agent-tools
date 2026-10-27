@@ -1,4 +1,4 @@
-# Agent operator surface: `understudy benchmarks mcp`
+# Agent operator surface: `orchestra benchmarks mcp`
 
 A stdio MCP server that exposes the file-based benchmark artifacts to a
 coding agent, so the agent — not a human clicking through the hub — can
@@ -6,8 +6,8 @@ author, diagnose, and fix a benchmark workload end to end (the Raindrop
 Workshop pattern: put traces and evals inside the agent's tool surface).
 
 ```bash
-understudy benchmarks mcp                 # roots: ~/.understudy/benchmarks
-understudy benchmarks mcp --root ./bench  # add extra roots (repeatable)
+orchestra benchmarks mcp                 # roots: ~/.understudy/benchmarks
+orchestra benchmarks mcp --root ./bench  # add extra roots (repeatable)
 ```
 
 Claude Code registration (`~/.claude.json` → `mcpServers`):
@@ -31,7 +31,7 @@ Claude Code registration (`~/.claude.json` → `mcpServers`):
 | `queue_run` | writes `understudy.run_request.v1` into `runs/queue/` — **never executes** | `queueOrCancelRun` — the exact validation behind `POST /api/runs` |
 | `run_status` | request status + row summary as `rows-*.jsonl` land, plus the calibration block (incumbent gate + null/spam trivial-arm floors) | `run-executor` readers |
 
-Execution stays where it always was: `understudy runs execute --benchmark
+Execution stays where it always was: `orchestra runs execute --benchmark
 <dir> --watch` (or the daemon) picks queued requests up. The MCP server is a
 pure operator surface over the sidecar files.
 
@@ -72,7 +72,7 @@ The intended improvement cycle, tool by tool:
      evidence, or edit the task/environment in the benchmark dir;
    - the *system under test* is wrong: edit prompts/code in the workload.
 5. **Re-run.** `queue_run(slug, models, tasks?)` — this only writes the
-   request file; make sure `understudy runs execute --benchmark <dir>
+   request file; make sure `orchestra runs execute --benchmark <dir>
    --watch` is running.
 6. **Re-check.** Poll `run_status(slug, run_id)` until rows land, then
    `read_rollout`/`diff_rollouts` against the previous run to confirm the
@@ -95,7 +95,7 @@ the same frozen tasks (see [`app-harness.md`](app-harness.md)):
 3. Queue an app-replay run: `POST /api/runs` / `queue_run` with
    `app_replay: true` (the request records `requires: ["app_replay"]`, so an
    old executor skips it with `run_unsupported` instead of corrupting it).
-4. `understudy runs execute --benchmark <dir> --watch` launches the app per
+4. `orchestra runs execute --benchmark <dir> --watch` launches the app per
    task with gateway-redirect env, kills it at the per-task timeout, and
    scores observed tool events through the shared contract scorer.
 5. Read the rows: they are labeled `arm_kind: "app_replay"`, never feed
@@ -111,9 +111,9 @@ Autonomy is governed by the **one-time trust posture** in
 `src/config/trust.ts`) instead of per-action approval dialogs:
 
 ```bash
-understudy trust show                          # posture + resolved boundaries
-understudy trust set bounded_experiments       # one action, visible, reversible
-understudy trust set hosted_ops --spend-stop-loss 25
+orchestra trust show                          # posture + resolved boundaries
+orchestra trust set bounded_experiments       # one action, visible, reversible
+orchestra trust set hosted_ops --spend-stop-loss 25
 ```
 
 Levels: `local_sandbox` (default) < `bounded_experiments` < `hosted_ops`,
@@ -150,7 +150,7 @@ instead of asking per upload.
   accepted** task (born accepted, or explicitly re-accepted; an explicit
   reject/restrict/needs_more blocks) with a validated environment (same
   gating as the hub); full runs require promotion
-  (`understudy traces promote`).
+  (`orchestra traces promote`).
 - Read-only sources (demo/fixture) reject writes.
 - Journals and row files are read with line caps; malformed lines are skipped,
   never fatal.

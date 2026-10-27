@@ -18,7 +18,7 @@ Full reference: `docs/app-harness.md` in this repo; sidecar schema:
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. If it is unavailable inside a repo
+Prefer the installed `orchestra` binary. If it is unavailable inside a repo
 checkout, run through the package script:
 
 ```sh
@@ -72,7 +72,7 @@ The request records `requires: ["app_replay"]` so old executors skip it with
 `run_unsupported` instead of corrupting it. Then make sure an executor runs:
 
 ```sh
-understudy runs execute --benchmark <benchmark-dir> --watch
+orchestra runs execute --benchmark <benchmark-dir> --watch
 ```
 
 ## Step 3 — Read the verdict honestly
