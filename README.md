@@ -27,14 +27,14 @@ CLI alias, and rerunning the installer replaces the old `understudy` plugin).
 ## Get started (30 seconds)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
 The installer sets up the CLI, asks which coding agents to attach to (Claude
 Code, Cursor, Codex, OpenCode, Hermes Agent, all, or CLI-only), and opens the
 selected agent when it can. It installs from the current GitHub `main`
 branch: the script clones the source into
-`~/.understudy/agent-tools/source/understudy-agent-tools`,
+`~/.understudy/agent-tools/source/orchestra-agent-tools`,
 builds and packs the CLI locally, installs the resulting tarball, and removes
 the temporary checkout. You do not need a published npm package.
 
@@ -67,7 +67,7 @@ agents the activation command differs slightly — see
 Non-interactive installs keep script-friendly autodetect behavior:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | bash -s -- --yes
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash -s -- --yes
 ```
 
 Override the agent prompt with
@@ -77,13 +77,13 @@ The installer is resumable. It writes step markers under
 `~/.understudy/agent-tools/install-state`; after a failed run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | bash -s -- --resume
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash -s -- --resume
 ```
 
 Or jump directly to a step:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | bash -s -- --from-step 2
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash -s -- --from-step 2
 ```
 
 Developer install from a clone:
@@ -103,7 +103,7 @@ current `main` branch, rebuilds the CLI, and refreshes the selected agent
 adapters and skills:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
 The [`install-agent-adapter`](skills/install-agent-adapter/SKILL.md) skill

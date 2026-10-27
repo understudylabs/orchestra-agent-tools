@@ -51,7 +51,7 @@ Pick one benchmark and route to the matching worker skill:
 1. Select benchmark. State why the benchmark matches the workload shape and the
    boundary on the claim.
 2. Clone or install upstream. Use the public repo's documented install path.
-   Keep benchmark source outside `understudy-agent-tools`.
+   Keep benchmark source outside `orchestra-agent-tools`.
 3. Smoke the harness. Run the smallest public smoke path first. For
    AutomationBench, prefer a small `simple` or domain-limited run. For LAB, start
    with the walkthrough task and inspect the generated report.

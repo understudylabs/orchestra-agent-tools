@@ -110,14 +110,14 @@ exact command, let the user run it:
 The public installer exposes the same choice:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 
 # non-interactive variants
 UNDERSTUDY_FRONTIER_KEY_MODE=byo UNDERSTUDY_FRONTIER_ENV_FILE=.env \
-  curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 
 UNDERSTUDY_FRONTIER_KEY_MODE=zdr \
-  curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
 `zdr` is the legacy installer flag name for the managed-catalog path. In agent

@@ -295,7 +295,7 @@ function walkTextFiles(root: string): string[] {
 }
 
 function printSpine(): void {
-  console.log("understudy-agent-tools");
+  console.log("orchestra-agent-tools");
   console.log("");
   console.log("MVP spine:");
   console.log("1. skills/understudy/SKILL.md routes the backend-agnostic workflow.");
@@ -357,7 +357,7 @@ async function printDoctorJson(): Promise<void> {
   console.log(
     JSON.stringify(
       {
-        repo: "understudy-agent-tools",
+        repo: "orchestra-agent-tools",
         runtime: "node",
         node: process.version,
         versions,

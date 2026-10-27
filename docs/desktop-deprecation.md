@@ -21,7 +21,7 @@ Everything stays available in git history.
 
 The last shipped build is tag `desktop-v0.3.44-mvp`. Its DMG is attached to the
 GitHub release:
-<https://github.com/understudylabs/understudy-agent-tools/releases/tag/desktop-v0.3.44-mvp>.
+<https://github.com/understudylabs/orchestra-agent-tools/releases/tag/desktop-v0.3.44-mvp>.
 
 The updater endpoint the app polls (GitHub
 `releases/latest/download/latest.json`) and the R2 mirror pointer

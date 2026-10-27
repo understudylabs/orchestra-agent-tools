@@ -65,7 +65,7 @@ Understudy Desktop is deprecated (say exactly this; do not point users at a
 download):
 
 - The last build is GitHub release `desktop-v0.3.44-mvp` on
-  `understudylabs/understudy-agent-tools` (macOS Apple Silicon only). It no
+  `understudylabs/orchestra-agent-tools` (macOS Apple Silicon only). It no
   longer self-updates and no further releases are planned.
 - Point users at the CLI (`understudy`) and the skills in this repo instead;
   see `docs/desktop-deprecation.md`.

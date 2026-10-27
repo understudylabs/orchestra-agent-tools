@@ -35,7 +35,7 @@ privacy, and ownership tradeoffs inspectable instead of hiding them behind one s
 
 ## Product surfaces
 
-- `understudy-agent-tools` is the preinstalled Understudy skill and CLI product used
+- `orchestra-agent-tools` (formerly `understudy-agent-tools`) is the preinstalled Understudy skill and CLI product used
   by coding agents and Understudy Desktop.
 - The root `understudy` skill progressively routes an agent to one specialist skill
   at a time.

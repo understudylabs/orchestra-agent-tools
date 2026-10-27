@@ -1,6 +1,6 @@
 # TypeScript + uv Python Bridge
 
-`understudy-agent-tools` is a skill library with a thin TypeScript CLI. The repo
+`orchestra-agent-tools` is a skill library with a thin TypeScript CLI. The repo
 can still use Python for Python-native optimizer and evaluation packages, but
 Python is runtime glue, not the product architecture.
 

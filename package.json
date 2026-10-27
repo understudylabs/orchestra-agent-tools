@@ -1,5 +1,5 @@
 {
-  "name": "@understudylabs/understudy-agent-tools",
+  "name": "orchestra-agent-tools",
   "version": "0.6.41",
   "description": "Public Understudy agent tools CLI and skill library.",
   "type": "module",
