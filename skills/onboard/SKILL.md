@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Use as the engaging first-run experience right after the Orchestra plugin is installed, or whenever a developer says "get started", "set me up", "I'm new to this", "onboard me", or asks what Orchestra is and where to begin. Backgrounds a small open-model download while it profiles the machine, detects ML tooling, interviews the user to gauge experience and goals, and writes a durable ~/.understudy/profile.json so every later skill can meet the user where they are. Hands off to the understudy orchestrator.
+description: Use as the engaging first-run experience right after the Orchestra plugin is installed, or whenever a developer says "get started", "set me up", "I'm new to this", "onboard me", or asks what Orchestra is and where to begin. Confirms the Orchestra sign-in, profiles the machine and goals in one quick interview, writes ~/.understudy/profile.json, points the plugin at the user's real workload, and reports the optional local model lab. Hands off to the understudy orchestrator.
 metadata:
   understudy:
     mode: interactive
@@ -11,23 +11,27 @@ metadata:
 # Orchestra Onboarding
 
 The first thing a new user experiences. Goal: in a few minutes, leave them with
-(1) a small open model **running locally on their own machine**, (2) a clear
-sense of what Orchestra is and why it matters, and (3) a saved profile so you
-never re-ask what you already learned.
+(1) a clear sense of what Orchestra is and why it matters, (2) the plugin
+pointed at their real workload, and (3) a saved profile so you never re-ask
+what you already learned. A local model is optional: the installer's local
+model lab (Apple Silicon only) or an explicit request, never a default.
 
 Run this after [`install-agent-adapter`](../install-agent-adapter/SKILL.md). It follows the
 engagement doctrine in
 [`../../docs/engagement-and-pacing.md`](../../docs/engagement-and-pacing.md):
-**start the slow download first, then interview while it runs.** Detail —
+keep the first minutes fast, and background anything slow. Detail —
 profile schema, interview bank, tooling-detection table — is in
 [`reference.md`](reference.md).
 
 ## Safety Gates
 
-- **Download approval + size cap.** Name the exact model, quantization, and disk
-  size, and get a quick yes before pulling weights. Default to the smallest
-  verified American open model that gives a real onboarding win, and label it
-  as a bootstrap model rather than a workload recommendation.
+- **No unrequested downloads.** Never pull weights or install MLX unless the
+  installer's local model lab already started them or the user asks. Before a
+  pull, name the exact model, quantization, and disk size, and get a yes.
+- **Sign-in stays with the user.** Never read the user's inbox or handle their
+  sign-in code. Ask them to run `orchestra login` in their own terminal; if
+  they would rather do it here, run `orchestra login --email <email> --send-code`
+  and let them type the code into the chat themselves.
 - **Local-first, no upload.** Profiling, interview answers, and the model run
   entirely on the machine. The profile is local; it holds preferences and
   detected tooling — never secrets, keys, or customer data.
@@ -49,46 +53,39 @@ and build an opportunity ledger before any code edits or provider calls.
 
 ## Flow
 
-1. **Start the slow thing first (background).** Detect the model runtime
-   (`mlx_vlm`, `mlx_lm`, `ollama`, `llama-server`, `lms`). On Apple Silicon, the
-   opinionated first out-of-box target is the smallest verified Gemma 4 local
-   Orchestra: the **QAT-derived** `gemma-4-e2b-it-qat-mlx-vlm-understudy` —
-   `google/gemma-4-E2B-it` QAT weights converted by Orchestra to MLX 4-bit at
-   `group_size=32` (matching Q4_0's block structure). The verified snapshot is
-   stored at
-   `https://models.understudylabs.com/session?model=gemma-4-e2b-it-qat-mlx-vlm-understudy`.
-   It is about 3.6 GB on disk, runs at ~3.9 GB peak memory (~2.6x less than
-   BF16), and is 4/4 certified (generation, OpenAI-compatible serving,
-   logprobs, tool calls) at the prescribed decode. Announce the model, quantization, size,
-   source, and ETA, get a quick yes, then route through
-   [`../manage-local-models/SKILL.md`](../manage-local-models/SKILL.md) and run
-   the CLI snapshot pull:
-   ```bash
-   orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
-   ```
-   This caches the first specialist model under
-   `~/.understudy/models/gemma-4-e2b-it-qat-mlx-vlm-understudy` and logs progress/ETA under
-   `~/.understudy/agent-tools/logs/`. If the MLX runtime is missing, the slow
-   step is *install MLX + pull* — get one quick approval, then background it.
-   Read `orchestra models snapshots` before promising the pull. If the live
-   catalog and bundled certified fallback disagree with the session endpoint,
-   surface the mismatch and offer the CLI repair flow; do not silently install
-   a vanilla or third-party model. Then immediately move on; do not watch the
-   bar.
+1. **Check the sign-in.** Run `orchestra status --json`. If `signed_in` is
+   false, say what the account is for (a gateway key for routing, captures,
+   and hosted runs; local work needs none) and follow the sign-in safety gate.
+   Do not block the rest of onboarding on it.
 
-2. **Profile the machine (while it downloads).** Detect OS/chip (Apple Silicon
-   vs CUDA), RAM / unified memory, free disk. State what fits locally. This is
-   the hardware inventory from
+2. **Check the local model lab.** If
+   `~/.understudy/agent-tools/install-state/local-model-lab.json` exists, the
+   installer started the managed MLX runtime install and the bootstrap model
+   download in the background. Read the `pull.log` and `runtime.log` paths it
+   names and report progress in one line (done, percent, or failed with the
+   log tail); do not watch it. Without that file, do not download anything.
+   On an Apple Silicon Mac, mention once that the lab is available; if the
+   user wants it, name the model (**Orchestra 2B**, catalog id
+   `gemma-4-e2b-it-qat-mlx-vlm-understudy`: our MLX 4-bit build of Gemma 4 E2B
+   QAT, about 3.6 GB), get a yes, and start
+   `orchestra models runtime install` (needs `uv`) and
+   `orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy` in the
+   background through [`../manage-local-models/SKILL.md`](../manage-local-models/SKILL.md).
+   Other machines: say local models are Mac-only for now and move on.
+
+3. **Profile the machine.** Detect OS/chip (Apple Silicon vs CUDA), RAM /
+   unified memory, free disk. State what fits locally. This is the hardware
+   inventory from
    [`../run-local-model-lab/SKILL.md`](../run-local-model-lab/SKILL.md), brought
    to the front.
 
-3. **Detect ML tooling → infer experience.** Check for PyTorch, vLLM,
+4. **Detect ML tooling → infer experience.** Check for PyTorch, vLLM,
    Transformers, TRL/PEFT, MLX, llama.cpp, Ollama, the HF CLI, `nvidia-smi`
    (table in [`reference.md`](reference.md)). Lots of ML libs ⇒ experienced;
    none ⇒ likely first-timer. Use this to *pre-fill* the interview, not to
    skip it.
 
-4. **Interview (one batched AskUserQuestion).** Confirm the inference rather than
+5. **Interview (one batched AskUserQuestion).** Confirm the inference rather than
    interrogate: *"I see PyTorch and vLLM here, so I'll assume you're comfortable
    with ML tooling — right?"* or *"No ML tooling yet — first time running models
    locally?"* Capture: experience tier, primary goal (cost / latency / quality /
@@ -96,7 +93,7 @@ and build an opportunity ledger before any code edits or provider calls.
    providers), and preferred coaching depth. Question bank in
    [`reference.md`](reference.md).
 
-5. **Write the profile and agent card.** Save `~/.understudy/profile.json` (schema in
+6. **Write the profile and agent card.** Save `~/.understudy/profile.json` (schema in
    [`reference.md`](reference.md)): experience tier, detected tooling, hardware,
    goal, constraints, and the three meet-them-where-they-are dials — vocabulary,
    coaching depth, opinion strength. Append, don't overwrite, the `history` of
@@ -105,32 +102,12 @@ and build an opportunity ledger before any code edits or provider calls.
    `app.pid`, or hit `app.base_url`): the app is the canonical local daemon and
    maintains the card itself — server endpoint, warm models, shutdown state.
    Only refresh the card yourself as a **fallback when the app isn't installed
-   or running**, recording live runtime facts: the local model, endpoint,
-   serving process, companion status, and the exact command or URL for talking
-   to the local specialist model. If `~/.understudy/companion.json` points at a dead
-   pid, clear it and record the stale pid in the card.
+   or running**, recording live runtime facts: the local model (if any),
+   endpoint, serving process, companion status, and the exact command or URL
+   for talking to the local specialist model. If `~/.understudy/companion.json`
+   points at a dead pid, clear it and record the stale pid in the card.
 
-6. **Land the quick win: show the local specialist model exists.** Once the snapshot is
-   cached, route through [`../ladder/SKILL.md`](../ladder/SKILL.md) and start the
-   onboarding climb:
-    ```bash
-    orchestra run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
-    ```
-   Then open
-   `http://localhost:8011/ladder.climb.html?task=sort-email&model=gemma-4-e2b`
-   or prove it headlessly:
-    ```bash
-    curl -N 'http://localhost:8011/run?task=sort-email&model=gemma-4-e2b'
-    ```
-   The ladder server loads the cached QAT snapshot for `gemma-4-e2b`, streams a
-   scored local run, and can optionally compare against the billed gateway lane.
-   Record the live runtime facts — endpoint, `served_by`, model path, and
-   follow-along URL — in the agent card (step 5). Briefly teach the idea: an
-   open-weight model is downloadable weights you run yourself; local is free and
-   ZDR-safe; you iterate small and local, then *graduate* to a larger model in
-   the same family via the gateway when you need the quality.
-
-7. **Profile the user's real workload.** The main path after the local proof is
+7. **Profile the user's real workload.** The main path is
    not a model duel. Ask the user for a codebase, trace folder, dataset, eval
    runner, prompt file, or app route. If they point at a project, route to
    [`../understand-workload/SKILL.md`](../understand-workload/SKILL.md) first:
@@ -144,11 +121,16 @@ and build an opportunity ledger before any code edits or provider calls.
    [`../lower-anthropic-bill/SKILL.md`](../lower-anthropic-bill/SKILL.md)
    instead of asking for a generic problem.
 
-8. **Make head-to-head optional.** A frontier-vs-local comparison is useful when the
+8. **Make the local proof and head-to-head optional.** Once the lab's model is
+   cached, the user can see it run: serve it with the managed runtime through
+   [`../manage-local-models/SKILL.md`](../manage-local-models/SKILL.md), and
+   briefly teach the idea — open weights you run yourself, free and ZDR-safe
+   locally, graduating to a larger model in the same family via the gateway
+   when quality demands it. A frontier-vs-local comparison is useful when the
    user needs to feel the quality gap, calibrate taste, or get buy-in. It is a
    side quest, not the default evidence path. If the user wants it, follow the
-   [`ladder`](../ladder/SKILL.md) VS lane and disclose that the frontier side is
-   billed. Otherwise keep going through workload understanding, capture
+   [`ladder`](../ladder/SKILL.md) VS lane (it runs from a source checkout) and
+   disclose that the frontier side is billed. Otherwise keep going through workload understanding, capture
    evidence, and local evaluation against the actual task slice.
 
 9. **Route onward.** Hand to the [`understudy`](../understudy/SKILL.md)
@@ -166,10 +148,11 @@ recommended path; stay terse and offer trade-offs to practitioners.
 
 ## Output Standard
 
-End with: runtime + model downloading (and ETA, or "cached"); hardware found and
-what fits locally; inferred experience tier and the dials set; the profile path
-written; the agent-card path refreshed; the quick-win result (local generation
-shown or pending); and one recommended next skill/command.
+End with: sign-in status; local model lab status (not started, downloading,
+cached, or Mac-only); hardware found and what fits locally; inferred
+experience tier and the dials set; the profile path written; the agent-card
+path refreshed; the workload picked (or the question still open); and one
+recommended next skill/command.
 
 ## References
 

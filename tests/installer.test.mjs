@@ -96,7 +96,7 @@ describe("install.sh", () => {
     assert.match(result.stdout, /Confirmation is required/);
   });
 
-  it("resets an existing sign-in by default, preserving everything else", () => {
+  it("signs out an existing sign-in with --fresh-login, preserving everything else", () => {
     const script = readFileSync("install.sh", "utf8");
     const home = join(root, "home");
     const understudyDir = join(home, ".understudy");
@@ -112,6 +112,7 @@ describe("install.sh", () => {
         "-s",
         "--",
         "--non-interactive",
+        "--fresh-login",
         "--from-step",
         "3",
         "--no-claude",
@@ -162,6 +163,7 @@ describe("install.sh", () => {
         "-s",
         "--",
         "--non-interactive",
+        "--fresh-login",
         "--from-step",
         "3",
         "--no-claude",
@@ -268,7 +270,7 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Keeping the existing Orchestra sign-in/);
+    assert.match(result.stdout, /Already signed in as demo@example\.com; keeping that sign-in/);
     assert.equal(existsSync(join(understudyDir, "credentials.json")), true);
   });
 
@@ -1367,5 +1369,174 @@ describe("install.sh", () => {
       assert.notEqual(readFileSync(lastStep, "utf8").trim(), "2");
     }
     assert.equal(existsSync(join(stateDir, "step-2.done")), false);
+  });
+
+  // Stubs for the commands the new install flow shells out to. The PATH holds
+  // only these stubs and node, so a real npm, git, uv, or brew on the machine
+  // can never be reached.
+  function flowStubs({ npmView = {}, uname = ["Darwin", "arm64"], uv = true } = {}) {
+    const bin = join(root, "bin");
+    const nodeBin = join(root, "node-bin");
+    const calls = join(root, "calls.txt");
+    const prefix = join(root, "prefix");
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(nodeBin, { recursive: true });
+    symlinkSync(process.execPath, join(nodeBin, "node"));
+    const views = Object.entries(npmView)
+      .map(([args, out]) => `  "view ${args}") printf '%s\\n' '${out}' ;;\n`)
+      .join("");
+    const stubs = {
+      npm: `#!/bin/bash\nprintf 'npm %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "root -g") printf '%s\\n' "${join(prefix, "lib", "node_modules")}" ;;\n  "prefix -g") printf '%s\\n' "${prefix}" ;;\n${views}  view*) exit 1 ;;\nesac\nexit 0\n`,
+      git: `#!/bin/bash\nprintf 'git %s\\n' "$*" >> "${calls}"\nexit 1\n`,
+      orchestra: `#!/bin/bash\nprintf 'orchestra %s\\n' "$*" >> "${calls}"\nexit 0\n`,
+      uname: `#!/bin/bash\ncase "$1" in\n  -s) echo ${uname[0]} ;;\n  -m) echo ${uname[1]} ;;\n  *) /usr/bin/uname "$@" ;;\nesac\n`,
+      date: `#!/bin/bash\nexec /bin/date "$@"\n`,
+    };
+    if (uv) stubs.uv = `#!/bin/bash\nexit 0\n`;
+    for (const [name, body] of Object.entries(stubs)) {
+      writeFileSync(join(bin, name), body);
+      chmodSync(join(bin, name), 0o755);
+    }
+    return { calls, path: `${bin}:${nodeBin}:/usr/bin:/bin` };
+  }
+
+  function runFlow(args, stubs) {
+    return spawnSync("bash", ["-s", "--", ...args, "--lab", join(root, "lab")], {
+      cwd: process.cwd(),
+      input: readFileSync("install.sh", "utf8"),
+      encoding: "utf8",
+      env: {
+        HOME: join(root, "home"),
+        PATH: stubs.path,
+        CI: "1",
+        UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
+      },
+    });
+  }
+
+  function waitForCalls(calls, pattern) {
+    for (let i = 0; i < 50; i += 1) {
+      if (existsSync(calls) && pattern.test(readFileSync(calls, "utf8"))) return;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    }
+  }
+
+  it("installs the published npm release by default, without cloning", () => {
+    mkdirSync(join(root, "home"), { recursive: true });
+    const stubs = flowStubs({
+      npmView: { "@orchestraai/agent-tools@latest version": "0.7.0", "@orchestraai/agent-tools@0.7.0 deprecated": "" },
+    });
+    const result = runFlow(["--non-interactive", "--only-step", "1"], stubs);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Installing @orchestraai\/agent-tools@0\.7\.0 from npm/);
+    const callsText = readFileSync(stubs.calls, "utf8");
+    assert.match(callsText, /npm install -g --ignore-scripts @orchestraai\/agent-tools@0\.7\.0/);
+    assert.doesNotMatch(callsText, /git clone/);
+    assert.equal(readFileSync(join(root, "lab", "install-state", "package-version"), "utf8"), "0.7.0\n");
+  });
+
+  it("builds from source when npm has no release or only the deprecated placeholder", () => {
+    for (const npmView of [{}, { "@orchestraai/agent-tools@latest version": "0.0.1", "@orchestraai/agent-tools@0.0.1 deprecated": "Not installable from npm." }]) {
+      rmSync(root, { recursive: true, force: true });
+      mkdirSync(join(root, "home"), { recursive: true });
+      const stubs = flowStubs({ npmView });
+      const result = runFlow(["--non-interactive", "--only-step", "1"], stubs);
+
+      // The stub git fails the clone, so the run stops there; what matters is
+      // that it went to the source build and never installed from npm.
+      assert.match(result.stdout, /Building Orchestra from the GitHub source instead/);
+      const callsText = readFileSync(stubs.calls, "utf8");
+      assert.match(callsText, /git clone/);
+      assert.doesNotMatch(callsText, /npm install -g --ignore-scripts @orchestraai/);
+    }
+  });
+
+  it("starts the local model lab in the background on Apple Silicon", () => {
+    mkdirSync(join(root, "home"), { recursive: true });
+    const stubs = flowStubs();
+    const result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none", "--local-models"], stubs);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Downloading the Orchestra 2B model \(about 3\.6 GB\) in the background/);
+    waitForCalls(stubs.calls, /models runtime install[\s\S]*models pull|models pull[\s\S]*models runtime install/);
+    const callsText = readFileSync(stubs.calls, "utf8");
+    assert.match(callsText, /orchestra models runtime install/);
+    assert.match(callsText, /orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy/);
+    const lab = JSON.parse(readFileSync(join(root, "lab", "install-state", "local-model-lab.json"), "utf8"));
+    assert.equal(lab.model, "gemma-4-e2b-it-qat-mlx-vlm-understudy");
+    assert.ok(lab.pull.log.endsWith(".log"));
+    assert.ok(lab.runtime.log.endsWith(".log"));
+  });
+
+  it("still downloads the model but never installs uv when uv is missing", () => {
+    mkdirSync(join(root, "home"), { recursive: true });
+    const stubs = flowStubs({ uv: false });
+    const result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none", "--local-models"], stubs);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /uv is not installed, so the MLX runtime was not set up/);
+    waitForCalls(stubs.calls, /models pull/);
+    const callsText = readFileSync(stubs.calls, "utf8");
+    assert.match(callsText, /orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy/);
+    assert.doesNotMatch(callsText, /models runtime install|brew/);
+    assert.equal(JSON.parse(readFileSync(join(root, "lab", "install-state", "local-model-lab.json"), "utf8")).runtime, null);
+  });
+
+  it("skips the local model lab off Apple Silicon", () => {
+    mkdirSync(join(root, "home"), { recursive: true });
+    const stubs = flowStubs({ uname: ["Linux", "x86_64"] });
+    const result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none", "--local-models"], stubs);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /The local model lab needs an Apple Silicon Mac; skipping it/);
+    assert.equal(existsSync(join(root, "lab", "install-state", "local-model-lab.json")), false);
+    assert.doesNotMatch(existsSync(stubs.calls) ? readFileSync(stubs.calls, "utf8") : "", /models (pull|runtime)/);
+  });
+
+  it("keeps an existing sign-in by default and leaves sign-in to the terminal", () => {
+    const understudyDir = join(root, "home", ".understudy");
+    mkdirSync(understudyDir, { recursive: true });
+    writeFileSync(join(understudyDir, "credentials.json"), '{"api_key":"sk_demo","orgs":{}}\n');
+    let stubs = flowStubs();
+    let result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none"], stubs);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Already signed in; keeping that sign-in/);
+    assert.equal(existsSync(join(understudyDir, "credentials.json")), true);
+    assert.equal(readdirSync(understudyDir).some((name) => name.startsWith("credentials.json.bak-")), false);
+
+    // Not signed in and no terminal: point at `orchestra login`, never sign in for the user.
+    rmSync(root, { recursive: true, force: true });
+    mkdirSync(join(root, "home"), { recursive: true });
+    stubs = flowStubs();
+    result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none"], stubs);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Not signed in\. Run `orchestra login` in a terminal/);
+    assert.doesNotMatch(existsSync(stubs.calls) ? readFileSync(stubs.calls, "utf8") : "", /orchestra login/);
+
+    result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none", "--skip-login"], stubs);
+    assert.match(result.stdout, /Skipping the Orchestra sign-in/);
+  });
+
+  it("hands off without forcing a permission mode, recording the session, or asking the agent to handle codes", () => {
+    const script = readFileSync("install.sh", "utf8");
+    assert.match(script, /^CLAUDE_PERMISSION_MODE="\$\{UNDERSTUDY_CLAUDE_PERMISSION_MODE:-\}"$/m);
+    assert.doesNotMatch(script, /script -q/);
+    const start = script.indexOf("compose_initial_prompt() {");
+    const prompt = script
+      .slice(start, script.indexOf("\n}\n", start))
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    assert.doesNotMatch(prompt, /inbox|login --code|login --email/);
+    assert.match(prompt, /Use the Orchestra onboarding skill for this project\./);
+  });
+
+  it("offers a short setup menu with the local model lab only on Apple Silicon", () => {
+    const script = readFileSync("install.sh", "utf8");
+    assert.match(script, /What do you want to set up\?/);
+    assert.match(script, /Orchestra account \+ plugin for your coding agents/);
+    assert.match(script, /if local_models_supported; then\n\s+say "  \$\{G3\}2\.\$\{R\} Option 1 \+ local model lab/);
+    assert.match(script, /Advanced: choose which coding agents get the plugin/);
   });
 });

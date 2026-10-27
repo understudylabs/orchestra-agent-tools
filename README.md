@@ -30,13 +30,26 @@ CLI alias, and rerunning the installer replaces the old `understudy` plugin).
 curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
-The installer sets up the CLI, asks which coding agents to attach to (Claude
-Code, Cursor, Codex, OpenCode, Hermes Agent, all, or CLI-only), and opens the
-selected agent when it can. It installs from the current GitHub `main`
-branch: the script clones the source into
-`~/.understudy/agent-tools/source/orchestra-agent-tools`,
-builds and packs the CLI locally, installs the resulting tarball, and removes
-the temporary checkout. You do not need a published npm package.
+You need Node.js 20+ (for npm). The installer asks one question:
+
+1. **Orchestra account + plugin for your coding agents** (recommended). It
+   installs the CLI, signs you in to your Orchestra account right in the
+   terminal (we email a one-time code; an existing sign-in is kept), and
+   installs the plugin into every coding agent it detects: Claude Code,
+   Cursor, Codex, OpenCode, Hermes Agent, Devin.
+2. **Option 1 + local model lab** (Apple Silicon only). Also starts the
+   managed MLX runtime install and the Orchestra 2B model download (about 3.6 GB,
+   our MLX build of Gemma 4 E2B) in
+   the background. The MLX runtime needs [uv](https://docs.astral.sh/uv/); if
+   it is missing the installer asks before running `brew install uv`.
+3. **CLI only.**
+
+`a` (or `--advanced`) lets you choose which coding agents get the plugin. At
+the end it offers to open Claude Code here, in your own permission mode.
+
+The CLI comes from the published npm package `@orchestraai/agent-tools`. If
+npm has no release yet (or with `--from-source`), the installer builds it from
+the GitHub `main` branch instead.
 
 The default install uses the smaller Vercel conversation backend. The optional
 Pi backend can be added later without reinstalling:
@@ -52,19 +65,21 @@ Then, in Claude Code:
 /orchestra:onboard
 ```
 
-That's it. Onboarding profiles your machine, interviews you about your
-workload, and starts the improvement loop. No registration required. On other
+That's it. Onboarding profiles your machine, asks what you're working on, and
+points the plugin at your real workload. Local work needs no account. On other
 agents the activation command differs slightly — see
 [Pick your platform](#pick-your-platform).
 
-> The installer intentionally does **not** download model weights, start MLX,
-> launch the ladder server, or make frontier calls. Those happen inside the
-> skill flow, where the agent explains tradeoffs and asks consent first.
+> Unless you pick the local model lab, the installer does **not** download
+> model weights or set up MLX, and it never makes frontier calls or spends
+> money.
 
 <details>
 <summary><b>Installer options: non-interactive, resume, agent selection, developer install</b></summary>
 
-Non-interactive installs keep script-friendly autodetect behavior:
+Non-interactive installs use option 1 without prompting (sign in later with
+`orchestra login`); add `--local-models` for the lab on Apple Silicon or
+`--skip-login` to skip the sign-in prompt:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash -s -- --yes
@@ -98,9 +113,8 @@ node dist/bin.js --help
 
 ## Update Orchestra Agent Tools
 
-Rerun the same installer. It replaces the managed GitHub checkout with the
-current `main` branch, rebuilds the CLI, and refreshes the selected agent
-adapters and skills:
+Rerun the same installer. It installs the newest CLI release and refreshes the
+selected agent adapters and skills; your sign-in is kept:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash

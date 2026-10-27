@@ -17,6 +17,31 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Changed
 
+- **Lighter installer.** One question up front: (1) Orchestra account + plugin
+  for your coding agents, (2) the same plus the local model lab on Apple
+  Silicon, or (3) CLI only; `a`/`--advanced` picks agents, and the default is
+  every detected agent. You sign in right in the terminal (an emailed one-time
+  code), and an existing sign-in is kept instead of being reset
+  (`--fresh-login` restores the old reset for demos; `--skip-login` skips).
+  The local model lab (`--local-models`) starts the managed MLX runtime install
+  and the Orchestra 2B model download in the background; uv is never installed
+  without asking. The CLI installs from the npm release
+  `@orchestraai/agent-tools`, falling back to the source build when npm has
+  none (`--from-source` forces it). Claude Code opens only if you say yes, in
+  your own permission mode, with a one-line prompt and no session recording.
+- **Onboarding without the download.** The onboarding skill no longer pulls a
+  model first. It checks the sign-in, reports the installer's local model lab
+  if one is running, interviews once, and moves to your real workload; local
+  models are opt-in and Mac-only.
+
+### Added
+
+- **npm release workflow.** Pushing a `v*` tag that matches `package.json`
+  runs the full check and publishes `@orchestraai/agent-tools` with
+  provenance (npm trusted publishing, or an `NPM_TOKEN` environment secret).
+
+### Changed
+
 - **Orchestra wording.** Installer messages, CLI help and messages, and skill
   copy now say Orchestra instead of Understudy, and say "specialist model"
   where they meant the trained model. Schema IDs, `UNDERSTUDY_*` env vars,

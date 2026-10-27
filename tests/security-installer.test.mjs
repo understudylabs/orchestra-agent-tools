@@ -206,7 +206,7 @@ ${block}`, "test", fixture, root], { encoding: "utf8" });
     writeFileSync(join(understudyDir, "credentials.json.bak-20240101T000000Z"), '{"api_key":"sk_old"}\n');
     const env = { ...process.env, CI: "1", HOME: home, UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs") };
 
-    const reset = runInstaller(["--from-step", "3", "--no-claude", "--agents", "none", "--lab", lab], { env });
+    const reset = runInstaller(["--fresh-login", "--from-step", "3", "--no-claude", "--agents", "none", "--lab", lab], { env });
     assert.equal(reset.status, 0, reset.stderr || reset.stdout);
     assert.match(reset.stdout, /Signed out demo@example\.com/);
     const backups = readdirSync(understudyDir).filter((name) => name.startsWith("credentials.json.bak-"));
@@ -217,7 +217,7 @@ ${block}`, "test", fixture, root], { encoding: "utf8" });
     // The agent signed the user back in; a --resume retry must not sign out again.
     writeFileSync(join(understudyDir, "credentials.json"), credentials);
     writeFileSync(join(lab, "install-state", "last-step"), "2\n");
-    const resumed = runInstaller(["--resume", "--no-claude", "--agents", "none", "--lab", lab], { env });
+    const resumed = runInstaller(["--fresh-login", "--resume", "--no-claude", "--agents", "none", "--lab", lab], { env });
     assert.equal(resumed.status, 0, resumed.stderr || resumed.stdout);
     assert.match(resumed.stdout, /already reset earlier in this install/);
     assert.equal(existsSync(join(understudyDir, "credentials.json")), true);

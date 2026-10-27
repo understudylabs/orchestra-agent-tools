@@ -1,0 +1,62 @@
+name: Release
+
+# Publishes @orchestraai/agent-tools to npm when a version tag (v0.6.42, ...)
+# is pushed. The installer installs this package by default, so a release is
+# what users get; it falls back to building from source when npm has none.
+#
+# Publishing uses npm trusted publishing (OIDC, no long-lived token) with
+# provenance. One-time setup on npmjs.com: under the package's settings, add
+# this repository and workflow (release.yml, environment "npm") as a trusted
+# publisher. Until then, set an NPM_TOKEN secret on the "npm" environment.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - name: Update npm
+        run: npm install -g npm@^11.5.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the tag matches package.json
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
+            exit 1
+          fi
+
+      - name: Check
+        run: npm run check
+
+      # A global install does not use package-lock.json, so ship the
+      # lockfile-installed runtime dependencies inside the tarball, as the
+      # installer's source build does.
+      - name: Bundle pinned runtime dependencies
+        run: npm pkg set --json bundleDependencies="$(node -p 'JSON.stringify(Object.keys(require("./package.json").dependencies || {}))')"
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
