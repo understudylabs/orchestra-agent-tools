@@ -174,7 +174,7 @@ export function readActiveId(repo: string): string | null {
 export function setActiveId(repoInput: string, id: string): void {
   const repo = ensureRepo(repoInput);
   if (!existsSync(experimentRecordPath(repo, id))) {
-    throw new Error(`Unknown experiment: ${id}. Run \`understudy experiments list\`.`);
+    throw new Error(`Unknown experiment: ${id}. Run \`orchestra experiments list\`.`);
   }
   const path = join(repo, activePointer);
   mkdirSync(dirname(path), { recursive: true });
@@ -184,7 +184,7 @@ export function setActiveId(repoInput: string, id: string): void {
 export function readExperiment(repo: string, id: string): Experiment {
   const path = experimentRecordPath(repo, id);
   if (!existsSync(path)) {
-    throw new Error(`Unknown experiment: ${id}. Run \`understudy experiments list\`.`);
+    throw new Error(`Unknown experiment: ${id}. Run \`orchestra experiments list\`.`);
   }
   const parsed = JSON.parse(readFileSync(path, "utf8")) as Experiment;
   return parsed;
@@ -265,7 +265,7 @@ export function recordOutcome(
   }
   const id = options.id ?? readActiveId(repo);
   if (!id) {
-    throw new Error("No active experiment. Run `understudy experiments new` first.");
+    throw new Error("No active experiment. Run `orchestra experiments new` first.");
   }
   const experiment = readExperiment(repo, id);
   experiment.outcome = outcome;
@@ -283,7 +283,7 @@ export function recordOutcome(
 function requireActive(repo: string): string {
   const id = readActiveId(repo);
   if (!id) {
-    throw new Error("No active experiment. Run `understudy experiments new` first.");
+    throw new Error("No active experiment. Run `orchestra experiments new` first.");
   }
   return id;
 }
@@ -419,12 +419,12 @@ export function promoteExperiment(
   const repo = ensureRepo(repoInput);
   const id = options.id ?? readActiveId(repo);
   if (!id) {
-    throw new Error("No active experiment. Pass an id or run `understudy experiments new`.");
+    throw new Error("No active experiment. Pass an id or run `orchestra experiments new`.");
   }
   const experiment = readExperiment(repo, id);
   if (experiment.outcome === null) {
     throw new Error(
-      `Experiment ${id} has no outcome yet. Record one with \`understudy experiments outcome\` before promoting.`,
+      `Experiment ${id} has no outcome yet. Record one with \`orchestra experiments outcome\` before promoting.`,
     );
   }
   const date = experiment.created_at.slice(0, 10);
@@ -497,7 +497,7 @@ export function deriveNext(repoInput: string): NextState {
       experiment_id: readActiveId(repo),
       pins_match: null,
       summary: `Workload evidence incomplete — missing ${evidence.missing.join(", ")}.`,
-      next_command: "understudy capture-evidence check --repo .",
+      next_command: "orchestra capture-evidence check --repo .",
     };
   }
 
@@ -509,7 +509,7 @@ export function deriveNext(repoInput: string): NextState {
       experiment_id: null,
       pins_match: null,
       summary: "Evidence is present but no experiment is open.",
-      next_command: "understudy experiments new --repo .",
+      next_command: "orchestra experiments new --repo .",
     };
   }
 
@@ -524,7 +524,7 @@ export function deriveNext(repoInput: string): NextState {
       experiment_id: activeId,
       pins_match: false,
       summary: `Experiment ${activeId} pins do not match the evidence on disk — re-baseline before optimizing.`,
-      next_command: "understudy capture-evidence check --repo .",
+      next_command: "orchestra capture-evidence check --repo .",
     };
   }
 
@@ -535,7 +535,7 @@ export function deriveNext(repoInput: string): NextState {
       experiment_id: activeId,
       pins_match: true,
       summary: `Experiment ${activeId} is baselined — run the optimizer and freeze a candidate.`,
-      next_command: "understudy optimize-workload check --repo .",
+      next_command: "orchestra optimize-workload check --repo .",
     };
   }
 
@@ -546,7 +546,7 @@ export function deriveNext(repoInput: string): NextState {
       experiment_id: activeId,
       pins_match: true,
       summary: `Experiment ${activeId} has a candidate but no claim — run holdout and freeze claim.json.`,
-      next_command: "understudy experiments freeze --claim-from <claim.json> --repo .",
+      next_command: "orchestra experiments freeze --claim-from <claim.json> --repo .",
     };
   }
 
@@ -557,7 +557,7 @@ export function deriveNext(repoInput: string): NextState {
       experiment_id: activeId,
       pins_match: true,
       summary: `Experiment ${activeId} has a claim — compare and record the outcome.`,
-      next_command: "understudy experiments outcome <success|partial|abandoned> --repo .",
+      next_command: "orchestra experiments outcome <success|partial|abandoned> --repo .",
     };
   }
 
@@ -567,6 +567,6 @@ export function deriveNext(repoInput: string): NextState {
     experiment_id: activeId,
     pins_match: true,
     summary: `Experiment ${activeId} outcome is ${experiment.outcome} — implement the route or promote a lab-note.`,
-    next_command: "understudy route-decision plan --workload-card .understudy/workload-discovery/workload-card.json",
+    next_command: "orchestra route-decision plan --workload-card .understudy/workload-discovery/workload-card.json",
   };
 }

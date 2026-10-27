@@ -1032,7 +1032,7 @@ export const BENCHMARKS_TOOLS = [
     name: "queue_run",
     description:
       "Write one understudy.run_request.v1 into <benchmark>/runs/queue/ (validated by the same shared schema " +
-      "as the hub's POST /api/runs) and return its run_id. NEVER executes anything — `understudy runs " +
+      "as the hub's POST /api/runs) and return its run_id. NEVER executes anything — `orchestra runs " +
       "execute --benchmark <dir> --watch` (or the daemon) picks the request up. Proposed benchmarks accept " +
       "single accepted tasks only.",
     inputSchema: {
@@ -1147,7 +1147,7 @@ export const BENCHMARKS_TOOLS = [
     name: "from_dataset",
     description:
       "Compile one labeled dataset (file, or directory containing exactly one data file) into a PROPOSED " +
-      "benchmark under the primary hub root — the same `understudy benchmarks from-dataset` foundry: curated " +
+      "benchmark under the primary hub root — the same `orchestra benchmarks from-dataset` foundry: curated " +
       "normalized captures, grouped train/dev/holdout splits, a verifiers environment, and machine_proposed " +
       "tasks awaiting the user's review in the task inbox. Creates review-pending artifacts only: " +
       "executable:false, human_final_judgment blocked — never queues a run, never spends.",
@@ -1318,7 +1318,7 @@ export function queueRunSpendNotice(args: Obj, posture: TrustPosture): string {
     `${incumbents.length > 0 ? ` (incl. ${incumbents.length} incumbent)` : ""} x ` +
     `${taskCount ?? "?"} task(s) x ${rollouts} rollout(s)` +
     `${totalRollouts === null ? "" : ` = ${totalRollouts} rollout(s)`}; ${est}. ` +
-    `Recorded, reversible: cancel via run_status/cancel; lower autonomy any time with \`understudy trust set local_sandbox\`.`
+    `Recorded, reversible: cancel via run_status/cancel; lower autonomy any time with \`orchestra trust set local_sandbox\`.`
   );
 }
 
@@ -1434,7 +1434,7 @@ export async function runBenchmarksMcpServer(extraRoots: string[]): Promise<void
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `understudy benchmarks mcp: serving ${BENCHMARKS_TOOLS.length} tools over stdio ` +
+    `orchestra benchmarks mcp: serving ${BENCHMARKS_TOOLS.length} tools over stdio ` +
       `(roots: ${process.env.BENCHMARK_HUB_DATA_DIR ?? join(homedir(), ".understudy", "benchmarks")})`,
   );
 }

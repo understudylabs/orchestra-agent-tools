@@ -64,7 +64,7 @@ describe("understudy experiments + next", () => {
       assert.equal(state.step, "capture-evidence");
       assert.equal(state.experiment_id, null);
       assert.ok(state.evidence.missing.includes("harness.json"));
-      assert.equal(state.next_command, "understudy capture-evidence check --repo .");
+      assert.equal(state.next_command, "orchestra capture-evidence check --repo .");
     });
   });
 
@@ -74,7 +74,7 @@ describe("understudy experiments + next", () => {
       const state = nextState(repo);
       assert.equal(state.step, "open-experiment");
       assert.equal(state.evidence.missing.length, 0);
-      assert.equal(state.next_command, "understudy experiments new --repo .");
+      assert.equal(state.next_command, "orchestra experiments new --repo .");
     });
   });
 
@@ -124,7 +124,7 @@ describe("understudy experiments + next", () => {
       const state = nextState(repo);
       assert.equal(state.step, "re-baseline");
       assert.equal(state.pins_match, false);
-      assert.equal(state.next_command, "understudy capture-evidence check --repo .");
+      assert.equal(state.next_command, "orchestra capture-evidence check --repo .");
     });
   });
 

@@ -45,7 +45,7 @@ export type MlxVlmRuntimeDoctor = {
   ok: boolean;
   checks: Array<{ name: string; ok: boolean; detail: string }>;
   status: MlxVlmRuntimeStatus;
-  repair_command: "understudy models runtime repair";
+  repair_command: "orchestra models runtime repair";
 };
 
 export function mlxVlmRuntimeHome(): string {
@@ -233,7 +233,7 @@ export function doctorMlxVlmRuntime(): MlxVlmRuntimeDoctor {
     ok: checks.every((check) => check.ok),
     checks,
     status,
-    repair_command: "understudy models runtime repair",
+    repair_command: "orchestra models runtime repair",
   };
 }
 
@@ -320,7 +320,7 @@ export function mlxVlmServerBinary(): string {
   const status = mlxVlmRuntimeStatus();
   if (!status.healthy) {
     throw new Error(
-      `managed MLX/VLM runtime is unavailable: ${status.detail}; run understudy models runtime repair`,
+      `managed MLX/VLM runtime is unavailable: ${status.detail}; run orchestra models runtime repair`,
     );
   }
   return status.server_binary;

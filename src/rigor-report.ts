@@ -158,7 +158,7 @@ export function deriveRigorReport(benchmarkDir: string, now: Date = new Date()):
     if (Array.isArray(missing) && missing.length > 0) missingGoldTasks.add(String(row.task_id));
   }
   if (oracleRows.length === 0) {
-    items.push({ item: "Oracle solver", status: "UNKNOWN", value: "not run", detail: "no oracle-runner rows — run `understudy runs execute --runner oracle`" });
+    items.push({ item: "Oracle solver", status: "UNKNOWN", value: "not run", detail: "no oracle-runner rows — run `orchestra runs execute --runner oracle`" });
   } else {
     const passed = taskIds.filter((taskId) => (oracleBest.get(taskId) ?? 0) >= threshold);
     const unverifiable = taskIds.filter((taskId) => missingGoldTasks.has(taskId) && !passed.includes(taskId));
@@ -272,7 +272,7 @@ export function deriveRigorReport(benchmarkDir: string, now: Date = new Date()):
             : "no contract target readable (verbatim or fuzzy) in candidate-facing fixtures/schemas",
     });
   } else {
-    items.push({ item: "Leakage / contamination audit", status: "UNKNOWN", value: "not checked", detail: "no manifest.json leakage_audit found — rebuild with `understudy traces build-benchmark` (the foundry writes the audit at generation time)" });
+    items.push({ item: "Leakage / contamination audit", status: "UNKNOWN", value: "not checked", detail: "no manifest.json leakage_audit found — rebuild with `orchestra traces build-benchmark` (the foundry writes the audit at generation time)" });
   }
 
   // Guidance effectiveness: per-rejection-class recovery rate over the
@@ -405,7 +405,7 @@ export function renderRigorReport(report: RigorReport): string {
   }
   }
   lines.push("");
-  lines.push("UNKNOWN rows are honest gaps, not passes: rerun `understudy benchmarks rigor` after the missing runs/audits exist.");
+  lines.push("UNKNOWN rows are honest gaps, not passes: rerun `orchestra benchmarks rigor` after the missing runs/audits exist.");
   lines.push("");
   return lines.join("\n");
 }
@@ -498,7 +498,7 @@ export function runRigorCiChecks(benchmarkDir: string, now: Date = new Date()): 
   // 2 — oracle rows present + oracle score 1.0 where recorded.
   const oracleRows = rows.filter((row) => Number(asObject(row.subscores).runner_oracle) === 1);
   if (oracleRows.length === 0) {
-    checks.push({ check: "oracle-solvability", status: "UNKNOWN", detail: "no oracle-runner rows recorded — run `understudy runs execute --runner oracle`" });
+    checks.push({ check: "oracle-solvability", status: "UNKNOWN", detail: "no oracle-runner rows recorded — run `orchestra runs execute --runner oracle`" });
   } else {
     const oracleBest = bestScores(rows, (row) => Number(asObject(row.subscores).runner_oracle) === 1);
     const covered = [...oracleBest.keys()];
@@ -571,7 +571,7 @@ export function runRigorCiChecks(benchmarkDir: string, now: Date = new Date()): 
         : { check: "gold-leakage", status: "FAIL", detail: `${verbatim} verbatim (tier-1) leakage finding(s) — contract targets readable in candidate surfaces` },
     );
   } else {
-    checks.push({ check: "gold-leakage", status: "UNKNOWN", detail: "no manifest.json leakage_audit — rebuild with `understudy traces build-benchmark`" });
+    checks.push({ check: "gold-leakage", status: "UNKNOWN", detail: "no manifest.json leakage_audit — rebuild with `orchestra traces build-benchmark`" });
   }
 
   // 6 — contamination: newest versions.jsonl line wins, else manifest.splits.

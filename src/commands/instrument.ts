@@ -124,13 +124,13 @@ export function buildInstrumentCheckReport(opts: InstrumentCheckOpts = {}): Inst
 
 function nextStep(redirectWired: boolean, credentialsPresent: boolean, captureCount: number): string {
   if (!credentialsPresent && captureCount === 0) {
-    return "Sign in first (understudy login --email you@company.com), then redirect your app: ANTHROPIC_BASE_URL=\"$UNDERSTUDY_GATEWAY_URL\" understudy run -- <your app command>.";
+    return "Sign in first (orchestra login --email you@company.com), then redirect your app: ANTHROPIC_BASE_URL=\"$UNDERSTUDY_GATEWAY_URL\" orchestra run -- <your app command>.";
   }
   if (!redirectWired && captureCount === 0) {
-    return "Set a redirect env var and make one call: ANTHROPIC_BASE_URL=\"$UNDERSTUDY_GATEWAY_URL\" understudy run -- <your app command>, then verify with understudy captures list --json.";
+    return "Set a redirect env var and make one call: ANTHROPIC_BASE_URL=\"$UNDERSTUDY_GATEWAY_URL\" orchestra run -- <your app command>, then verify with orchestra captures list --json.";
   }
   if (redirectWired && captureCount === 0) {
-    return "Redirect is wired. Trigger one test call, then verify with understudy captures list --json (gateway captures are hosted, not local).";
+    return "Redirect is wired. Trigger one test call, then verify with orchestra captures list --json (gateway captures are hosted, not local).";
   }
   return "Captures exist. Hand off to skills/ingest-traces to turn them into local eval sets.";
 }

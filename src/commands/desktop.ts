@@ -480,7 +480,7 @@ async function printRuntimeEvents(response: Response, json: boolean): Promise<nu
 export function registerDesktopCommand(program: Command): void {
   const desktop = program
     .command("desktop")
-    .description("Use the authenticated local API of the running Understudy Desktop app.");
+    .description("Use the authenticated local API of the running Orchestra Desktop app.");
 
   desktop.hook("preAction", () => {
     process.stderr.write(

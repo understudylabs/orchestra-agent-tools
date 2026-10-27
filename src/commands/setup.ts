@@ -76,7 +76,7 @@ export function registerSetupCommand(program: Command): void {
   program
     .command("setup")
     .description(
-      "Install the legacy Claude-compatible Understudy onboarding skill copy.",
+      "Install the legacy Claude-compatible Orchestra onboarding skill copy.",
     )
     .option(
       "--global",

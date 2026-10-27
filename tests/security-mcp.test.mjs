@@ -120,7 +120,7 @@ describe("spend-adjacent guard (pi-free)", () => {
     const blocked = classifyBenchmarkToolCall("queue_run", spendy, postureAt("local_sandbox"));
     assert.equal(blocked.decision, "block");
     assert.equal(blocked.rule_id, "benchmark.queue-run-below-posture");
-    assert.match(benchmarkGuardBlockMessage(blocked), /understudy trust set bounded_experiments/);
+    assert.match(benchmarkGuardBlockMessage(blocked), /orchestra trust set bounded_experiments/);
     assert.deepEqual(classifyBenchmarkToolCall("queue_run", { ...spendy, confirm: true }, postureAt("local_sandbox")), { decision: "allow" });
     const allowed = classifyBenchmarkToolCall("queue_run", spendy, postureAt("bounded_experiments"));
     assert.equal(allowed.decision, "allow");

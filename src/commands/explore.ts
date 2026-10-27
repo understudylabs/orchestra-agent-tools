@@ -287,7 +287,7 @@ async function runCluster(opts: { llmUrl: string }): Promise<void> {
     .prepare("SELECT label, COUNT(*) c FROM session_scan GROUP BY label ORDER BY c DESC")
     .all() as { label: string; c: number }[]).filter((l) => !PINNED.includes(l.label));
   if (!labels.length) {
-    console.log("no labels yet — run `understudy explore scan` first");
+    console.log("no labels yet — run `orchestra explore scan` first");
     db.close();
     return;
   }
@@ -896,7 +896,7 @@ export function registerExploreCommand(program: Command): void {
   explore
     .command("mcp-install")
     .description(
-      "Register `understudy explore mcp` as the `understudy` MCP server in agent configs, " +
+      "Register `orchestra explore mcp` as the `understudy` MCP server in agent configs, " +
         "replacing the `moraine` entry (Claude Code: ~/.claude.json). Backs up configs first.",
     )
     .option("--dry-run", "Print planned changes without writing.", false)

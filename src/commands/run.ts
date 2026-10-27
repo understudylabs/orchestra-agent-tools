@@ -3,7 +3,8 @@ import { spawn } from "node:child_process";
 import { Command } from "commander";
 import kleur from "kleur";
 
-import { DEFAULT_GATEWAY_URL } from "../config/defaults.js";
+import { CLI_NAME, DEFAULT_GATEWAY_URL } from "../config/defaults.js";
+import { withBothEnvPrefixes } from "../config/env-aliases.js";
 import { readCredentials } from "../config/credentials.js";
 import { readProjectConfig } from "../config/index.js";
 import { isJsonMode, runAction } from "../internal/output.js";
@@ -21,8 +22,9 @@ interface ResolvedRunEnv {
 }
 
 /**
- * `understudy run -- <command>` — run an arbitrary child command with the
- * authenticated Understudy key injected into that process only.
+ * `orchestra run -- <command>` — run an arbitrary child command with the
+ * authenticated key injected into that process only, under both the
+ * `ORCHESTRA_*` and legacy `UNDERSTUDY_*` names.
  *
  * This is the agent-first bridge: skills can execute local inference
  * or cookbook scripts through Understudy without reading the credential
@@ -31,9 +33,9 @@ interface ResolvedRunEnv {
 export function registerRunCommand(program: Command): void {
   program
     .command("run")
-    .description("Run a command with the authenticated Understudy API key injected.")
+    .description("Run a command with the authenticated Orchestra API key injected.")
     .allowUnknownOption(true)
-    .argument("<command...>", "Command to run after --, for example: understudy run -- npm run gepa")
+    .argument("<command...>", "Command to run after --, for example: orchestra run -- npm run gepa")
     .action(async function (this: Command, command: string[]) {
       await runAction(this, () => runWithUnderstudyEnv(command, isJsonMode(this)));
     });
@@ -46,9 +48,14 @@ async function runWithUnderstudyEnv(
   const resolved = resolveRunEnv();
   const [bin, ...args] = command;
   if (!bin) {
-    throw new Error("Usage: understudy run -- <command>");
+    throw new Error("Usage: orchestra run -- <command>");
   }
 
+  const injectedEnv = withBothEnvPrefixes({
+    UNDERSTUDY_API_KEY: resolved.apiKey,
+    UNDERSTUDY_GATEWAY_URL: resolved.gatewayUrl,
+    ...(resolved.orgId ? { UNDERSTUDY_ORG_ID: resolved.orgId } : {}),
+  });
   const startedAt = Date.now();
   const commandKind = classifyCommand(bin, args);
   trackRunStarted({
@@ -65,11 +72,7 @@ async function runWithUnderstudyEnv(
       `${JSON.stringify({
         ok: true,
         command: [bin, ...args],
-        injected: [
-          "UNDERSTUDY_API_KEY",
-          "UNDERSTUDY_GATEWAY_URL",
-          ...(resolved.orgId ? ["UNDERSTUDY_ORG_ID"] : []),
-        ],
+        injected: Object.keys(injectedEnv),
         org_id: resolved.orgId,
         project_slug: resolved.projectSlug,
         source: resolved.source,
@@ -77,16 +80,14 @@ async function runWithUnderstudyEnv(
     );
   } else {
     process.stderr.write(
-      `${kleur.gray("understudy")} injecting UNDERSTUDY_API_KEY into child process\n`,
+      `${kleur.gray(CLI_NAME)} injecting ORCHESTRA_API_KEY and UNDERSTUDY_API_KEY into child process\n`,
     );
   }
 
   const child = spawn(bin, args, {
     env: {
       ...process.env,
-      UNDERSTUDY_API_KEY: resolved.apiKey,
-      UNDERSTUDY_GATEWAY_URL: resolved.gatewayUrl,
-      ...(resolved.orgId ? { UNDERSTUDY_ORG_ID: resolved.orgId } : {}),
+      ...injectedEnv,
     },
     stdio: "inherit",
   });
@@ -142,7 +143,7 @@ function resolveRunEnv(): ResolvedRunEnv {
   const config = readProjectConfig();
   const credentials = readCredentials();
   if (!credentials) {
-    throw new Error("Not signed in. Run `understudy login` once, then re-run this command.");
+    throw new Error("Not signed in. Run `orchestra login` once, then re-run this command.");
   }
 
   const orgCredentials = config ? credentials.orgs[config.org_id] : undefined;
@@ -153,7 +154,7 @@ function resolveRunEnv(): ResolvedRunEnv {
     DEFAULT_GATEWAY_URL;
 
   if (!apiKey) {
-    throw new Error("Not signed in. Run `understudy login` once, then re-run this command.");
+    throw new Error("Not signed in. Run `orchestra login` once, then re-run this command.");
   }
 
   return {

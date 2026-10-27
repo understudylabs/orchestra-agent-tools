@@ -650,7 +650,7 @@ EOF
     printf '\n'
     fail_line "${B}NO CODING-AGENT PLUGIN WAS INSTALLED.${R}"
     warn "The adapter selection was '$AGENT_PLATFORMS', but every candidate was skipped or failed (reasons above)."
-    warn "The understudy CLI is installed, but the Orchestra skills are NOT available in any coding agent until an adapter is installed."
+    warn "The orchestra CLI is installed, but the Orchestra skills are NOT available in any coding agent until an adapter is installed."
     manual_adapter_instructions
     say "Install log: $LOG_FILE"
   elif [ "$installed" -eq 0 ] && [ "$selection" != "none" ]; then
@@ -713,7 +713,7 @@ confirm() {
 }
 
 remove_previous_global_package() {
-  local global_root global_prefix package_path bin_path
+  local global_root global_prefix package_path bin_path bin_name
   global_root="$(npm root -g)"
   global_prefix="$(npm prefix -g)"
   package_path="$global_root/@understudylabs/understudy-agent-tools"
@@ -726,18 +726,21 @@ remove_previous_global_package() {
     fi
   fi
 
-  for bin_path in "$global_prefix/bin/understudy" "$HOME/.local/bin/understudy"; do
-    [ -e "$bin_path" ] || [ -L "$bin_path" ] || continue
-    if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -q 'understudy-agent-tools'; then
-      say "Removing stale Orchestra command at $bin_path"
-      rm -f "$bin_path"
-    elif [ -f "$bin_path" ] && [ "$bin_path" != "$global_prefix/bin/understudy" ]; then
-      # Not created by npm or this installer: a user's own wrapper stays.
-      warn "Leaving existing $bin_path in place; if its directory precedes $global_prefix/bin in PATH it will shadow the newly installed understudy command."
-    elif [ -f "$bin_path" ] && grep -q 'understudy-agent-tools' "$bin_path" 2>/dev/null; then
-      say "Removing stale Orchestra command at $bin_path"
-      rm -f "$bin_path"
-    fi
+  # The package installs `orchestra` and the legacy `understudy` alias.
+  for bin_name in orchestra understudy; do
+    for bin_path in "$global_prefix/bin/$bin_name" "$HOME/.local/bin/$bin_name"; do
+      [ -e "$bin_path" ] || [ -L "$bin_path" ] || continue
+      if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -q 'understudy-agent-tools'; then
+        say "Removing stale Orchestra command at $bin_path"
+        rm -f "$bin_path"
+      elif [ -f "$bin_path" ] && [ "$bin_path" != "$global_prefix/bin/$bin_name" ]; then
+        # Not created by npm or this installer: a user's own wrapper stays.
+        warn "Leaving existing $bin_path in place; if its directory precedes $global_prefix/bin in PATH it will shadow the newly installed $bin_name command."
+      elif [ -f "$bin_path" ] && grep -q 'understudy-agent-tools' "$bin_path" 2>/dev/null; then
+        say "Removing stale Orchestra command at $bin_path"
+        rm -f "$bin_path"
+      fi
+    done
   done
 }
 
@@ -836,7 +839,7 @@ install_understudy_package() {
   (cd "$INSTALL_SOURCE_DIR" && run_logged "Pack Orchestra" npm pack . --ignore-scripts --pack-destination "$STATE_DIR")
   # Only now that a replacement tarball exists is the previous CLI removed.
   remove_previous_global_package
-  run_logged "Install the understudy command" npm install -g --ignore-scripts "$package_tarball"
+  run_logged "Install the orchestra command" npm install -g --ignore-scripts "$package_tarball"
   rm -rf "$INSTALL_SOURCE_DIR"
 }
 
@@ -920,14 +923,19 @@ compose_initial_prompt() {
     INITIAL_CLAUDE_PROMPT="$USER_PROMPT_OVERRIDE"
     return 0
   fi
-  local signup="" email_clause
+  local signup="" email_clause cli="orchestra"
+  # A partial rerun (--only-step 3) can sit on an older package that only
+  # ships the legacy command name.
+  if ! need orchestra && need understudy; then
+    cli="understudy"
+  fi
   if [ ! -f "$CREDENTIALS_FILE" ]; then
     if [ -n "$KNOWN_EMAIL" ]; then
-      email_clause="run \`understudy login --email $KNOWN_EMAIL\`"
+      email_clause="run \`$cli login --email $KNOWN_EMAIL\`"
     else
-      email_clause="ask me for my email, then run \`understudy login --email <my-email>\`"
+      email_clause="ask me for my email, then run \`$cli login --email <my-email>\`"
     fi
-    signup="Start with the agent-first Understudy sign-up: check \`understudy status --json\`, and if signed_in is false, $email_clause — it emails me a one-time code and exits. Ask me for the code from my inbox (or fetch it yourself if you have email access, reading only the Understudy sign-in email), finish with \`understudy login --code <code>\`, and confirm with \`understudy status --json\`. Then "
+    signup="Start with the agent-first Understudy sign-up: check \`$cli status --json\`, and if signed_in is false, $email_clause — it emails me a one-time code and exits. Ask me for the code from my inbox (or fetch it yourself if you have email access, reading only the Understudy sign-in email), finish with \`$cli login --code <code>\`, and confirm with \`$cli status --json\`. Then "
   fi
   local next_prompt
   if lower_my_ant_bill_enabled; then
@@ -1646,10 +1654,10 @@ if [ "$ADAPTERS_ATTEMPTED" != "1" ]; then
   say "  Devin: ask Devin to use the Understudy onboarding skill for this project. For persistent installs, add the npm install to the Devin environment blueprint."
 elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
   if [ "$(normalize_agent_platform "$AGENT_PLATFORMS")" = "none" ]; then
-    say "The installer is done. No coding-agent plugins were requested, so only the understudy CLI was installed."
+    say "The installer is done. No coding-agent plugins were requested, so only the orchestra CLI was installed."
     say "Rerun this installer with --agents claude-code (or another adapter) when you want the skills inside a coding agent."
   elif [ "${ADAPTERS_UNMET_COUNT:-0}" -eq 0 ]; then
-    say "The installer is done. Every selected coding-agent adapter was disabled by a flag (e.g. --no-claude), so only the understudy CLI was installed."
+    say "The installer is done. Every selected coding-agent adapter was disabled by a flag (e.g. --no-claude), so only the orchestra CLI was installed."
     say "Rerun this installer without the disable flag (or with --agents <adapter>) when you want the skills inside a coding agent."
   else
     fail_line "The installer finished, but no coding-agent plugin was installed — the Orchestra skills are NOT ready in any coding agent."

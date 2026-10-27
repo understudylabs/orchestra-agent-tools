@@ -31,7 +31,7 @@ test("large benchmark viewers keep capture bodies out of the HTML payload", () =
 
   for (const captures of [overByteLimit, overCountLimit]) {
     const viewer = traceFoundryViewer({ tasks: [], nodes: [], issues: [], captures, benchmark: {} });
-    assert.match(viewer, /understudy traces serve --benchmark/);
+    assert.match(viewer, /orchestra traces serve --benchmark/);
     assert.doesNotMatch(viewer, /must-not-be-inlined/);
   }
 });

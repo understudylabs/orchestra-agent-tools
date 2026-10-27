@@ -6,7 +6,7 @@ import { daemonStatus } from "../internal/daemon.js";
 export function registerDaemonCommand(program: Command): void {
   const daemon = program
     .command("daemon")
-    .description("Inspect the Understudy desktop app's local daemon.");
+    .description("Inspect the Orchestra desktop app's local daemon.");
 
   daemon
     .command("status")

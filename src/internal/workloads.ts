@@ -85,7 +85,7 @@ export async function resolveWorkload(project: ResolvedProject, value: string): 
   const workload = matches[0];
   if (!workload) {
     const projectLabel = project.projectSlug ?? project.projectId;
-    throw new Error(`No workload named ${value} in project ${projectLabel}. Run \`understudy workloads list\` or create it.`);
+    throw new Error(`No workload named ${value} in project ${projectLabel}. Run \`orchestra workloads list\` or create it.`);
   }
   return workload;
 }

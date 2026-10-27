@@ -99,12 +99,12 @@ export function registerLoginCommand(program: Command): void {
   program
     .command("login")
     .description(
-      "Sign in or register with Understudy. `--email` sends a one-time code; in a non-interactive shell, finish with `understudy login --code <code>`.",
+      "Sign in or register with Orchestra. `--email` sends a one-time code; in a non-interactive shell, finish with `orchestra login --code <code>`.",
     )
     .option("--email <email>", "Use the auth.md email code registration flow.")
     .option(
       "--send-code",
-      "Send the one-time code and exit without prompting; finish with `understudy login --code <code>`.",
+      "Send the one-time code and exit without prompting; finish with `orchestra login --code <code>`.",
     )
     .option(
       "--code <code>",
@@ -215,7 +215,7 @@ async function runLogin(opts: LoginOpts, json: boolean): Promise<void> {
   }
 
   throw new Error(
-    "Run `understudy login --email <email>` to send a one-time code, then `understudy login --code <code>` to finish.",
+    "Run `orchestra login --email <email>` to send a one-time code, then `orchestra login --code <code>` to finish.",
   );
 }
 
@@ -231,7 +231,7 @@ function runManualLogin(
       : (opts.apiKey ?? process.env.UNDERSTUDY_API_KEY);
   if (!apiKey || !opts.org || !opts.project) {
     throw new Error(
-      "Manual login requires --api-key (or UNDERSTUDY_API_KEY), --org, and --project. For normal sign-in, run `understudy login` with no flags.",
+      "Manual login requires --api-key (or UNDERSTUDY_API_KEY), --org, and --project. For normal sign-in, run `orchestra login` with no flags.",
     );
   }
   if (!apiKey.startsWith("sk_")) {
@@ -320,7 +320,7 @@ async function completePendingLogin(code: string, json: boolean): Promise<void> 
   const pending = readPendingLogin();
   if (!pending) {
     throw new Error(
-      "No pending sign-in found. Run `understudy login --email <email>` first to send a one-time code.",
+      "No pending sign-in found. Run `orchestra login --email <email>` first to send a one-time code.",
     );
   }
   const completeUrl = assertGatewayOrigin(
@@ -353,7 +353,7 @@ async function completePendingLogin(code: string, json: boolean): Promise<void> 
       errorKind: loginErrorKind(err),
     });
     if (err instanceof Error) {
-      err.message += ` If the code expired (about 10 minutes), run \`understudy login --email ${pending.email}\` to send a fresh one.`;
+      err.message += ` If the code expired (about 10 minutes), run \`orchestra login --email ${pending.email}\` to send a fresh one.`;
     }
     throw err;
   }
@@ -392,7 +392,7 @@ function emitCodeSent(pending: PendingLogin, json: boolean): void {
         pending: true,
         code_sent_to: pending.email,
         gateway_url: pending.gateway_url,
-        complete_with: "understudy login --code <code>",
+        complete_with: "orchestra login --code <code>",
         expires_in_minutes: 10,
         pending_path: globalLoginPendingPath(),
       })}\n`,
@@ -402,7 +402,7 @@ function emitCodeSent(pending: PendingLogin, json: boolean): void {
   process.stdout.write(
     `${kleur.green("✓")} One-time code sent to ${kleur.bold(pending.email)}\n` +
       `  Get the code from the inbox, then finish with:\n` +
-      `    ${kleur.cyan("understudy login --code <code>")}\n` +
+      `    ${kleur.cyan("orchestra login --code <code>")}\n` +
       `  ${kleur.dim("The code expires in about 10 minutes.")}\n`,
   );
 }
@@ -505,7 +505,7 @@ function saveApiKeyResult(
       // dir, not a project. Credentials are saved; the project pin waits
       // for a real repo.
       process.stderr.write(
-        "note: current directory is your home directory, so no project config was written. cd into your project and run `understudy projects use <slug>`.\n",
+        "note: current directory is your home directory, so no project config was written. cd into your project and run `orchestra projects use <slug>`.\n",
       );
     } else {
       writeProjectConfig(target, {

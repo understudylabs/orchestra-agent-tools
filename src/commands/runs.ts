@@ -41,7 +41,7 @@ export function registerRunsCommand(program: Command): void {
 
   runs
     .command("queue")
-    .description("Queue a run request (validated by the same shared schema the hub API uses); execute it with `understudy runs execute`")
+    .description("Queue a run request (validated by the same shared schema the hub API uses); execute it with `orchestra runs execute`")
     .requiredOption("--benchmark <dir>", "Promoted benchmark directory")
     .option("--models <ids>", "Comma-separated gateway model ids")
     .option(
@@ -96,7 +96,7 @@ export function registerRunsCommand(program: Command): void {
         const { readExperiments, latestExperiments, experimentsPath } = await import("../benchmark-artifacts.js");
         const { experiments } = readExperiments(experimentsPath(benchmark));
         if (!latestExperiments(experiments)[options.experiment]) {
-          throw new Error(`unknown experiment_id: ${options.experiment} (understudy benchmarks experiment create first)`);
+          throw new Error(`unknown experiment_id: ${options.experiment} (orchestra benchmarks experiment create first)`);
         }
       }
       const errors = validateRunRequestInput(input, knownTaskIds);
@@ -163,7 +163,7 @@ export function registerRunsCommand(program: Command): void {
       };
       // Attribution: which executor build this watcher is, on stderr up front
       // (the stale-watcher hijack class is diagnosable from the first line).
-      console.error(`understudy runs execute — executor version ${EXECUTOR_VERSION} (pid ${process.pid})`);
+      console.error(`orchestra runs execute — executor version ${EXECUTOR_VERSION} (pid ${process.pid})`);
       do {
         // app_replay requests (request.app_replay) always use the app-harness
         // runner regardless of --runner; providing it here is what advertises

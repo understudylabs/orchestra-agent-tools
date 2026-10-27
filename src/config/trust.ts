@@ -178,7 +178,7 @@ export function resolveTrustBoundaries(posture: TrustPosture): ResolvedTrustBoun
 
 /** The one-action fix a below-posture gate offers instead of a per-call dialog. */
 export function raiseTrustHint(level: TrustLevel): string {
-  return `understudy trust set ${level}`;
+  return `orchestra trust set ${level}`;
 }
 
 /** True when the trust file exists at all (posture explicitly chosen at least once). */

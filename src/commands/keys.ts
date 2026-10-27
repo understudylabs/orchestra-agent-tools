@@ -46,7 +46,7 @@ interface OrgOpt {
 export function registerKeysCommand(program: Command): void {
   const keys = program
     .command("keys")
-    .description("Manage org-level Understudy API keys.");
+    .description("Manage org-level Orchestra API keys.");
 
   keys
     .command("list")
@@ -102,7 +102,7 @@ async function runList(cmd: Command, opts: OrgOpt): Promise<void> {
 
   if (res.data.keys.length === 0) {
     process.stdout.write(
-      `${kleur.gray("No API keys in this org.")} Run ${kleur.cyan("understudy keys create")} to mint one.\n`,
+      `${kleur.gray("No API keys in this org.")} Run ${kleur.cyan("orchestra keys create")} to mint one.\n`,
     );
     return;
   }

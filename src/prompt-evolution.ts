@@ -545,7 +545,7 @@ function defaultIo(benchmarkDir: string): EvolveIo {
       waitForRun(benchmarkDir, runId, {
         onIdle: () =>
           console.error(
-            `[evolve] run request is queued but unclaimed — start an executor in another terminal:\n  understudy runs execute --benchmark ${resolve(benchmarkDir)} --watch`,
+            `[evolve] run request is queued but unclaimed — start an executor in another terminal:\n  orchestra runs execute --benchmark ${resolve(benchmarkDir)} --watch`,
           ),
       }),
     rows: (runId) => readRunRows(benchmarkDir, runId),

@@ -608,7 +608,7 @@ export function renderPartnerReport(report: PartnerReport): string {
   const push = (line = "") => lines.push(line);
   push(`# Benchmark & savings report — ${report.workload.name}`);
   push();
-  push(`Generated ${report.generated_at} from local benchmark artifacts only (no new runs, no network). Every number in this report is derived from persisted eval rows; the derivation is reproducible with \`understudy benchmarks report\`.`);
+  push(`Generated ${report.generated_at} from local benchmark artifacts only (no new runs, no network). Every number in this report is derived from persisted eval rows; the derivation is reproducible with \`orchestra benchmarks report\`.`);
   push();
 
   push("## Workload");

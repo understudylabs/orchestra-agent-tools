@@ -297,7 +297,7 @@ async function startDeterministicMalformedToolFixture(): Promise<{
 export function registerRuntimeCommand(program: Command): void {
   const runtime = program
     .command("runtime")
-    .description("Manage the local conversation runtime used by Understudy Desktop.");
+    .description("Manage the local conversation runtime used by Orchestra Desktop.");
 
   runtime
     .command("version")

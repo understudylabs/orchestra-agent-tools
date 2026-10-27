@@ -46,7 +46,7 @@ interface OrgOpt {
 export function registerProjectsCommand(program: Command): void {
   const projects = program
     .command("projects")
-    .description("Manage Understudy projects within the current org.");
+    .description("Manage Orchestra projects within the current org.");
 
   projects
     .command("list")
@@ -111,7 +111,7 @@ async function runList(cmd: Command, opts: OrgOpt): Promise<void> {
 
   if (res.data.projects.length === 0) {
     process.stdout.write(
-      `${kleur.gray("No projects in this org.")} Run ${kleur.cyan("understudy projects create <slug>")} to create one.\n`,
+      `${kleur.gray("No projects in this org.")} Run ${kleur.cyan("orchestra projects create <slug>")} to create one.\n`,
     );
     return;
   }
@@ -214,7 +214,7 @@ async function runSwitch(
 
   if (!found) {
     throw new Error(
-      `No project with slug "${slug}" in org ${auth.orgId}. Run \`understudy projects list\` to see what's available.`,
+      `No project with slug "${slug}" in org ${auth.orgId}. Run \`orchestra projects list\` to see what's available.`,
     );
   }
 

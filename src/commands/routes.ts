@@ -43,7 +43,7 @@ export function registerRoutesCommand(program: Command): void {
     });
 
   addProjectOptions(routes.command("set <workload>")
-    .description("Route a small traffic percentage to an Understudy model.")
+    .description("Route a small traffic percentage to an Orchestra model.")
     .requiredOption("--model-id <id>", "Public Understudy model id.")
     .option("--traffic-pct <0-100>", "Traffic percentage.", "10"))
     .action(async function (this: Command, workload: string, opts: SetOpts) {
@@ -76,7 +76,7 @@ export function registerRoutesCommand(program: Command): void {
 
 function addProjectOptions(command: Command): Command {
   return command
-    .option("--project-id <id>", "Project id from `understudy projects list --json`.")
+    .option("--project-id <id>", "Project id from `orchestra projects list --json`.")
     .option("--project <slug>", "Project slug to resolve to an id.")
     .option("--org <id>", "Org id to use (default: local config or only org in credentials).");
 }

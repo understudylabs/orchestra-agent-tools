@@ -168,7 +168,7 @@ describe("spend-adjacent gating", () => {
     const spendy = { slug: "s", models: ["glm-5.2", "gemma-4-31b-it"], tasks: ["t1", "t2"], rollouts_per_task: 3 };
     const blocked = classifyBenchmarkToolCall("queue_run", spendy, postureAt("local_sandbox"));
     assert.equal(blocked.decision, "block");
-    assert.match(benchmarkGuardBlockMessage(blocked), /understudy trust set bounded_experiments/, "ONE action, not a per-call dialog");
+    assert.match(benchmarkGuardBlockMessage(blocked), /orchestra trust set bounded_experiments/, "ONE action, not a per-call dialog");
     for (const level of ["bounded_experiments", "hosted_ops"]) {
       const allowed = classifyBenchmarkToolCall("queue_run", spendy, postureAt(level));
       assert.equal(allowed.decision, "allow");

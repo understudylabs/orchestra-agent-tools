@@ -796,7 +796,7 @@ export function queueOrCancelRun(entry: AnyHubEntry | null, body: QueueRunBody):
       return {
         ok: false,
         error:
-          "proposed benchmarks accept single-task runs only (tasks: [task_id]); promote the benchmark for full runs (understudy traces promote)",
+          "proposed benchmarks accept single-task runs only (tasks: [task_id]); promote the benchmark for full runs (orchestra traces promote)",
         status: 400,
       };
     }
@@ -885,7 +885,7 @@ export function queueOrCancelRun(entry: AnyHubEntry | null, body: QueueRunBody):
     app_replay: input.app_replay as boolean | undefined,
     experiment_id: input.experiment_id as string | undefined,
   });
-  return { ok: true, run, execute_hint: `understudy runs execute --benchmark ${entry.dir} --watch` };
+  return { ok: true, run, execute_hint: `orchestra runs execute --benchmark ${entry.dir} --watch` };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1104,7 +1104,7 @@ export function buildTaskFeedbackHandoff(dir: string, taskId: string, feedback: 
     `2. Edit that task line to address the feedback (title, outcome_contract, world_model, or the`,
     `   authored block), keeping schema_version understudy.benchmark_task.v1 and the task_id stable.`,
     `3. Rebuild the generated environment in place (tasks, reviews, and authored blocks are untouched):`,
-    `   understudy traces regenerate-env --benchmark ${dir}`,
+    `   orchestra traces regenerate-env --benchmark ${dir}`,
     `4. Confirm ${path.join(dir, "environment", "offline-validation.json")} passes for ${taskId}, then`,
     `   report exactly what you changed and why it addresses the feedback.`,
   ].join("\n");

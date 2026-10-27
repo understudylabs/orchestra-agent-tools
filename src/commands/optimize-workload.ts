@@ -24,7 +24,7 @@ export function registerOptimizeWorkloadCommand(program: Command): void {
     .command("optimize-workload")
     .description("Validate deterministic optimizer artifact gates");
   optimizeWorkload.action(() => {
-    console.log("Use `understudy optimize-workload check --repo .` or `understudy skills --search gepa`.");
+    console.log("Use `orchestra optimize-workload check --repo .` or `orchestra skills --search gepa`.");
   });
   optimizeWorkload
     .command("check")

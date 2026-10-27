@@ -45,7 +45,7 @@ export function registerTracesCommand(program: Command): void {
       console.error(`viewer: ${join(result.output_dir, "viewer", "index.html")}`);
     });
   traces.command("author-tasks")
-    .description("LLM-author legible task definitions over a compiled benchmark, grounding-verified against the deterministic evidence (Understudy gateway only)")
+    .description("LLM-author legible task definitions over a compiled benchmark, grounding-verified against the deterministic evidence (Orchestra gateway only)")
     .requiredOption("--benchmark <dir>", "Benchmark output directory (tasks.jsonl + normalized-captures.jsonl)")
     .option("--model <id>", "Gateway model id; defaults to a cheap capable model from /v1/models")
     .option("--limit <count>", "Author at most N tasks")
