@@ -16,7 +16,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { GLOBAL_HOME_MARKER, globalConfigDir, migrateGlobalHome } from "../dist/config/paths.js";
+import { GLOBAL_HOME_MARKER, globalConfigDir, migrateGlobalHome, samePath } from "../dist/config/paths.js";
 
 const posix = process.platform !== "win32";
 
@@ -139,6 +139,28 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
     assert.equal(readFileSync(join(current, "profile.json"), "utf8"), '{"tier":"new"}\n');
     assert.ok(existsSync(join(current, "agent-tools", "logs")));
     assert.equal(readFileSync(join(current, "credentials.json"), "utf8"), "{}\n");
+  });
+
+  it("moves symlinks inside a reappeared ~/.understudy as links", () => {
+    mkdirSync(current);
+    writeFileSync(join(current, GLOBAL_HOME_MARKER), "{}\n");
+    mkdirSync(join(home, "checkout", "skills"), { recursive: true });
+    mkdirSync(legacy);
+    symlinkSync(join(home, "checkout", "skills"), join(legacy, "skills"), "dir");
+
+    assert.equal(migrateGlobalHome().status, "already-migrated");
+    assert.ok(lstatSync(join(current, "skills")).isSymbolicLink());
+    assert.equal(readlinkSync(join(current, "skills")), join(home, "checkout", "skills"));
+    assert.ok(lstatSync(legacy).isSymbolicLink());
+  });
+
+  it("samePath compares through the legacy link, even for paths that no longer exist", () => {
+    assert.equal(migrateGlobalHome().status, "created");
+    mkdirSync(join(current, "runs", "r1"), { recursive: true });
+    assert.ok(samePath(join(legacy, "runs", "r1"), join(current, "runs", "r1")));
+    assert.ok(samePath(join(legacy, "runs", "r1", "model"), join(current, "runs", "r1", "model")));
+    assert.ok(samePath(join(legacy, "gone", "deeper"), join(current, "gone", "deeper")));
+    assert.ok(!samePath(join(legacy, "runs", "r1"), join(current, "runs", "r2")));
   });
 
   it("never overwrites: entries in both homes stay put and are reported", () => {

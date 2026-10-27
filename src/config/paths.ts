@@ -1,17 +1,21 @@
 import { homedir } from "node:os";
 import {
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readdirSync,
+  readlinkSync,
   realpathSync,
   renameSync,
   rmSync,
   rmdirSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
+import type { Stats } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 /**
@@ -123,6 +127,33 @@ export function isGlobalProjectConfigPath(path: string): boolean {
     basename(target) === basename(global) &&
     canonicalDir(dirname(target)) === canonicalDir(dirname(global))
   );
+}
+
+/**
+ * True when two paths name the same location once symlinks are resolved.
+ * Records written before the home migration store `~/.understudy/...`
+ * paths, which now reach `~/.orchestra/...` through a symlink, so stored
+ * paths must be compared this way, never as strings. Works for paths that
+ * no longer exist: the deepest existing ancestor is resolved and the rest
+ * appended.
+ */
+export function samePath(a: string, b: string): boolean {
+  return canonicalPath(a) === canonicalPath(b);
+}
+
+function canonicalPath(path: string): string {
+  let head = resolve(path);
+  const tail: string[] = [];
+  while (true) {
+    try {
+      return join(realpathSync(head), ...tail);
+    } catch {
+      const parent = dirname(head);
+      if (parent === head) return resolve(path);
+      tail.unshift(basename(head));
+      head = parent;
+    }
+  }
 }
 
 export function projectConfigPath(startDir: string = process.cwd()): string {
@@ -248,18 +279,42 @@ function mergeInto(src: string, dst: string, conflicts: string[], top: boolean):
       continue;
     }
     const to = join(dst, name);
+    const fromStat = lstatSync(from);
     const toStat = lstatOrNull(to);
     if (!toStat) {
-      renameSync(from, to);
-      continue;
-    }
-    if (lstatSync(from).isDirectory() && toStat.isDirectory()) {
+      if (moveWithoutOverwrite(from, to, fromStat)) continue;
+    } else if (fromStat.isDirectory() && toStat.isDirectory()) {
       mergeInto(from, to, conflicts, false);
       if (readdirSync(from).length === 0) rmdirSync(from);
       continue;
     }
     conflicts.push(from);
   }
+}
+
+/**
+ * Move one entry to a path that did not exist a moment ago, failing
+ * (false) rather than replacing anything created there since. A plain
+ * rename would silently overwrite a file another process just wrote.
+ */
+function moveWithoutOverwrite(from: string, to: string, fromStat: Stats): boolean {
+  try {
+    if (fromStat.isSymbolicLink()) {
+      // link() follows symlinks on macOS; recreate the link itself.
+      symlinkSync(readlinkSync(from), to);
+    } else if (fromStat.isFile()) {
+      linkSync(from, to);
+    } else {
+      // A directory rename only replaces an empty directory: no data lost.
+      renameSync(from, to);
+      return true;
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
+  unlinkSync(from);
+  return true;
 }
 
 /** True when `legacy` is (or now is) a symlink resolving to `current`. */

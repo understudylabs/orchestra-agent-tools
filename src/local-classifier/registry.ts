@@ -4,14 +4,13 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  realpathSync,
   renameSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { globalConfigDir } from "../config/paths.js";
+import { globalConfigDir, samePath } from "../config/paths.js";
 import {
   createClassifierModelIdentity,
   type CanonicalModelIdentity,
@@ -147,23 +146,6 @@ function parseJson(path: string): unknown {
 
 function defaultCaptureRoot(): string {
   return join(globalConfigDir(), "capture-imports");
-}
-
-/**
- * Stored manifests carry absolute paths. Runs recorded under ~/.understudy
- * now live under ~/.orchestra behind a symlink, so compare paths with
- * symlinks resolved, not as strings.
- */
-function samePath(stored: string, actual: string): boolean {
-  return realPathOrResolved(stored) === realPathOrResolved(actual);
-}
-
-function realPathOrResolved(path: string): string {
-  try {
-    return realpathSync(path);
-  } catch {
-    return resolve(path);
-  }
 }
 
 function lifecyclePath(manifestPath: string): string {

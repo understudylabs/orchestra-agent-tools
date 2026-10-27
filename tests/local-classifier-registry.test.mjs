@@ -93,6 +93,19 @@ describe("local classifier run registry", () => {
     assert.equal(getLocalClassifierRun(movedManifest).run_id, "pre-migration-run");
   });
 
+  it("keeps a pre-migration run whose model folder was deleted", { skip: process.platform === "win32" }, () => {
+    const data = runFixture({ runId: "pre-migration-no-model" });
+    rmSync(data.modelPath, { recursive: true, force: true });
+    const moved = `${data.root}-moved`;
+    renameSync(data.root, moved);
+    symlinkSync(moved, data.root, "dir");
+    roots.push(moved);
+
+    const runs = listLocalClassifierRuns({ captureRoot: join(moved, "capture-imports") });
+    assert.deepEqual(runs.map((run) => run.run_id), ["pre-migration-no-model"]);
+    assert.equal(runs[0].model.available, false);
+  });
+
   it("discovers completed local runs without copying label values into the summary", () => {
     const data = runFixture();
     const repeatPath = join(data.runRoot, "evaluations", "repeat-1", "evaluation.json");

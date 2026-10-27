@@ -14,6 +14,7 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { dirname, join, resolve } from "node:path";
 
+import { samePath } from "../config/paths.js";
 import { localClassifierRuntimeSource } from "./runtime-source.js";
 
 export const DEFAULT_CLASSIFIER_MODEL = "answerdotai/ModernBERT-base";
@@ -1053,14 +1054,14 @@ export function predictLocalClassifier(options: PredictLocalClassifierOptions): 
   const run = parseJsonObject(manifestPath) as unknown as ClassificationTrainingRunManifest;
   if (run.schema_version !== RUN_SCHEMA || run.status !== "completed" || !run.model || !run.runtime ||
       run.local_only !== true || run.data_boundary?.dataset_uploaded !== false ||
-      run.data_boundary.telemetry_sent !== false || resolve(run.manifest_path) !== manifestPath) {
+      run.data_boundary.telemetry_sent !== false || !samePath(run.manifest_path, manifestPath)) {
     throw new Error("Prediction requires a completed local classification run.");
   }
   if (!isNonEmptyString(options.text) || options.text.length > 100_000) {
     throw new Error("Prediction text must contain between 1 and 100,000 characters.");
   }
   const expectedModelPath = join(dirname(manifestPath), "model");
-  if (resolve(run.model.path) !== expectedModelPath || !existsSync(expectedModelPath) ||
+  if (!samePath(run.model.path, expectedModelPath) || !existsSync(expectedModelPath) ||
       !statSync(expectedModelPath).isDirectory()) {
     throw new Error("The completed classifier model artifact is missing.");
   }

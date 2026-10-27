@@ -19,6 +19,7 @@ import {
   type LocalClassifierRunnerOverride,
 } from "./index.js";
 import { localClassifierLifecycleRuntimeSource } from "./lifecycle-runtime-source.js";
+import { samePath } from "../config/paths.js";
 import { getLocalClassifierRun } from "./registry.js";
 
 const RUN_SCHEMA = "understudy.capture_import.classification_run.v1";
@@ -229,7 +230,7 @@ function readCompletedRun(runManifestPath: string): {
   const run = parseObject(manifestPath) as unknown as ClassificationTrainingRunManifest;
   if (run.schema_version !== RUN_SCHEMA || run.status !== "completed" || !run.model || !run.runtime || !run.heldout ||
       run.local_only !== true || run.data_boundary.dataset_uploaded !== false || run.data_boundary.telemetry_sent !== false ||
-      resolve(run.manifest_path) !== manifestPath || resolve(run.model.path) !== join(dirname(manifestPath), "model")) {
+      !samePath(run.manifest_path, manifestPath) || !samePath(run.model.path, join(dirname(manifestPath), "model"))) {
     throw new Error("The completed classifier failed its immutable local evidence contract.");
   }
   const modelEvidence = directoryEvidence(run.model.path);
