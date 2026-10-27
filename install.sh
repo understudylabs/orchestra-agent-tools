@@ -17,7 +17,8 @@ if [ -n "${UNDERSTUDY_INSTALL_REPO_URL:-}${UNDERSTUDY_INSTALL_REF:-}${UNDERSTUDY
 fi
 INSTALLER_COMMIT="${UNDERSTUDY_INSTALLER_COMMIT:-unknown}"
 LAUNCH_CLAUDE="${UNDERSTUDY_LAUNCH_AGENT:-${UNDERSTUDY_LAUNCH_CLAUDE:-1}}"
-CLAUDE_PERMISSION_MODE="${UNDERSTUDY_CLAUDE_PERMISSION_MODE:-auto}"
+# Empty means Claude Code uses the permission mode the user already chose.
+CLAUDE_PERMISSION_MODE="${UNDERSTUDY_CLAUDE_PERMISSION_MODE:-}"
 USER_PROMPT_OVERRIDE="${UNDERSTUDY_INITIAL_CLAUDE_PROMPT:-}"
 INITIAL_CLAUDE_PROMPT=""
 AGENT_PLATFORMS="${UNDERSTUDY_AGENT_PLATFORMS:-auto}"
@@ -29,7 +30,15 @@ if [ -n "${UNDERSTUDY_AGENT_PLATFORMS:-}" ]; then
   AGENT_SELECTION_SOURCE="UNDERSTUDY_AGENT_PLATFORMS"
 fi
 LOWER_MY_ANT_BILL="${UNDERSTUDY_LOWER_MY_ANT_BILL:-0}"
-KEEP_LOGIN="${UNDERSTUDY_KEEP_LOGIN:-0}"
+KEEP_LOGIN="${UNDERSTUDY_KEEP_LOGIN:-1}"
+SKIP_LOGIN="${UNDERSTUDY_SKIP_LOGIN:-0}"
+LOCAL_MODELS="${UNDERSTUDY_LOCAL_MODELS:-0}"
+LOCAL_MODEL_ID="gemma-4-e2b-it-qat-mlx-vlm-understudy"
+INSTALL_FROM_SOURCE="${UNDERSTUDY_INSTALL_FROM_SOURCE:-0}"
+INSTALL_VERSION="${UNDERSTUDY_INSTALL_VERSION:-latest}"
+ADVANCED=0
+SETUP_CHOSEN=0
+SETUP_MENU_ANSWERED=0
 NO_CLAUDE=0
 START_STEP=1
 ONLY_STEP=""
@@ -44,32 +53,33 @@ while [ "$#" -gt 0 ]; do
     --non-interactive|--noninteractive|--no-input) NONINTERACTIVE=1 ;;
     --require-confirm) REQUIRE_CONFIRM=1 ;;
     --no-claude) NO_CLAUDE=1 ;;
-    --agents|--agent) AGENT_PLATFORMS="${2:?missing agent platform list}"; AGENT_PLATFORMS_EXPLICIT=1; AGENT_SELECTION_SOURCE="--agents flag"; shift ;;
+    --agents|--agent) AGENT_PLATFORMS="${2:?missing agent platform list}"; AGENT_PLATFORMS_EXPLICIT=1; AGENT_SELECTION_SOURCE="--agents flag"; SETUP_CHOSEN=1; shift ;;
     --no-agents) AGENT_PLATFORMS="none"; AGENT_PLATFORMS_EXPLICIT=1; AGENT_SELECTION_SOURCE="--no-agents flag"; NO_CLAUDE=1; LAUNCH_CLAUDE=0 ;;
     --no-launch-claude|--no-launch-agent) LAUNCH_CLAUDE=0 ;;
     --launch-claude|--launch-agent) LAUNCH_CLAUDE=1 ;;
     --lower-my-ant-bill|--lower-my-anthropic-bill) LOWER_MY_ANT_BILL=1 ;;
     --keep-login) KEEP_LOGIN=1 ;;
     --fresh-login) KEEP_LOGIN=0 ;;
+    --skip-login|--no-login) SKIP_LOGIN=1 ;;
+    --local-models) LOCAL_MODELS=1; SETUP_CHOSEN=1 ;;
+    --advanced) ADVANCED=1 ;;
+    --from-source) INSTALL_FROM_SOURCE=1 ;;
     --from-step) START_STEP="${2:?missing step number}"; shift ;;
     --only-step) ONLY_STEP="${2:?missing step number}"; shift ;;
     --resume) RESUME=1 ;;
     --lab) LAB="${2:?missing path}"; shift ;;
     -h|--help)
       cat <<'EOF'
-Usage: install.sh [--yes] [--non-interactive] [--resume] [--from-step N] [--only-step N] [--keep-login] [--lower-my-ant-bill] [--agents auto|all|claude-code|cursor|codex|opencode|hermes|devin|none] [--no-claude] [--no-launch-agent]
+Usage: install.sh [--yes] [--non-interactive] [--resume] [--from-step N] [--only-step N] [--skip-login] [--local-models] [--advanced] [--lower-my-ant-bill] [--agents auto|all|claude-code|cursor|codex|opencode|hermes|devin|none] [--no-claude] [--no-launch-agent]
 
-Installs the Orchestra CLI + detected coding-agent skill/plugin surfaces, then
-hands the user back to the selected coding agent when possible. It does not
-download model weights, start MLX, launch the ladder server, or make frontier
-calls. Those are guided by the Orchestra onboarding skill after the user is in
-their coding agent.
+Installs the Orchestra CLI, signs you in to your Orchestra account in this
+terminal, and installs the Orchestra plugin into every detected coding agent
+(--advanced to choose). With --local-models on Apple Silicon it also starts the
+managed MLX runtime install and the Gemma 4 E2B download (about 3.6 GB) in the
+background. It makes no frontier calls and spends nothing.
 
-If you are already signed in, the installer signs you out by default so the
-agent-first sign-up can be experienced (or demoed) from scratch. Only the
-login state is touched — profile, models, and history under ~/.understudy are
-preserved, and the old credentials file is kept as a timestamped backup.
-Pass --keep-login to keep the existing sign-in.
+An existing sign-in is kept. --fresh-login signs you out first (credentials are
+kept as a timestamped backup) so the sign-up can be demoed from scratch.
 
 Options:
   --yes                 approve the installer prompt
@@ -78,12 +88,17 @@ Options:
   --resume              continue from the next unfinished install step
   --from-step N         start from step 1, 2, or 3
   --only-step N         run only step 1, 2, or 3
-  --keep-login          keep an existing sign-in instead of resetting it
-  --fresh-login         reset an existing sign-in for agent-first sign-up (default)
+  --skip-login          do not prompt for an Orchestra sign-in (run `orchestra login` later)
+  --keep-login          keep an existing sign-in (default)
+  --fresh-login         sign out an existing sign-in first, for demos
+  --local-models        Apple Silicon only: start the MLX runtime install and the
+                        Gemma 4 E2B download (about 3.6 GB) in the background
+  --advanced            choose which coding agents get the plugin
+  --from-source         build the CLI from the GitHub source instead of npm
   --lower-my-ant-bill   focus onboarding on lowering Anthropic/Claude API spend
   --lower-my-anthropic-bill
                         alias for --lower-my-ant-bill
-  --agents LIST         agent adapters to install: auto, all, claude-code, cursor, codex, opencode, hermes, devin, none
+  --agents LIST         agent adapters to install (default auto = every detected agent): auto, all, claude-code, cursor, codex, opencode, hermes, devin, none
                         comma-separated lists are accepted, e.g. claude-code,cursor
   --no-agents           skip all coding-agent plugin installs and launches
   --no-claude           skip Claude Code plugin install and final Claude launch
@@ -111,16 +126,20 @@ Environment overrides:
   UNDERSTUDY_INSTALL_LOG_FILE    exact install log path
   UNDERSTUDY_INSTALLER_COMMIT    optional script commit label when caller knows it
   UNDERSTUDY_INSTALL_PACKAGE     optional npm package spec override
+  UNDERSTUDY_INSTALL_VERSION     npm version or dist-tag to install, default latest
+  UNDERSTUDY_INSTALL_FROM_SOURCE set to 1 to build from the GitHub source instead of npm
   UNDERSTUDY_INSTALL_FROM_CWD    set to 1 to install agent adapters from a checkout in the current directory
   UNDERSTUDY_NONINTERACTIVE      set to 1 to use safe defaults without prompting
   UNDERSTUDY_REQUIRE_CONFIRM     set to 1 to fail when no prompt TTY exists
-  UNDERSTUDY_KEEP_LOGIN          set to 1 to keep an existing sign-in
+  UNDERSTUDY_KEEP_LOGIN          set to 0 to sign out an existing sign-in first
+  UNDERSTUDY_SKIP_LOGIN          set to 1 to skip the terminal sign-in
+  UNDERSTUDY_LOCAL_MODELS        set to 1 to start the local model lab (Apple Silicon)
   UNDERSTUDY_LOWER_MY_ANT_BILL   set to 1 to focus onboarding on lowering Anthropic/Claude API spend
   UNDERSTUDY_AGENT_PLATFORMS     auto, all, claude-code, cursor, codex, opencode, hermes, devin, none, or comma list
   UNDERSTUDY_LAUNCH_AGENT       set to 0 to skip opening a coding agent
   UNDERSTUDY_LAUNCH_CLAUDE      set to 0 to skip opening a coding agent
   UNDERSTUDY_CLAUDE_ARGS        optional extra args when launching Claude Code
-  UNDERSTUDY_CLAUDE_PERMISSION_MODE Claude Code permission mode, default auto
+  UNDERSTUDY_CLAUDE_PERMISSION_MODE Claude Code permission mode, default: your own Claude Code setting
   UNDERSTUDY_INITIAL_CLAUDE_PROMPT initial prompt passed to Claude Code
   NO_COLOR                      disable all installer styling
 EOF
@@ -455,15 +474,63 @@ lower_my_ant_bill_enabled() {
     *) return 1 ;;
   esac
 }
+# Apple Silicon Macs are the only supported local model lab hosts for now.
+local_models_supported() {
+  [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]
+}
+
+# The opening question for human installs. --yes, --non-interactive, and any
+# explicit agent or local-model flag skip it; the defaults are option 1.
+choose_setup() {
+  local answer
+  [ "$SETUP_CHOSEN" = "0" ] || return 0
+  [ "$AGENT_PLATFORMS_EXPLICIT" = "0" ] || return 0
+  [ -z "$ONLY_STEP" ] || return 0
+  [ "$YES" = "0" ] || return 0
+  noninteractive_enabled && return 0
+  [ -r /dev/tty ] && [ -w /dev/tty ] || return 0
+
+  section "What do you want to set up?"
+  say "  ${G2}1.${R} Orchestra account + plugin for your coding agents ${D}(recommended, about a minute)${R}"
+  if local_models_supported; then
+    say "  ${G3}2.${R} Option 1 + local model lab ${D}(MLX runtime + Gemma 4 E2B, about 3.6 GB, downloads in the background)${R}"
+  fi
+  say "  ${G4}3.${R} CLI only"
+  say "  ${G5}a.${R} Advanced: choose which coding agents get the plugin"
+  if ! printf "  %s?%s Setup %s[1]%s " "$G4" "$R" "$D" "$R" >/dev/tty 2>/dev/null; then
+    return 0
+  fi
+  read -r answer </dev/tty 2>/dev/null || return 0
+  SETUP_MENU_ANSWERED=1
+  case "$answer" in
+    ""|1) ;;
+    2)
+      if local_models_supported; then
+        LOCAL_MODELS=1
+      else
+        warn "The local model lab needs an Apple Silicon Mac; continuing with option 1."
+      fi
+      ;;
+    3|cli|cli-only)
+      AGENT_PLATFORMS="none"; AGENT_PLATFORMS_EXPLICIT=1; AGENT_SELECTION_SOURCE="setup menu"
+      NO_CLAUDE=1; LAUNCH_CLAUDE=0; SKIP_LOGIN=1
+      ;;
+    a|A|advanced) ADVANCED=1 ;;
+    *) warn "Unrecognized choice '$answer'; continuing with option 1." ;;
+  esac
+  SETUP_CHOSEN=1
+}
+
 select_agent_platforms() {
   local answer default
+  [ "$ADVANCED" = "1" ] || return 0
   [ "$AGENT_PLATFORMS_EXPLICIT" = "0" ] || return 0
   should_run_step 2 || return 0
   [ "$YES" = "0" ] || return 0
   noninteractive_enabled && return 0
   [ -r /dev/tty ] && [ -w /dev/tty ] || return 0
 
-  default="$(default_agent_platform)"
+  default="auto"
   section "Choose Coding Agent"
   say "Where should Orchestra install its agent plugin?"
   say "  ${G2}1.${R} $(detected_agent_label "claude-code" "Claude Code")"
@@ -474,7 +541,7 @@ select_agent_platforms() {
   say "  ${G6}6.${R} $(detected_agent_label "devin" "Devin")"
   say "  ${G6}7.${R} All detected coding agents"
   say "  ${G6}8.${R} CLI only, no coding-agent plugins"
-  say "Press Enter for: $default."
+  say "Press Enter for: all detected coding agents."
 
   if ! printf "  %s?%s Install target %s[1-8 or name]%s " "$G4" "$R" "$D" "$R" >/dev/tty 2>/dev/null; then
     return 0
@@ -543,7 +610,7 @@ should_install_devin_adapter() {
 }
 agent_plan_label() {
   case "$(normalize_agent_platform "$AGENT_PLATFORMS")" in
-    auto) printf '%s\n' "Autodetect and install available agent adapters." ;;
+    auto) printf '%s\n' "Install the Orchestra plugin into every detected coding agent (--advanced to choose)." ;;
     none) printf '%s\n' "Skip coding-agent plugin adapters." ;;
     all) printf '%s\n' "Install all supported agent adapters." ;;
     *) printf '%s\n' "Install requested agent adapter(s): $AGENT_PLATFORMS." ;;
@@ -685,6 +752,17 @@ adapter_exit_code() {
   fi
   printf '0\n'
 }
+# Like confirm, but Enter means yes; used for optional follow-ups in a run
+# the user already approved.
+confirm_default_yes() {
+  local answer
+  [ "$YES" = "1" ] && return 0
+  noninteractive_enabled && return 1
+  printf "  %s?%s %s %s[Y/n]%s " "$G4" "$R" "$1" "$D" "$R" >/dev/tty 2>/dev/null || return 1
+  read -r answer </dev/tty 2>/dev/null || return 1
+  case "$answer" in ""|y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+}
+
 confirm() {
   local answer
   [ "$YES" = "1" ] && return 0
@@ -764,6 +842,30 @@ record_install_source() {
   } >"$STATE_DIR/install-source"
 }
 
+# Install the newest published release (or UNDERSTUDY_INSTALL_VERSION) from
+# npm. Returns nonzero, leaving the caller to build from source, when npm has
+# no usable release yet; deprecated versions are the name-reservation
+# placeholders, never a real CLI.
+install_from_npm_registry() {
+  local version deprecated
+  version="$(npm view "$PACKAGE_NAME@$INSTALL_VERSION" version 2>>"$LOG_FILE" | tail -1)" || version=""
+  if [ -z "$version" ]; then
+    log "npm has no $PACKAGE_NAME@$INSTALL_VERSION"
+    return 1
+  fi
+  deprecated="$(npm view "$PACKAGE_NAME@$version" deprecated 2>>"$LOG_FILE" || true)"
+  if [ -n "$deprecated" ]; then
+    log "npm $PACKAGE_NAME@$version is deprecated: $deprecated"
+    return 1
+  fi
+  say "Installing $PACKAGE_NAME@$version from npm."
+  remove_previous_global_package
+  if ! run_logged "Install the orchestra command" npm install -g --ignore-scripts "$PACKAGE_NAME@$version"; then
+    return 1
+  fi
+  printf '%s\n' "$version" >"$STATE_DIR/package-version"
+}
+
 install_understudy_package() {
   local package_commit package_version package_tarball runtime_deps
   record_install_source
@@ -772,6 +874,16 @@ install_understudy_package() {
     warn "Installing Orchestra package from a non-default source: $(redact_url "$INSTALL_PACKAGE")"
     run_logged "Install Orchestra package" npm install -g "$INSTALL_PACKAGE"
     return 0
+  fi
+
+  # The published package is the default: a prebuilt, provenance-signed
+  # release, no git clone or on-machine build. A custom repo/ref, --from-source,
+  # or a registry without a usable release falls through to the source build.
+  if [ "$INSTALL_FROM_SOURCE" != "1" ] && [ "$INSTALL_SOURCE_OVERRIDDEN" != "1" ]; then
+    if install_from_npm_registry; then
+      return 0
+    fi
+    say "Building Orchestra from the GitHub source instead."
   fi
 
   need git || {
@@ -851,11 +963,11 @@ install_understudy_package() {
   rm -rf "$INSTALL_SOURCE_DIR"
 }
 
-# ── agent-first sign-in ──────────────────────────────────────────────
-# The sign-up itself belongs to the coding agent (`understudy login`
-# sends an email code; `understudy login --code` finishes). The
-# installer only resets login state so that experience starts from
-# scratch — everything else under ~/.understudy is preserved.
+# ── sign-in ──────────────────────────────────────────────────────────
+# The user signs in here, in their own terminal: `orchestra login --email`
+# emails a one-time code and prompts for it, so the code never passes
+# through a coding agent. --fresh-login first resets the login state (for
+# demos); everything else under ~/.understudy is preserved.
 CREDENTIALS_FILE="$HOME/.understudy/credentials.json"
 KNOWN_EMAIL=""
 
@@ -875,7 +987,7 @@ remember_known_email() {
   local candidate="${1:-}" source_label="${2:-email source}"
   [ -z "$candidate" ] && return 0
   if is_github_noreply_email "$candidate"; then
-    say "Ignoring GitHub noreply email from $source_label; the agent will ask for a real sign-in email."
+    say "Ignoring GitHub noreply email from $source_label; you can enter your real email for the sign-in."
     return 0
   fi
   KNOWN_EMAIL="$candidate"
@@ -884,14 +996,19 @@ remember_known_email() {
 prepare_agent_first_signin() {
   local existing_email=""
   [ -n "$ONLY_STEP" ] && return 0
-  section "Prepare the agent-first sign-in."
   if [ -f "$CREDENTIALS_FILE" ]; then
     existing_email="$(credentials_email)"
     remember_known_email "$existing_email" "existing Orchestra credentials"
     if [ "$KEEP_LOGIN" = "1" ]; then
-      say "Keeping the existing Orchestra sign-in (--keep-login)."
+      section "Orchestra account"
+      if [ -n "$KNOWN_EMAIL" ]; then
+        say_unlogged "Already signed in as $KNOWN_EMAIL; keeping that sign-in."
+      else
+        say "Already signed in; keeping that sign-in."
+      fi
       return 0
     fi
+    section "Orchestra account"
     # A --resume retry after the reset already happened in this install must
     # not sign the user out again (the agent may have signed in since).
     if [ "$RESUME" = "1" ] && [ -f "$STATE_DIR/login-reset.done" ]; then
@@ -908,22 +1025,118 @@ prepare_agent_first_signin() {
     private_mkdir "$STATE_DIR"
     date -u +"%Y-%m-%dT%H:%M:%SZ" >"$STATE_DIR/login-reset.done"
     if [ -n "$KNOWN_EMAIL" ]; then
-      say_unlogged "Signed out $KNOWN_EMAIL so the agent can run the sign-up from scratch."
+      say_unlogged "Signed out $KNOWN_EMAIL so the sign-up runs from scratch (--fresh-login)."
     elif [ -n "$existing_email" ]; then
-      ok "Signed out the existing Orchestra sign-in so the agent can run the sign-up from scratch."
+      ok "Signed out the existing Orchestra sign-in so the sign-up runs from scratch (--fresh-login)."
     else
-      ok "Signed out so the agent can run the sign-up from scratch."
+      ok "Signed out so the sign-up runs from scratch (--fresh-login)."
     fi
     say "Only the login state was reset; profile, models, and history under ~/.understudy are untouched."
     say "Credentials backup: $backup"
     say "Restore it without re-signing in: mv \"$backup\" \"$CREDENTIALS_FILE\""
-    say "Keep the sign-in next time with --keep-login."
-  else
-    say "No existing sign-in found; the coding agent will run the first sign-up."
   fi
   if [ -z "$KNOWN_EMAIL" ]; then
     remember_known_email "$(git config --get user.email 2>/dev/null || true)" "git config user.email"
   fi
+}
+
+# Without a terminal (CI, --yes, agent shells) there is nobody to type the
+# code, so the sign-in is left for `orchestra login` later.
+sign_in_in_terminal() {
+  local answer email
+  [ -z "$ONLY_STEP" ] || return 0
+  [ -f "$CREDENTIALS_FILE" ] && return 0
+  if [ "$SKIP_LOGIN" = "1" ]; then
+    say "Skipping the Orchestra sign-in; run \`orchestra login\` when you want an account."
+    return 0
+  fi
+  need orchestra || return 0
+  if [ "$YES" = "1" ] || noninteractive_enabled || ! { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    say "Not signed in. Run \`orchestra login\` in a terminal to create or sign in to your Orchestra account."
+    return 0
+  fi
+  section "Sign in to Orchestra"
+  say "Your Orchestra account gives the CLI and plugin a gateway API key. We email you a one-time code."
+  if [ -n "$KNOWN_EMAIL" ]; then
+    printf "  %s?%s Email %s[%s, or s to skip]%s " "$G4" "$R" "$D" "$KNOWN_EMAIL" "$R" >/dev/tty 2>/dev/null || return 0
+  else
+    printf "  %s?%s Email %s[s to skip]%s " "$G4" "$R" "$D" "$R" >/dev/tty 2>/dev/null || return 0
+  fi
+  read -r answer </dev/tty 2>/dev/null || return 0
+  case "$answer" in
+    s|S|skip|SKIP)
+      say "Skipped. Run \`orchestra login\` when you want an account."
+      return 0
+      ;;
+  esac
+  email="${answer:-$KNOWN_EMAIL}"
+  if [ -z "$email" ]; then
+    say "No email entered. Run \`orchestra login\` when you want an account."
+    return 0
+  fi
+  log "RUN orchestra login --email <redacted>"
+  if orchestra login --email "$email" </dev/tty >/dev/tty 2>&1; then
+    ok "Signed in to Orchestra."
+  else
+    warn "The sign-in did not finish; the install continues. Run \`orchestra login\` to try again."
+  fi
+}
+
+# ── local model lab ──────────────────────────────────────────────────
+# Opt-in (--local-models or setup option 2), Apple Silicon only. Starts the
+# managed MLX runtime install and the bootstrap Gemma 4 E2B snapshot download
+# in the background so the user is never waiting on them; the onboarding skill
+# reads $STATE_DIR/local-model-lab.json to report progress. uv is never
+# installed silently: with Homebrew the user is asked first, otherwise they get
+# the command to run, and the model download goes ahead either way.
+LOCAL_MODEL_LAB_STARTED=0
+
+ensure_uv_for_local_models() {
+  need uv && return 0
+  if need brew && [ "$YES" = "0" ] && ! noninteractive_enabled && { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    if confirm_default_yes "The MLX runtime needs uv. Install it with Homebrew (brew install uv)?"; then
+      run_logged "Install uv with Homebrew" brew install uv && return 0
+    fi
+  fi
+  warn "uv is not installed, so the MLX runtime was not set up. Install uv (brew install uv, or see https://docs.astral.sh/uv/), then run: orchestra models runtime install"
+  return 1
+}
+
+start_local_model_lab() {
+  local runtime_log pull_log runtime_pid="" pull_pid=""
+  [ "$LOCAL_MODELS" = "1" ] || return 0
+  [ -z "$ONLY_STEP" ] || return 0
+  if ! local_models_supported; then
+    warn "The local model lab needs an Apple Silicon Mac; skipping it."
+    return 0
+  fi
+  if ! need orchestra; then
+    warn "The orchestra command is not on PATH; skipping the local model lab."
+    return 0
+  fi
+  section "Local model lab"
+  private_mkdir "$LOG_DIR"
+  private_mkdir "$STATE_DIR"
+  runtime_log="$LOG_DIR/mlx-runtime-$(date -u +"%Y%m%dT%H%M%SZ").log"
+  pull_log="$LOG_DIR/model-pull-$(date -u +"%Y%m%dT%H%M%SZ").log"
+  if ensure_uv_for_local_models; then
+    nohup orchestra models runtime install >"$runtime_log" 2>&1 </dev/null &
+    runtime_pid="$!"
+    ok "Installing the managed MLX runtime in the background."
+  fi
+  nohup orchestra models pull "$LOCAL_MODEL_ID" >"$pull_log" 2>&1 </dev/null &
+  pull_pid="$!"
+  ok "Downloading $LOCAL_MODEL_ID (about 3.6 GB) in the background."
+  node -e '
+    const [file, model, runtimeLog, runtimePid, pullLog, pullPid] = process.argv.slice(1);
+    const lab = { model, started_at: new Date().toISOString(),
+      runtime: runtimePid ? { log: runtimeLog, pid: Number(runtimePid) } : null,
+      pull: { log: pullLog, pid: Number(pullPid) } };
+    require("fs").writeFileSync(file, JSON.stringify(lab, null, 2) + "\n", { mode: 0o600 });
+  ' "$STATE_DIR/local-model-lab.json" "$LOCAL_MODEL_ID" "$runtime_log" "$runtime_pid" "$pull_log" "$pull_pid"
+  say "Progress: tail -f \"$pull_log\""
+  say "It keeps going if you close this terminal; onboarding picks it up when it finishes."
+  LOCAL_MODEL_LAB_STARTED=1
 }
 
 compose_initial_prompt() {
@@ -931,30 +1144,18 @@ compose_initial_prompt() {
     INITIAL_CLAUDE_PROMPT="$USER_PROMPT_OVERRIDE"
     return 0
   fi
-  local signup="" email_clause cli="orchestra"
-  # A partial rerun (--only-step 3) can sit on an older package that only
-  # ships the legacy command name.
-  if ! need orchestra && need understudy; then
-    cli="understudy"
+  # Keep the handoff short and plain: the onboarding skill carries the flow,
+  # and nothing here asks the agent to handle sign-in codes or the inbox.
+  if lower_my_ant_bill_enabled; then
+    INITIAL_CLAUDE_PROMPT="Use the Orchestra onboarding skill with the lower-Anthropic-bill path for this project, then the lower-anthropic-bill skill. Do not spend money, upload data, or call providers without my explicit approval and a cap."
+  else
+    INITIAL_CLAUDE_PROMPT="Use the Orchestra onboarding skill for this project."
   fi
   if [ ! -f "$CREDENTIALS_FILE" ]; then
-    if [ -n "$KNOWN_EMAIL" ]; then
-      email_clause="run \`$cli login --email $KNOWN_EMAIL\`"
-    else
-      email_clause="ask me for my email, then run \`$cli login --email <my-email>\`"
-    fi
-    signup="Start with the agent-first Orchestra sign-up: check \`$cli status --json\`, and if signed_in is false, $email_clause — it emails me a one-time code and exits. Ask me for the code from my inbox (or fetch it yourself if you have email access, reading only the Orchestra (or Understudy) sign-in email), finish with \`$cli login --code <code>\`, and confirm with \`$cli status --json\`. Then "
+    INITIAL_CLAUDE_PROMPT="$INITIAL_CLAUDE_PROMPT I'm not signed in to Orchestra yet; if an account is needed, ask me to run \`orchestra login\` in my terminal."
   fi
-  local next_prompt
-  if lower_my_ant_bill_enabled; then
-    next_prompt="use the Orchestra onboarding skill with the lower-Anthropic-bill path for this project. Set my primary goal to lowering my Anthropic/Claude API bill. After the local proof, run the lower-anthropic-bill skill against this repo: inventory Anthropic call sites, re-baseline token counts for Opus 4.7+ tokenizer changes, audit prompt-cache hit opportunities, build a savings ledger, and propose measured Anthropic, OpenAI, or local route candidates. Do not spend money, upload data, or call providers without my explicit approval and a cap."
-  else
-    next_prompt="use the Orchestra onboarding skill for this project. Guide me through getting my first local specialist model, launch the ladder climb, then help me pick a real problem or find local data so we can try to make the specialist beat the frontier on that task slice."
-  fi
-  if [ -n "$signup" ]; then
-    INITIAL_CLAUDE_PROMPT="${signup}${next_prompt}"
-  else
-    INITIAL_CLAUDE_PROMPT="U${next_prompt#u}"
+  if [ "$LOCAL_MODEL_LAB_STARTED" = "1" ]; then
+    INITIAL_CLAUDE_PROMPT="$INITIAL_CLAUDE_PROMPT The installer started the local model lab in the background."
   fi
 }
 
@@ -1036,7 +1237,7 @@ install_claude_plugin() {
     record_adapter "claude-code" "installed" "plugin installed"
   fi
   say "In Claude Code, type /reload-plugins once to activate the skills."
-  say "Then type /orchestra:onboard so the agent can guide your first local specialist model."
+  say "Then type /orchestra:onboard to get started."
 }
 
 # Print the source path a marketplace listing (JSON on stdin) records for one
@@ -1495,7 +1696,6 @@ install_agent_adapters() {
 }
 
 launch_claude_code() {
-  local claude_log
   if [ "$NO_CLAUDE" != "0" ]; then
     say "Skipping Claude Code launch because --no-claude is set."
     mark_step_done 3
@@ -1528,50 +1728,27 @@ launch_claude_code() {
   fi
 
   section "Step 3/3 · Open Claude Code"
-  say "Claude Code will open in: $(pwd)"
-  say "The Orchestra plugin will be loaded for this launch with --plugin-dir."
-  say "Claude Code permission mode: $CLAUDE_PERMISSION_MODE."
-  say "Claude Code will receive the first prompt automatically:"
-  say_unlogged "  ${D}$INITIAL_CLAUDE_PROMPT${R}"
-  log "  <initial-prompt>"
-  say "If you open a separate existing Claude Code session later, run /reload-plugins there once."
-  say "Launching Claude Code now. Exit Claude to return to this shell."
-  claude_log="$LOG_DIR/claude-$(date -u +"%Y%m%dT%H%M%SZ").log"
-  say "Claude Code launch log: $claude_log"
-  log "LAUNCH claude --permission-mode $CLAUDE_PERMISSION_MODE --plugin-dir $PKG_DIR $(redact_url "${UNDERSTUDY_CLAUDE_ARGS:-}") <initial-prompt>"
-  if need script; then
-    # curl | sh leaves stdin attached to the pipe. `script` gives Claude Code a
-    # real pseudo-terminal while also capturing the launch output for debugging.
-    # macOS script(1) takes a positional command; Linux script(1) needs -c.
-    # shellcheck disable=SC2086
-    if [ "$(uname -s)" = "Darwin" ]; then
-      # The transcript records the whole session, including the sign-in code
-      # the user types; keep it private like the rest of ~/.understudy.
-      ( umask 077; : >"$claude_log" )
-      script -q "$claude_log" claude --permission-mode "$CLAUDE_PERMISSION_MODE" --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
-        local status="$?"
-        say "Claude Code exited with status $status."
-        say "See Claude Code launch log: $claude_log"
-        return "$status"
-      }
-    else
-      say "script(1) command syntax varies on non-macOS; launching without a Claude Code transcript."
-      # shellcheck disable=SC2086
-      claude --permission-mode "$CLAUDE_PERMISSION_MODE" --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
-        local status="$?"
-        say "Claude Code exited with status $status."
-        return "$status"
-      }
-    fi
-  else
-    say "script(1) not found; launching without a Claude Code transcript."
-    # shellcheck disable=SC2086
-    claude --permission-mode "$CLAUDE_PERMISSION_MODE" --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
-      local status="$?"
-      say "Claude Code exited with status $status."
-      return "$status"
-    }
+  if ! { [ "$YES" = "1" ] || noninteractive_enabled; } && ! confirm_default_yes "Open Claude Code in $(pwd) now?"; then
+    say "Open Claude Code here whenever you're ready, then run /orchestra:onboard."
+    mark_step_done 3
+    return 0
   fi
+  local permission_args=()
+  if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+    permission_args=(--permission-mode "$CLAUDE_PERMISSION_MODE")
+    say "Claude Code permission mode: $CLAUDE_PERMISSION_MODE (UNDERSTUDY_CLAUDE_PERMISSION_MODE)."
+  fi
+  say "Opening Claude Code with the Orchestra plugin. First message: ${D}$INITIAL_CLAUDE_PROMPT${R}"
+  say "Exit Claude Code to return to this shell."
+  log "LAUNCH claude ${permission_args[*]:-} --plugin-dir $PKG_DIR $(redact_url "${UNDERSTUDY_CLAUDE_ARGS:-}") <initial-prompt>"
+  # curl | bash leaves stdin on the pipe, so Claude Code gets the terminal
+  # directly. No session transcript is recorded.
+  # shellcheck disable=SC2086
+  claude ${permission_args[@]+"${permission_args[@]}"} --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
+    local status="$?"
+    say "Claude Code exited with status $status."
+    return "$status"
+  }
   mark_step_done 3
 }
 
@@ -1671,7 +1848,7 @@ if [ "$FANCY" = "1" ]; then
 else
   section "Welcome. We are going to install Orchestra for your coding agent."
 fi
-say "This installer bootstraps the CLI and selected coding-agent skills, then drops you back into your coding agent when possible."
+say "This installer sets up the Orchestra CLI, your Orchestra account, and the plugin for your coding agents."
 if [ -n "$INSTALL_PACKAGE" ]; then
   warn "Source: npm package $(redact_url "$INSTALL_PACKAGE") (UNDERSTUDY_INSTALL_PACKAGE override) ${D}(installer commit: $INSTALLER_COMMIT)${R}"
 elif [ "$INSTALL_SOURCE_OVERRIDDEN" = "1" ]; then
@@ -1681,28 +1858,39 @@ else
 fi
 say "Install log: $LOG_FILE"
 say ""
+choose_setup
 select_agent_platforms
 report_agent_selection
 say "${B}Install plan${R}"
 say "  ${G2}1.${R} Install the Orchestra CLI."
-if [ "$KEEP_LOGIN" = "1" ]; then
-  say "  ${G3}·${R}  Keep the existing Orchestra sign-in (--keep-login)."
+if [ "$SKIP_LOGIN" = "1" ]; then
+  say "  ${G3}·${R}  Skip the Orchestra sign-in (run \`orchestra login\` later)."
+elif [ "$KEEP_LOGIN" = "0" ]; then
+  say "  ${G3}·${R}  Sign out any existing sign-in first (--fresh-login; backup kept), then sign in here."
 else
-  say "  ${G3}·${R}  Reset any existing sign-in so the agent-first sign-up starts fresh (backup kept; --keep-login skips)."
+  say "  ${G3}·${R}  Sign in to your Orchestra account here, unless you already are."
 fi
 say "  ${G4}2.${R} $(agent_plan_label)"
-say "  ${G5}3.${R} Open a supported coding agent here when available — otherwise finish with reload instructions."
+if [ "$LOCAL_MODELS" = "1" ]; then
+  say "  ${G5}·${R}  Start the local model lab in the background (MLX runtime + Gemma 4 E2B, about 3.6 GB)."
+fi
+say "  ${G5}3.${R} Offer to open Claude Code here, or finish with reload instructions."
 if lower_my_ant_bill_enabled; then
   say "  ${G6}·${R}  Focus onboarding on the lower Anthropic bill audit path."
 fi
 say ""
-say "Default install does not download weights, start MLX, launch the ladder server, or make frontier calls."
-say "Those actions happen later through the Orchestra onboarding skill, where the coding agent can coach the user and ask consent."
+if [ "$LOCAL_MODELS" != "1" ]; then
+  say "No model weights are downloaded and no frontier calls are made. Add the local model lab any time with --local-models."
+fi
 say "This installer writes only under $LAB, $HOME/.understudy, the global npm prefix, and selected coding-agent plugin state."
 if [ -n "${UNDERSTUDY_INSTALL_SOURCE_DIR:-}" ]; then
   say "Scratch checkout (UNDERSTUDY_INSTALL_SOURCE_DIR): $INSTALL_SOURCE_DIR is deleted before and after the install."
 fi
-confirm "Continue with this Orchestra installation?" || exit 1
+# Picking an option in the setup menu is the go-ahead; every other path
+# (flags, --require-confirm, no menu) still confirms the plan.
+if [ "$SETUP_MENU_ANSWERED" != "1" ]; then
+  confirm "Continue with this Orchestra installation?" || exit 1
+fi
 
 PKG_DIR="$(npm root -g)/$PACKAGE_NAME"
 
@@ -1722,6 +1910,7 @@ else
 fi
 
 prepare_agent_first_signin
+sign_in_in_terminal
 
 if should_run_step 2; then
   section "Step 2/3 · Install agent adapters"
@@ -1737,6 +1926,7 @@ else
   say "Skipping step 2/3: install agent adapters."
 fi
 
+start_local_model_lab
 compose_initial_prompt
 
 section "Where this goes next"
@@ -1787,7 +1977,7 @@ if lower_my_ant_bill_enabled; then
   say "Focused path: lower Anthropic bill. Ask the agent to use onboarding with the lower-Anthropic-bill path, then run the lower-anthropic-bill skill."
 fi
 if [ "$ADAPTERS_ATTEMPTED" != "1" ] || [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ]; then
-  say "That lets the coding agent run the email-code sign-up itself, explain the first local specialist model, and open a terminal of the user's choice when needed."
+  say "Onboarding profiles your setup, asks what you're working on, and points the plugin at your real workload."
 fi
 if should_run_step 3; then
   launch_selected_agent
