@@ -88,7 +88,7 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     ],
     reload: "Restart OpenCode or open a new TUI session so it reloads global skills and commands.",
     uninstall: [
-      'find "$HOME/.config/opencode/skills" -type l \\( -lname "*/orchestra-agent-tools/skills/*" -o -lname "*/understudy-agent-tools/skills/*" \\) -delete',
+      'find "$HOME/.config/opencode/skills" -type l \\( -lname "*/@orchestraai/agent-tools/skills/*" -o -lname "*/orchestra-agent-tools/skills/*" -o -lname "*/understudy-agent-tools/skills/*" \\) -delete',
       'rm -f "$HOME/.config/opencode/commands/orchestra-onboard.md"',
     ],
     onboarding: "Run /orchestra-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project.",
@@ -142,7 +142,7 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     ],
     reload: "Each Devin session starts fresh from a snapshot; no reload step is needed.",
     uninstall: [
-      "npm uninstall -g orchestra-agent-tools",
+      "npm uninstall -g @orchestraai/agent-tools",
     ],
     onboarding: "Ask Devin: Use the Understudy onboarding skill for this project.",
     notes: [

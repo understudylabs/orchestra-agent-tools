@@ -3,8 +3,10 @@
 set -euo pipefail
 
 LAB="${UNDERSTUDY_LAB:-$HOME/.understudy/agent-tools}"
-PACKAGE_NAME="orchestra-agent-tools"
-LEGACY_PACKAGE_NAME="@understudylabs/understudy-agent-tools"
+PACKAGE_NAME="@orchestraai/agent-tools"
+# Earlier package names, removed on upgrade: unscoped briefly after the
+# Orchestra rename, and @understudylabs before it. Must not contain spaces.
+LEGACY_PACKAGE_NAMES="orchestra-agent-tools @understudylabs/understudy-agent-tools"
 INSTALL_REPO_URL="${UNDERSTUDY_INSTALL_REPO_URL:-https://github.com/understudylabs/orchestra-agent-tools.git}"
 INSTALL_REF="${UNDERSTUDY_INSTALL_REF:-main}"
 INSTALL_PACKAGE="${UNDERSTUDY_INSTALL_PACKAGE:-}"
@@ -719,8 +721,8 @@ remove_previous_global_package() {
   global_root="$(npm root -g)"
   global_prefix="$(npm prefix -g)"
 
-  # The package was @understudylabs/understudy-agent-tools before the rename.
-  for package_name in "$PACKAGE_NAME" "$LEGACY_PACKAGE_NAME"; do
+  # shellcheck disable=SC2086 # LEGACY_PACKAGE_NAMES is a space-separated list.
+  for package_name in "$PACKAGE_NAME" $LEGACY_PACKAGE_NAMES; do
     package_path="$global_root/$package_name"
     if [ -e "$package_path" ] || [ -L "$package_path" ]; then
       say "Removing previous global Orchestra install at $package_path"
@@ -736,13 +738,13 @@ remove_previous_global_package() {
   for bin_name in orchestra understudy; do
     for bin_path in "$global_prefix/bin/$bin_name" "$HOME/.local/bin/$bin_name"; do
       [ -e "$bin_path" ] || [ -L "$bin_path" ] || continue
-      if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -qE 'orchestra-agent-tools|understudy-agent-tools'; then
+      if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -qE 'orchestraai/agent-tools|orchestra-agent-tools|understudy-agent-tools'; then
         say "Removing stale Orchestra command at $bin_path"
         rm -f "$bin_path"
       elif [ -f "$bin_path" ] && [ "$bin_path" != "$global_prefix/bin/$bin_name" ]; then
         # Not created by npm or this installer: a user's own wrapper stays.
         warn "Leaving existing $bin_path in place; if its directory precedes $global_prefix/bin in PATH it will shadow the newly installed $bin_name command."
-      elif [ -f "$bin_path" ] && grep -qE 'orchestra-agent-tools|understudy-agent-tools' "$bin_path" 2>/dev/null; then
+      elif [ -f "$bin_path" ] && grep -qE 'orchestraai/agent-tools|orchestra-agent-tools|understudy-agent-tools' "$bin_path" 2>/dev/null; then
         say "Removing stale Orchestra command at $bin_path"
         rm -f "$bin_path"
       fi
@@ -829,7 +831,7 @@ install_understudy_package() {
     -p "$INSTALL_SOURCE_DIR/tsconfig.install.json"
   run_logged "Prepare the CLI" node "$INSTALL_SOURCE_DIR/scripts/ensure-bin-mode.mjs"
   package_version="$(node -p 'require(process.argv[1] + "/package.json").version' "$INSTALL_SOURCE_DIR")"
-  package_tarball="$STATE_DIR/orchestra-agent-tools-$package_version.tgz"
+  package_tarball="$STATE_DIR/orchestraai-agent-tools-$package_version.tgz"
   rm -f "$package_tarball"
   # npm pack always runs `prepare` for directory inputs. The installer already
   # produced dist with its no-typecheck build, so remove prepare only from this
@@ -1054,7 +1056,7 @@ marketplace_path() {
 }
 
 # orchestra-skills records the package folder it was added from. When the
-# package moved (it was @understudylabs/understudy-agent-tools), drop the
+# package moved (see LEGACY_PACKAGE_NAMES), drop the
 # stale marketplace and plugin so the normal install below re-adds them from
 # $1. A marketplace outside an Orchestra install is left alone.
 repoint_claude_marketplace() {
@@ -1062,7 +1064,7 @@ repoint_claude_marketplace() {
   current="$(claude plugin marketplace list --json 2>/dev/null | marketplace_path orchestra-skills)"
   [ -n "$current" ] && [ "$current" != "$repo" ] || return 0
   case "$current" in
-    *orchestra-agent-tools|*understudy-agent-tools) ;;
+    */@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools) ;;
     *) return 0 ;;
   esac
   say "Moving the Orchestra Claude Code plugin from $current."
@@ -1112,7 +1114,7 @@ install_cursor_plugin() {
   local legacy="$HOME/.cursor/plugins/local/understudy"
   if [ -L "$legacy" ]; then
     case "$(readlink "$legacy" 2>/dev/null || true)" in
-      *orchestra-agent-tools|*understudy-agent-tools) rm -f "$legacy" ;;
+      */@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools) rm -f "$legacy" ;;
     esac
   fi
   if [ -L "$dest" ] && [ "$(readlink "$dest" 2>/dev/null || true)" = "$repo" ]; then
@@ -1122,7 +1124,7 @@ install_cursor_plugin() {
     local current
     current="$(readlink "$dest" 2>/dev/null || true)"
     case "$current" in
-      *orchestra-agent-tools|*understudy-agent-tools)
+      */@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools)
         rm -f "$dest"
         ln -s "$repo" "$dest"
         ok "Orchestra Cursor plugin refreshed at $dest."
@@ -1195,7 +1197,7 @@ install_codex_plugin() {
   current="$(codex plugin marketplace list --json 2>/dev/null | marketplace_path orchestra-skills)"
   if [ -n "$current" ] && [ "$current" != "$repo" ]; then
     case "$current" in
-      *orchestra-agent-tools|*understudy-agent-tools)
+      */@orchestraai/agent-tools|*orchestra-agent-tools|*understudy-agent-tools)
         log "RUN codex plugin marketplace remove orchestra-skills"
         codex plugin marketplace remove orchestra-skills >>"$LOG_FILE" 2>&1 || true
         ;;
@@ -1230,7 +1232,7 @@ link_opencode_path() {
       return 0
     fi
     case "$current" in
-      *orchestra-agent-tools/skills/*|*orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/skills/*|*understudy-agent-tools/.opencode/commands/*)
+      */@orchestraai/agent-tools/skills/*|*/@orchestraai/agent-tools/.opencode/commands/*|*orchestra-agent-tools/skills/*|*orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/skills/*|*understudy-agent-tools/.opencode/commands/*)
         rm -f "$dest"
         ln -s "$src" "$dest"
         return 0
@@ -1285,7 +1287,7 @@ install_opencode_adapter() {
   # Pre-rename command; drop it only when it links into an Orchestra checkout.
   if [ -L "$command_root/understudy-onboard.md" ]; then
     case "$(readlink "$command_root/understudy-onboard.md" 2>/dev/null || true)" in
-      *orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/understudy-onboard.md" ;;
+      */@orchestraai/agent-tools/.opencode/commands/*|*orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/understudy-onboard.md" ;;
     esac
   fi
 
@@ -1341,7 +1343,7 @@ hermes_register_dir() {
       printf '%s\n' "$stable_link"; return 0
     fi
     case "$current" in
-      *orchestra-agent-tools/skills|*understudy-agent-tools/skills)
+      */@orchestraai/agent-tools/skills|*orchestra-agent-tools/skills|*understudy-agent-tools/skills)
         rm -f "$stable_link"
         ln -s "$skills_dir" "$stable_link"
         printf '%s\n' "$stable_link"; return 0
