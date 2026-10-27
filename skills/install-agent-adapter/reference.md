@@ -12,7 +12,7 @@ Claude Code uses a local marketplace plugin declared in `.claude-plugin/`.
 REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
 ls "$REPO/.claude-plugin/marketplace.json" "$REPO/.claude-plugin/plugin.json"
 claude plugin marketplace add "$REPO"
-claude plugin install understudy@understudy-skills
+claude plugin install orchestra@orchestra-skills
 ```
 
 If it is already installed, check freshness:
@@ -22,13 +22,13 @@ claude plugin list --json
 ```
 
 If the marketplace is stale, refresh with the available Claude command for the
-installed CLI version, then reinstall `understudy@understudy-skills`.
+installed CLI version, then reinstall `orchestra@orchestra-skills`.
 
 Activation is user-typed:
 
 ```text
 /reload-plugins
-/understudy:onboard
+/orchestra:onboard
 ```
 
 No restart should be needed unless `/reload-plugins` fails.
@@ -36,8 +36,8 @@ No restart should be needed unless `/reload-plugins` fails.
 Uninstall:
 
 ```bash
-claude plugin uninstall understudy@understudy-skills
-claude plugin marketplace remove understudy-skills
+claude plugin uninstall orchestra@orchestra-skills
+claude plugin marketplace remove orchestra-skills
 ```
 
 ## Cursor
@@ -46,7 +46,7 @@ Cursor loads local plugins from `~/.cursor/plugins/local/<plugin-name>`.
 
 ```bash
 REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
-dest="$HOME/.cursor/plugins/local/understudy"
+dest="$HOME/.cursor/plugins/local/orchestra"
 ls "$REPO/.cursor-plugin/plugin.json" "$REPO/skills/understudy/SKILL.md"
 mkdir -p "$(dirname "$dest")"
 if [ -L "$dest" ] && case "$(readlink "$dest")" in "$REPO"|*understudy-agent-tools) true ;; *) false ;; esac; then
@@ -78,7 +78,7 @@ Use the Understudy onboarding skill for this project.
 Uninstall:
 
 ```bash
-rm -f "$HOME/.cursor/plugins/local/understudy"
+rm -f "$HOME/.cursor/plugins/local/orchestra"
 ```
 
 ## Codex
@@ -95,7 +95,7 @@ codex plugin marketplace add "$REPO"
 If the marketplace already exists, refresh:
 
 ```bash
-codex plugin marketplace upgrade understudy-skills
+codex plugin marketplace upgrade orchestra-skills
 ```
 
 Activation is in the Codex UI:
@@ -104,7 +104,7 @@ Activation is in the Codex UI:
 /plugins
 ```
 
-Choose the `understudy-skills` marketplace, install or enable the `understudy`
+Choose the `orchestra-skills` marketplace, install or enable the `orchestra`
 plugin, then start a new thread if needed. Next ask:
 
 ```text
@@ -114,7 +114,7 @@ Use the Understudy onboarding skill for this project.
 Uninstall: remove the plugin from `/plugins`, then remove the marketplace:
 
 ```bash
-codex plugin marketplace remove understudy-skills
+codex plugin marketplace remove orchestra-skills
 ```
 
 ## OpenCode
@@ -154,19 +154,19 @@ for skill in "$REPO"/skills/*; do
   fi
   ln -s "$skill" "$dest"
 done
-command_dest="$HOME/.config/opencode/commands/understudy-onboard.md"
+command_dest="$HOME/.config/opencode/commands/orchestra-onboard.md"
 if [ -L "$command_dest" ] && readlink "$command_dest" | grep -q 'understudy-agent-tools/.opencode/commands/'; then
   rm -f "$command_dest"
 fi
 [ -e "$command_dest" ] || [ -L "$command_dest" ] || \
-  ln -s "$REPO/.opencode/commands/understudy-onboard.md" "$command_dest"
+  ln -s "$REPO/.opencode/commands/orchestra-onboard.md" "$command_dest"
 ```
 
 Activation:
 
 ```text
 Restart OpenCode or open a new TUI session.
-/understudy-onboard
+/orchestra-onboard
 ```
 
 OpenCode may ask before reading symlink targets outside the current project.
@@ -177,14 +177,14 @@ Verify:
 
 ```bash
 ls "$HOME/.config/opencode/skills/understudy/SKILL.md"
-ls "$HOME/.config/opencode/commands/understudy-onboard.md"
+ls "$HOME/.config/opencode/commands/orchestra-onboard.md"
 ```
 
 Uninstall Understudy-owned symlinks:
 
 ```bash
 find "$HOME/.config/opencode/skills" -type l -lname '*/understudy-agent-tools/skills/*' -delete
-rm -f "$HOME/.config/opencode/commands/understudy-onboard.md"
+rm -f "$HOME/.config/opencode/commands/orchestra-onboard.md"
 ```
 
 ## Hermes Agent

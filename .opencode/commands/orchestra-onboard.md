@@ -1,5 +1,5 @@
 ---
-description: Start the Understudy onboarding skill
+description: Start the Orchestra onboarding skill
 agent: build
 ---
 

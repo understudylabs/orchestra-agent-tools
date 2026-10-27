@@ -1,11 +1,12 @@
 {
-  "name": "understudy",
-  "description": "Improve LLM apps and agents from real traces: capture evidence, build evals, optimize prompts/routes, compare models, run local models, and hand off to Understudy.",
+  "name": "orchestra",
+  "description": "Improve LLM apps and agents from real traces: capture evidence, build evals, optimize prompts/routes, compare models, run local models, and hand off to Orchestra.",
   "version": "0.6.41",
   "author": {
-    "name": "Understudy Labs"
+    "name": "Orchestra"
   },
   "keywords": [
+    "orchestra",
     "understudy",
     "llm",
     "evals",

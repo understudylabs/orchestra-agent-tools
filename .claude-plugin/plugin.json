@@ -1,12 +1,13 @@
 {
-  "name": "understudy",
-  "description": "Improve LLM apps and agents from real traces — reduce cost/latency, raise quality/reliability, capture traces, build evals, run local optimization (GEPA), compare models/providers, and route through Understudy.",
+  "name": "orchestra",
+  "description": "Improve LLM apps and agents from real traces — reduce cost/latency, raise quality/reliability, capture traces, build evals, run local optimization (GEPA), compare models/providers, and route through Orchestra.",
   "version": "0.6.41",
   "author": {
-    "name": "Understudy Labs"
+    "name": "Orchestra"
   },
   "license": "MIT",
   "keywords": [
+    "orchestra",
     "understudy",
     "llm",
     "evals",

@@ -1415,7 +1415,7 @@ describe("understudy CLI", () => {
     assert.match(result.stdout, /OpenCode/);
     assert.match(result.stdout, /\.opencode\/adapter\.json/);
     assert.match(result.stdout, /skills\/commands adapter/);
-    assert.match(result.stdout, /understudy-onboard/);
+    assert.match(result.stdout, /orchestra-onboard/);
   });
 
   it("inspects the Hermes platform adapter", () => {

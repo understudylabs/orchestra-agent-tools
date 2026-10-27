@@ -40,7 +40,7 @@ test -d "$HOME/.hermes" && echo hermes-config
 Platform details live in [`reference.md`](reference.md):
 
 - Claude Code: local marketplace plugin, then user runs `/reload-plugins`.
-- Cursor: symlink this repo into `~/.cursor/plugins/local/understudy`, then
+- Cursor: symlink this repo into `~/.cursor/plugins/local/orchestra`, then
   reload the window.
 - Codex: register the local marketplace, then user installs/enables from
   `/plugins`.
@@ -83,13 +83,13 @@ Use the Understudy onboarding skill for this project.
 For Claude Code specifically, after `/reload-plugins` the next command is:
 
 ```text
-/understudy:onboard
+/orchestra:onboard
 ```
 
 For OpenCode, the convenience command is:
 
 ```text
-/understudy-onboard
+/orchestra-onboard
 ```
 
 For Hermes, rescan in-session and start onboarding:

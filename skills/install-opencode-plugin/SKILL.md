@@ -16,7 +16,7 @@ This skill is a compatibility shim. The consolidated setup surface is
 The legacy skill name says "plugin" for compatibility with older prompts, but
 the OpenCode implementation is not a JS/TS OpenCode plugin. It is a native
 skills/commands adapter: symlink `SKILL.md` directories into OpenCode's global
-skills directory and link the `/understudy-onboard` markdown command.
+skills directory and link the `/orchestra-onboard` markdown command.
 
 ## Procedure
 
@@ -30,13 +30,13 @@ mkdir -p "$HOME/.config/opencode/skills" "$HOME/.config/opencode/commands"
 ```
 
 The reference links each `skills/<name>/` directory into OpenCode's global skill
-directory and links `.opencode/commands/understudy-onboard.md`.
+directory and links `.opencode/commands/orchestra-onboard.md`.
 
 Activation:
 
 ```text
 Restart OpenCode or open a new TUI session.
-/understudy-onboard
+/orchestra-onboard
 ```
 
 ## Safety Gates
@@ -60,4 +60,4 @@ confirming the repo contains `skills/understudy/SKILL.md`.
 
 End with: that this routed through `install-agent-adapter`; whether OpenCode
 skills were linked/refreshed/skipped due to conflicts; the restart/new-session
-step; `/understudy-onboard`; and the uninstall command.
+step; `/orchestra-onboard`; and the uninstall command.

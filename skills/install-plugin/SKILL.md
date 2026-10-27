@@ -22,14 +22,14 @@ the current commands:
 
 ```bash
 claude plugin marketplace add "$REPO"
-claude plugin install understudy@understudy-skills
+claude plugin install orchestra@orchestra-skills
 ```
 
 Activation is user-typed:
 
 ```text
 /reload-plugins
-/understudy:onboard
+/orchestra:onboard
 ```
 
 ## Safety Gates
@@ -52,4 +52,4 @@ available; otherwise show the interactive `/plugin ...` commands from
 
 End with: that this routed through `install-agent-adapter`; whether the Claude
 plugin was installed/refreshed/shown for manual run; `/reload-plugins`; the next
-command `/understudy:onboard`; and the uninstall commands.
+command `/orchestra:onboard`; and the uninstall commands.
