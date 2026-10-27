@@ -3,34 +3,27 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>understudy — the climb</title>
+<title>Orchestra — the climb</title>
 <style>
+  @font-face {
+    font-family: Inter;
+    src: url("./brand/inter-latin-variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+  }
   :root {
-    --color-paper: #F5F2ED;
-    --color-ink: #0A0A0A;
-    --color-ink-muted: #6B6862;
-    --color-rule: #D9D4CA;
-    --color-stamp: #B24A2E;
-    --color-good: #6FAE82;
-    --color-warn: #C7A04A;
-    --color-bad: #C26A55;
+    --color-paper: #FFFFFF;
+    --color-ink: #123D32;
+    --color-ink-muted: #5C6B64;
+    --color-rule: #D7DFDB;
+    --color-stamp: #123D32;
+    --color-good: #237548;
+    --color-warn: #896414;
+    --color-bad: #B04032;
     --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --font-reading: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-reading: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --settle-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
     --tool-ease: cubic-bezier(0.16, 1, 0.3, 1);   /* expo-out: smooth deceleration for the tool-column expand */
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-paper: #141311;
-      --color-ink: #E8E4DC;
-      --color-ink-muted: #8A8680;
-      --color-rule: #2A2622;
-      --color-stamp: #D7623E;
-      --color-good: #8DD39E;
-      --color-warn: #E4BF69;
-      --color-bad: #D97A66;
-    }
-    .ui-badge { background: transparent; }
   }
   * { box-sizing: border-box; }
   html, body {
@@ -286,7 +279,8 @@
     font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.16em;
     color: var(--color-ink-muted); display: flex; justify-content: space-between; gap: 16px;
   }
-  .wordmark { color: var(--color-ink); }
+  .wordmark { display: inline-flex; align-items: center; }
+  .wordmark img { display: block; width: 132px; height: auto; }
 </style>
 </head>
 <body>
@@ -337,7 +331,7 @@
 
   <!-- ============================================================= FOOT -->
   <div class="foot">
-    <span class="wordmark">understudy</span>
+    <a class="wordmark" href="https://orchestra.ai" aria-label="Orchestra"><img src="./brand/orchestra-logo-forest.svg" alt="Orchestra" width="132" /></a>
   </div>
 
 </div>
@@ -392,20 +386,10 @@
 
   var idx = 0;
 
-  var LIVE_MODELS = [
-    { id: "gemma-4-e2b", label: "gemma-4-e2b" },
-    { id: "glm-5.2", label: "GLM 5.2 · remote", billed: true },
-    { id: "minimax-m3", label: "MiniMax M3 · remote", billed: true },
-    { id: "glm-5.1", label: "GLM 5.1 · deprecates 2026-06-29", billed: true },
-    { id: "gemma-4-31b-it", label: "Gemma 4 31B · deprecates 2026-06-29", billed: true },
-    { id: "kimi-k2.6", label: "Kimi K2.6 · deprecates 2026-06-29", billed: true },
-    { id: "minimax-m2.7", label: "MiniMax M2.7 · remote", billed: true },
-    { id: "nemotron-3-nano", label: "Nemotron 3 Nano · remote", billed: true },
-    { id: "nemotron-3-super", label: "Nemotron 3 Super · remote", billed: true },
-    { id: "nemotron-3-ultra", label: "Nemotron 3 Ultra · remote", billed: true }
-  ];
+  // Remote choices come only from /models; never keep a second stale snapshot here.
+  var LIVE_MODELS = [{ id: "gemma-4-e2b", label: "gemma-4-e2b", lane: "mlx_vlm", billed: false }];
   var curModel = "gemma-4-e2b";
-  var curModelB = "glm-5.1";        // VS mode: the second model
+  var curModelB = null;             // resolved from the server catalog
   var vsOn = false;                 // VS (compare-two) mode active?
   var single = null;                // live single-pane stream handle
   var vsConns = [];                 // live VS stream handles
@@ -440,14 +424,14 @@
     return out;
   }
   function hydrateModels(){
-    return fetch('/models').then(function (r) { return r.json(); }).then(function (j) {
+    return fetch('/models').then(function (r) { if (!r.ok) throw new Error('Model catalog unavailable'); return r.json(); }).then(function (j) {
       var next = normalizeModels(j.models);
       if (!next.length) return;
       LIVE_MODELS = next;
       if (!validModel(curModel)) curModel = LIVE_MODELS[0].id;
       if (!validModel(curModelB)) curModelB = fallbackRemoteModel();
       pickModel(); pickModelB();
-    }).catch(function () { /* keep the fallback model list */ });
+    }).catch(function () { curModelB = curModel; /* Only the local lane remains when the server catalog is unavailable. */ });
   }
   function humanizeTask(id){ return id.replace(/^hard\./, '').replace(/[-_]/g, ' '); }
   var RAIL_LABELS = {   // friendly rail names; falls back to humanizeTask when absent
@@ -540,7 +524,7 @@
     buildPicker(modelPicker, LIVE_MODELS, {
       text: function (m) { return m.label; }, id: function (m) { return m.id; },
       active: function () { return curModel; },
-      billed: 'runs on the Understudy gateway — billed to your account',
+      billed: 'runs on the Orchestra gateway — billed to your account',
       pick: function (m) { curModel = m.id; pickModel(); play(); }
     });
   }
@@ -548,7 +532,7 @@
     buildPicker(modelPickerB, LIVE_MODELS, {
       label: 'vs', text: function (m) { return m.label; }, id: function (m) { return m.id; },
       active: function () { return curModelB; },
-      billed: 'runs on the Understudy gateway — billed',
+      billed: 'runs on the Orchestra gateway — billed',
       pick: function (m) { curModelB = m.id; pickModelB(); play(); }
     });
   }
@@ -569,7 +553,7 @@
     buildPicker(q('[data-name]'), LIVE_MODELS, {
       text: function (m) { return m.label; }, id: function (m) { return m.id; },
       active: function () { return which === 'a' ? curModel : curModelB; },
-      billed: 'runs on the Understudy gateway — billed to your account',
+      billed: 'runs on the Orchestra gateway — billed to your account',
       pick: function (m) { if (which === 'a') curModel = m.id; else curModelB = m.id; play(); }
     });
     if (lm && lm.billed) q('[data-billed]').textContent = '$ billed';

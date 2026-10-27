@@ -40,7 +40,7 @@ specific run or embed a precise view.
 | param | meaning |
 |---|---|
 | `?task=<id>` | task to open: a classify id (`sort-email`, `match-search`) or any tool-task id from the fixtures (e.g. `hard.sla_route`) |
-| `?model=<id>` | model lane for the single pane / VS pane A (`gemma-4-e2b` or any `/models` remote id such as `glm-5.2`) |
+| `?model=<id>` | model lane for the single pane / VS pane A (`gemma-4-e2b` or any `/models` remote id such as `glm-5.3`) |
 | `?vs=1` | open in compare-two (VS) mode |
 | `?modelB=<id>` | VS pane B's model (only meaningful with `vs=1`) |
 
@@ -53,31 +53,32 @@ extra wiring. (Both helpers live in the viewer's `<script>`.)
 
 ## Model lanes & tool-call dialects
 
-The local lane is fixed; remote lanes are gateway-backed and discovered at server
-start. If `understudy run` injects `UNDERSTUDY_ORG_ID`, `/models` tries the live
-org catalog first. Without live catalog access it falls back to the checked-in
-public remote ids. For a specific existing remote model that is not in the
-fallback list, launch with:
+The local lane is `gemma-4-e2b` (`mlx_vlm`, **$0**). Remote lanes use the
+Orchestra gateway (**billed**). At server start, gateway credentials injected by
+`understudy run` (`UNDERSTUDY_API_KEY` and `UNDERSTUDY_GATEWAY_URL`) enable
+`GET /v1/models`. Only models advertising `openai-chat` appear: this harness
+calls `/v1/chat/completions`, so Messages-only models cannot run here.
+
+The server's `FALLBACK_REMOTE_MODELS` is the single offline snapshot, checked
+against active chat routes on 2026-10-26. It includes GLM 5.3, GPT-6.1 Sol/Terra,
+Kimi K3/K3.1 Pro, DeepSeek V4.1 Flash, and the other listed releases. Retired
+GLM 5.1/5.2, Kimi K2.6, and Nemotron 3 Super are absent. A successful empty
+live catalog stays empty; only missing credentials, transport failures, or an
+invalid catalog use the snapshot. A snapshot verifies catalog configuration at
+that date, not ongoing provider health or tool-call quality.
+
+The browser gets remote choices exclusively from the server's `/models`; if
+that request fails it offers only the local lane. To deliberately override
+remote discovery, supply exact public model ids:
 
 ```sh
-UNDERSTUDY_LADDER_REMOTE_MODELS=glm-5.2 understudy run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
+UNDERSTUDY_LADDER_REMOTE_MODELS=glm-5.3,kimi-k3.1-pro understudy run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
 ```
 
-Active local lane plus default fallback remotes:
-
-| id | lane | where |
-|---|---|---|
-| `gemma-4-e2b` | `mlx_vlm` | local default, **$0** |
-| `glm-5.2` | `gateway` | Understudy gateway, **billed** |
-| `minimax-m3` | `gateway` | Understudy gateway, **billed** |
-| `glm-5.1` | `gateway` | Understudy gateway, **billed**; Lilac deprecates 2026-06-29 |
-| `gemma-4-31b-it` | `gateway` | Understudy gateway, **billed**; Lilac deprecates 2026-06-29 |
-| `kimi-k2.6` | `gateway` | Understudy gateway, **billed**; Lilac deprecates 2026-06-29 |
-| `minimax-m2.7` | `gateway` | Understudy gateway, **billed** |
-| `nemotron-3-nano` | `gateway` | Understudy gateway, **billed** |
-| `nemotron-3-super` | `gateway` | Understudy gateway, **billed** |
-| `nemotron-3-ultra` | `gateway` | Understudy gateway, **billed** |
-| `lfm2.5-8b-a1b` | `mlx_lm` | coded but commented out (uncomment in `serve.py`) |
+The `lfm2.5-8b-a1b` local lane remains coded but commented out in `serve.py`.
+The viewer uses Orchestra's forest/white palette, logo, and locally bundled
+Inter font (license in `viewer/brand/OFL.txt`). CLI commands, environment
+variables, cache paths, and schema names retain their compatibility names.
 
 Each lane speaks its own tool-call dialect against the **one** world + scorer:
 

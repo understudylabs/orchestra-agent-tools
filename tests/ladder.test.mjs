@@ -7,10 +7,11 @@ import { describe, it } from "node:test";
 
 const pythonAvailable = spawnSync("python3", ["--version"], { encoding: "utf8" }).status === 0;
 
-function ladderCatalog(env = {}) {
+function ladderCatalog(env = {}, setup = "") {
   const servePath = resolve("skills/ladder/serve.py");
   const code = `
 import importlib.util, json, os
+${setup}
 spec = importlib.util.spec_from_file_location("ladder_serve", ${JSON.stringify(servePath)})
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -39,13 +40,13 @@ describe("ladder model catalog", { skip: !pythonAvailable }, () => {
 
     assert.equal(models.get("gemma-4-e2b").lane, "mlx_vlm");
     assert.equal(models.get("gemma-4-e2b").billed, false);
-    assert.equal(models.get("glm-5.2").lane, "gateway");
-    assert.equal(models.get("glm-5.2").billed, true);
+    assert.equal(models.get("glm-5.3").lane, "gateway");
+    assert.equal(models.get("glm-5.3").billed, true);
     assert.equal(models.get("minimax-m3").lane, "gateway");
     assert.equal(models.get("minimax-m3").billed, true);
     assert.equal(models.get("nemotron-3-ultra").lane, "gateway");
     // gateway ids deprecated 2026-06-29 must not be offered as fallbacks
-    for (const retired of ["glm-5.1", "gemma-4-31b-it", "kimi-k2.6"]) {
+    for (const retired of ["glm-5.1", "glm-5.2", "gemma-4-31b-it", "kimi-k2.6", "nemotron-3-super"]) {
       assert.equal(models.has(retired), false, `${retired} should be retired`);
     }
     for (const model of payload.models) {
@@ -54,11 +55,85 @@ describe("ladder model catalog", { skip: !pythonAvailable }, () => {
   });
 
   it("can override the remote gateway list with explicit model ids", () => {
-    const payload = ladderCatalog({ UNDERSTUDY_LADDER_REMOTE_MODELS: "glm-5.2,nemotron-3-super" });
+    const payload = ladderCatalog({ UNDERSTUDY_LADDER_REMOTE_MODELS: "glm-5.3,kimi-k3.1-pro" });
     const remoteIds = payload.models.filter((model) => model.lane === "gateway").map((model) => model.id);
 
-    assert.deepEqual(remoteIds, ["glm-5.2", "nemotron-3-super"]);
-    assert.equal(payload.models.find((model) => model.id === "glm-5.2").billed, true);
+    assert.deepEqual(remoteIds, ["glm-5.3", "kimi-k3.1-pro"]);
+    assert.equal(payload.models.find((model) => model.id === "glm-5.3").billed, true);
+  });
+
+  const liveEnv = { UNDERSTUDY_API_KEY: "test-key", UNDERSTUDY_GATEWAY_URL: "https://gateway.example" };
+  function mockCatalog(data) {
+    return `
+import io, urllib.request
+requests = []
+def catalog_request(req, timeout):
+    assert req.full_url == "https://gateway.example/v1/models"
+    assert req.get_header("Authorization") == "Bearer test-key"
+    return io.BytesIO(${JSON.stringify(JSON.stringify(data))}.encode())
+urllib.request.urlopen = catalog_request
+`;
+  }
+
+  it("uses the live chat catalog instead of the offline snapshot", () => {
+    const payload = ladderCatalog(liveEnv, mockCatalog({ data: [
+      { id: "current-chat", display_name: "Current Chat", wire_shapes: ["openai-chat"] },
+      { id: "messages-only", wire_shapes: ["anthropic-messages"] },
+      { id: "retired", active: false, wire_shapes: ["openai-chat"] },
+    ] }));
+    assert.deepEqual(payload.models.filter((m) => m.billed).map((m) => m.id), ["current-chat"]);
+    assert.equal(payload.models.find((m) => m.id === "current-chat").label, "Current Chat · remote");
+  });
+
+  it("keeps an empty or incompatible live catalog empty", () => {
+    for (const data of [[], [{ id: "messages-only", wire_shapes: ["anthropic-messages"] }]]) {
+      const payload = ladderCatalog(liveEnv, mockCatalog({ data }));
+      assert.deepEqual(payload.models.map((m) => m.id), ["gemma-4-e2b"]);
+    }
+  });
+
+  it("falls back on unavailable or malformed catalogs", () => {
+    for (const setup of [mockCatalog({ error: "unavailable" }), `
+import urllib.request
+def unavailable(*args, **kwargs):
+    raise OSError("offline")
+urllib.request.urlopen = unavailable
+`]) {
+      assert.deepEqual(ladderCatalog(liveEnv, setup), ladderCatalog());
+    }
+  });
+
+  it("lets an explicit remote selection take precedence over discovery", () => {
+    const payload = ladderCatalog({ ...liveEnv, UNDERSTUDY_LADDER_REMOTE_MODELS: "chosen-model" }, mockCatalog({ data: [] }));
+    assert.deepEqual(payload.models.filter((m) => m.billed).map((m) => m.id), ["chosen-model"]);
+  });
+
+});
+
+describe("ladder brand assets", { skip: !pythonAvailable }, () => {
+  it("serves the bundled logo and font with browser-compatible content types", () => {
+    const code = `
+import importlib.util, threading, urllib.request
+spec = importlib.util.spec_from_file_location("ladder", ${JSON.stringify(resolve("skills/ladder/serve.py"))})
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+server = m.QuietServer(("127.0.0.1", 0), m.Handler)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+try:
+    for asset, mime in [("orchestra-logo-forest.svg", "image/svg+xml"), ("inter-latin-variable.woff2", "font/woff2")]:
+        with urllib.request.urlopen("http://127.0.0.1:%s/brand/%s" % (server.server_port, asset)) as response:
+            assert response.status == 200
+            assert response.headers.get_content_type() == mime
+            assert len(response.read()) > 0
+finally:
+    server.shutdown()
+    server.server_close()
+`;
+    const result = spawnSync("python3", ["-c", code], {
+      encoding: "utf8",
+      env: { ...process.env, UNDERSTUDY_API_KEY: "", UNDERSTUDY_GATEWAY_URL: "" },
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
   });
 });
 
