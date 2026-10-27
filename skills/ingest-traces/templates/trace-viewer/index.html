@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Understudy trace viewer</title>
+<title>Orchestra trace viewer</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -745,7 +745,7 @@ body { box-sizing: border-box; padding: 1.25rem; }
 <div id="understudy-trace-explorer">
   <header class="trace-header">
     <div>
-      <div id="trace-scope" class="trace-eyebrow">Local Understudy captures</div>
+      <div id="trace-scope" class="trace-eyebrow">Local Orchestra captures</div>
       <div class="trace-identity">
         <code id="trace-id">loading…</code>
         <span class="viz-badge">trace snapshot</span>
@@ -1144,8 +1144,8 @@ body { box-sizing: border-box; padding: 1.25rem; }
       ? window.TRACE_VIEWER_META
       : {};
     const traceId = viewerMeta.trace_id || source.find((capture) => capture?.trace_id)?.trace_id || "unscoped captures";
-    const scopeLabel = viewerMeta.label || "Local Understudy captures";
-    document.title = viewerMeta.title || `Understudy trace ${String(traceId).slice(0, 8)}`;
+    const scopeLabel = viewerMeta.label || "Local Orchestra captures";
+    document.title = viewerMeta.title || `Orchestra trace ${String(traceId).slice(0, 8)}`;
     document.getElementById("trace-scope").textContent = scopeLabel;
     document.getElementById("trace-id").textContent = traceId;
     const state = { selected: 0, tab: "conversation" };

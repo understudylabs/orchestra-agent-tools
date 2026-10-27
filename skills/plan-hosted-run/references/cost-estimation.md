@@ -227,4 +227,4 @@ assume the rented GPU is cheaper.**
 - Local M-series @ ~80 tok/s decode: 100e6 / 80 ≈ ~347 hr — **impractical** for this volume.
 
 Pattern: **SFT → local is the free, tolerable-time path; large-scale generation and RL
-training → cloud**, matching the Understudy local-SFT / cloud-RL split.
+training → cloud**, matching the Orchestra local-SFT / cloud-RL split.

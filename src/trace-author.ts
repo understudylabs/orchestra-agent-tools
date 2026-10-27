@@ -508,7 +508,7 @@ export function resolveGatewayAuth(env: NodeJS.ProcessEnv = process.env, credent
     if (apiKey) return { baseUrl: (org?.gateway_url ?? credentials.gateway_url ?? "https://api.understudylabs.com").replace(/\/$/, "") + "/v1", apiKey };
     if (orgIds.length > 1) throw new Error(`Multiple orgs in credentials (${orgIds.join(", ")}) and no .understudy/config.json selects one. Run \`orchestra login\` in this repo.`);
   }
-  throw new Error("No Understudy gateway key found. Task authoring only calls the Understudy gateway (https://api.understudylabs.com/v1); set UNDERSTUDY_API_KEY or run `orchestra login` to write ~/.understudy/credentials.json. Refusing to use any other provider.");
+  throw new Error("No Orchestra gateway key found. Task authoring only calls the Orchestra gateway (https://api.understudylabs.com/v1); set UNDERSTUDY_API_KEY or run `orchestra login` to write ~/.understudy/credentials.json. Refusing to use any other provider.");
 }
 
 function readCredentialsFile(path: string): Credentials | null {

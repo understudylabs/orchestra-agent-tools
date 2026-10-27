@@ -1,4 +1,4 @@
-# Understudy orchestrator — reference
+# Orchestra orchestrator — reference
 
 Depth for [`SKILL.md`](SKILL.md). The orchestrator routes; the workers do the
 work. This file holds the framing the orchestrator reuses across every job:
@@ -16,7 +16,7 @@ Inspect the repo first (see `capture-evidence`), then ask at most these four:
    workflow automation.
 3. **Constraints** — SOC 2, ZDR, approved providers, no data leaves the machine,
    max cost/run, max latency, required model family, hosting region.
-4. **Environment** — local-only, Understudy hosted, private gateway, or hybrid.
+4. **Environment** — local-only, Orchestra hosted, private gateway, or hybrid.
 
 Do not ask anything the repo answers. Surface what you found instead.
 
@@ -32,7 +32,7 @@ Do not ask anything the repo answers. Surface what you found instead.
   parallelize safe steps, simpler prompts, small models for routing/triage.
 - **D. Constraints** — see below; treat as hard limits, not objectives.
 - **E. Route** — best harness / model / supplier; local vs hosted; when to use
-  the Understudy inference layer, gateway-only, or local-only.
+  the Orchestra inference layer, gateway-only, or local-only.
 
 A single change often moves several at once (e.g. a prompt that stops retries
 cuts both cost and latency) — measure all affected axes, not just the target.
@@ -87,11 +87,11 @@ unattended mode is configured. State the data class and the exact action.
 
 Recommend the most efficient route across four axes:
 
-- **Harness** — existing app harness, the Understudy trace/eval harness, a
+- **Harness** — existing app harness, the Orchestra trace/eval harness, a
   framework-specific harness, or a custom lightweight one.
 - **Model** — current, smaller/cheaper, stronger-for-hard-cases, local, or
   fallback.
-- **Supplier** — current provider, an alternative, the Understudy inference
+- **Supplier** — current provider, an alternative, the Orchestra inference
   layer, a private deployment, or a local runtime.
 - **Routing strategy** — single model, cascade, router model, confidence-based
   escalation, or cost-/latency-/compliance-aware routing.
@@ -105,7 +105,7 @@ eval through the gateway, and the `route-decision` packet to record the choice.
 ### Fresh-pricing rule
 
 Never make cost, availability, or capability claims from memory. Use fresh data:
-the Understudy platform/model catalog where available, and official provider docs
+the Orchestra platform/model catalog where available, and official provider docs
 or the web otherwise. Label every assumption and date it. A pricing claim without
 a current source is not a claim — it's a guess.
 
@@ -119,12 +119,12 @@ or write a local deployment artifact / `understudy.yaml` in local-only mode.
 Always include rollback steps, run comparison evals, show before/after metrics,
 and list regressions — never bury them.
 
-## Understudy Agent Improvement Report
+## Orchestra Agent Improvement Report
 
 Produce this for every completed improvement attempt:
 
 ```text
-# Understudy Agent Improvement Report
+# Orchestra Agent Improvement Report
 1. Objective
 2. Constraints
 3. Current architecture
@@ -173,14 +173,14 @@ Produce this for every completed improvement attempt:
 - **Fastest safe route** — baseline latency → check current model availability
   (fresh data) → latency-aware eval → test candidates → recommend by measured
   latency at a quality threshold (`use-understudy-gateway` route A/B).
-- **Gemma-4 demo** — run a small task suite with Gemma-4 through the Understudy
+- **Gemma-4 demo** — run a small task suite with Gemma-4 through the Orchestra
   gateway (mock provider if unavailable) → capture → eval → optimize → compare →
   report the full loop.
 
 ## Glossary
 
 - **Harness** — the runnable shape that executes the task and scores it
-  (app-native, Understudy artifact contract, or a verifiers env).
+  (app-native, Orchestra artifact contract, or a verifiers env).
 - **Route** — the chosen harness + model + supplier + routing strategy +
   deployment path.
 - **Trace** — a recorded LLM/tool call (prompt, response, tool calls, latency,

@@ -1,6 +1,6 @@
 ---
 name: instrument
-description: Use when a developer's LLM app is running but has NO traces yet and wants capture flowing in about a minute with no code changes — "instrument my app", "start capturing my LLM calls", "I have no traces, get me some", "turn on tracing for my agent". Detects the provider SDK, redirects it through the Understudy gateway (capture on by default) via env vars, verifies a capture actually landed, then hands off to ingest-traces.
+description: Use when a developer's LLM app is running but has NO traces yet and wants capture flowing in about a minute with no code changes — "instrument my app", "start capturing my LLM calls", "I have no traces, get me some", "turn on tracing for my agent". Detects the provider SDK, redirects it through the Orchestra gateway (capture on by default) via env vars, verifies a capture actually landed, then hands off to ingest-traces.
 metadata:
   understudy:
     mode: interactive
@@ -96,7 +96,7 @@ OPENAI_BASE_URL="${UNDERSTUDY_GATEWAY_URL:-https://api.understudylabs.com}/v1" \
 `orchestra run` resolves the stored credentials, so inside the child process
 `$UNDERSTUDY_GATEWAY_URL` is set; the SDK's own env var points it there. The
 provider API key env var can stay as-is — the gateway authenticates with the
-Understudy key that `orchestra run` injects (see the gateway skill for
+Orchestra key that `orchestra run` injects (see the gateway skill for
 key-header details per shape).
 
 ## Step 4 — Verify a trace is actually flowing (do not skip)

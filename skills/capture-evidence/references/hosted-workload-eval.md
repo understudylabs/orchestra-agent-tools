@@ -1,7 +1,7 @@
-# Build a local eval from a hosted Understudy workload
+# Build a local eval from a hosted Orchestra workload
 
 Use this branch when the developer names a workload already captured by
-Understudy. The CLI transports and validates one exact raw workload day; the coding agent owns
+Orchestra. The CLI transports and validates one exact raw workload day; the coding agent owns
 all workload understanding, case selection, environment design, verifier
 authoring, and the conversation with the developer. The CLI is a transport and
 validation primitive, not a questionnaire or eval author. No hosted eval
@@ -245,7 +245,7 @@ stay local. The manifest carries only the selected source window, cutoff,
 capture count, byte count, and local index SHA-256; raw source files are never
 uploaded by publication.
 
-Then ask, "May I upload this manifest and checked bundle to Understudy now?"
+Then ask, "May I upload this manifest and checked bundle to Orchestra now?"
 Wait for an explicit yes. Final artifact approval alone is not permission to
 perform the external upload. Only after that separate permission, carry the
 preview's `expected_release_id` into the upload:

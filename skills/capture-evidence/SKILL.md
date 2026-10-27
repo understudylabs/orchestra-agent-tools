@@ -14,11 +14,11 @@ Use this worker when the developer has not yet produced current local evidence
 for the workload, or when any core artifact is missing, stale, ambiguous, or
 untrusted.
 
-The OSS loop does not require registration, auth, provider keys, an Understudy
+The OSS loop does not require registration, auth, provider keys, an Orchestra
 account, or hosted gateway access. Do a sufficient local pass that turns the
 workload into auditable artifacts and can answer the named decision.
 
-When the developer names a workload already captured by Understudy and the
+When the developer names a workload already captured by Orchestra and the
 active credentials can read it, use the hosted-workload front door in
 [`references/hosted-workload-eval.md`](references/hosted-workload-eval.md).
 An active `understudy.eval-project.v2` is a separate, project-local branch: use
@@ -154,7 +154,7 @@ enough provenance for another agent to repeat the step without guessing.
    score, so the next step can see whether optimization **headroom** exists —
    i.e. rows the incumbent fails that a stronger model could fix.
    Record each per-row result as an `understudy.eval_result.v1` row — the
-   required row format for eval evidence across every Understudy surface
+   required row format for eval evidence across every Orchestra surface
    ([`schemas/understudy.eval_result.v1.schema.json`](../../schemas/understudy.eval_result.v1.schema.json)):
    `run_id`, `task_id`, `split`, `score` (0..1 or null — a 0 is a scored
    failure, never a missing value), `status` (`ok`/`error`/`skipped`/`unscored`),

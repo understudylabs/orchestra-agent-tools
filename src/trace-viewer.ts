@@ -391,7 +391,7 @@ export function renderTraceViewer(
   const viewerPath = join(output, "index.html");
   const dataPath = join(output, "trace-data.js");
   const manifestPath = join(output, "manifest.json");
-  const label = labelInput?.trim() || "Local Understudy captures";
+  const label = labelInput?.trim() || "Local Orchestra captures";
   const data = [
     `window.TRACE_VIEWER_META = ${jsLiteral({ trace_id: selectedTraceId, label })};`,
     `window.TRACE_CAPTURES = ${jsLiteral(captures)};`,

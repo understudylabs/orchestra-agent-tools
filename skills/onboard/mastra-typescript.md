@@ -4,7 +4,7 @@ This recipe slots into the master onboarding task's `<<CONVERT_TARGET>>`
 placeholder. Apply it when the project uses [Mastra](https://mastra.ai)
 agents (`@mastra/core`). Mastra agents specify their model with a string
 like `model: "openai/gpt-5-mini"`, which Mastra resolves through its
-built-in model gateway. To route through Understudy, the patch swaps that
+built-in model gateway. To route through Orchestra, the patch swaps that
 string for an explicit AI SDK provider instance with a custom `baseURL`
 and headers.
 

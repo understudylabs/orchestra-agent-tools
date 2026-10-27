@@ -4,7 +4,7 @@ Deep detail for [`SKILL.md`](../SKILL.md), for the **state-mutating** lens: a
 multi-step LLM or agent loop that reads task instructions and policy docs,
 discovers or selects REST endpoints, performs writes across one or more business
 systems, and is judged by final state plus policy compliance. Use this reference
-when wiring a resettable API workflow into the Understudy artifact contract,
+when wiring a resettable API workflow into the Orchestra artifact contract,
 measuring a baseline, and comparing model, route, prompt, tool-access, or parser
 candidates.
 
@@ -338,7 +338,7 @@ Keep `baseline.model` factual. If the incumbent is unknown, write
 Use this intervention when the attributed gap is model capability or
 provider/runtime behavior. For API workflows, the comparison is simpler than
 live traffic routing: run the same harness rows twice with only the candidate
-route changed. Understudy, provider-native, and existing application runners
+route changed. Orchestra, provider-native, and existing application runners
 are all eligible when they preserve the frozen comparison and data contract.
 
 ```sh

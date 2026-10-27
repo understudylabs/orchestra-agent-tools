@@ -2,7 +2,7 @@
 
 The on-ramp for developers with no captured traces: use a public long-horizon
 agent benchmark as the golden path. The benchmark repository owns the harness.
-Understudy owns the workflow around it: inspect, capture, freeze splits,
+Orchestra owns the workflow around it: inspect, capture, freeze splits,
 baseline, optimize, compare, and write a conservative route claim.
 
 Clone public repositories on demand in the user's workspace. Keep benchmark
@@ -11,7 +11,7 @@ outputs local and link upstream docs in the final report.
 ## When to use
 
 - "Run the golden path"
-- "Try Understudy on AutomationBench"
+- "Try Orchestra on AutomationBench"
 - "Compare against Harvey LAB / legal agent benchmarks"
 - "Show me the loop without using private customer traces"
 - A demo needs credible public evidence with minimal repo surface area.
@@ -62,7 +62,7 @@ Pick one benchmark and route to the matching worker skill:
    train/dev/holdout boundaries. If the upstream public set has no optimization
    split, create a local split manifest and keep final claims caveated.
 6. Baseline. Run the incumbent model or approved frontier/local model with the
-   benchmark's own scorer. Save raw benchmark outputs and the Understudy workload
+   benchmark's own scorer. Save raw benchmark outputs and the Orchestra workload
    card.
 7. Optimize. Use [`optimize-workload`](../../optimize-workload/SKILL.md) only on
    the train/dev portion. For API-workflow tasks, hand off to
@@ -77,7 +77,7 @@ Pick one benchmark and route to the matching worker skill:
 
 - Benchmark name, URL, version or commit if available, and fit.
 - Exact upstream command or hosted environment used.
-- Upstream metric plus any Understudy workload-card mapping.
+- Upstream metric plus any Orchestra workload-card mapping.
 - Public/private or local train/dev/holdout policy.
 - Baseline vs candidate, score delta, and cost/latency if measured.
 - Conservative claim scoped to the public benchmark slice.
@@ -121,7 +121,7 @@ prime eval run zapier/AutomationBench --num-examples 5
 prime eval run zapier/AutomationBench --env-args '{"domains": "sales"}'
 ```
 
-Understudy mapping:
+Orchestra mapping:
 
 - `trigger data` -> workload inputs
 - simulated SaaS tools -> tool catalog / environment
@@ -149,7 +149,7 @@ Sources:
 - LawNext reports that LAB launched without a leaderboard and should be read with
   care because Harvey authors the benchmark.
 
-Understudy mapping:
+Orchestra mapping:
 
 - partner/associate instruction -> task prompt
 - closed matter document universe -> retrieval/search environment

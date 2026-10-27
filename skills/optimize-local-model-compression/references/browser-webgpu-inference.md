@@ -4,7 +4,7 @@ The [Gemma 4 WebGPU Kernels](https://huggingface.co/spaces/webml-community/gemma
 space by webml-community is a working reference for running a compressed LLM
 entirely in the browser via WebGPU compute shaders. It demonstrates that
 browser-based local inference is real today — and it points directly at an
-opportunity to deploy Understudy's stacked QAT compression in a new runtime.
+opportunity to deploy Orchestra's stacked QAT compression in a new runtime.
 
 ## What the reference does
 
@@ -24,7 +24,7 @@ opportunity to deploy Understudy's stacked QAT compression in a new runtime.
 - Pauses the WebGL background when the chat view scrolls into view, freeing
   the GPU for the WebGPU model.
 
-## Why this matters for Understudy
+## Why this matters for Orchestra
 
 ### The deployment surface opportunity
 
@@ -57,7 +57,7 @@ is:
 - **Single-precision.** No sensitivity-driven layer allocation. Every layer
   gets the same bit-width.
 
-### The Understudy opportunity
+### The Orchestra opportunity
 
 Our stacked compression method (QAT + g32 + tool-call calibration) produces
 an artifact that is:
@@ -70,9 +70,9 @@ an artifact that is:
 3. **Tool-call calibrated** — the calibration data source can be tuned to
    the SaaS app's specific tool schemas (CRM tools, coding tools, etc.)
 
-## How to reimplement with Understudy's stacked method
+## How to reimplement with Orchestra's stacked method
 
-The path from the reference to an Understudy-powered browser inference:
+The path from the reference to an Orchestra-powered browser inference:
 
 1. **Export the stacked artifact in a browser-compatible format.** The
    stacked method produces MLX safetensors. For WebGPU, the weights need to
@@ -90,7 +90,7 @@ The path from the reference to an Understudy-powered browser inference:
    tool definitions and traces. This makes the compressed model specifically
    good at calling the app's tools.
 
-4. **Serve via the browser, certify with Understudy.** Use the same
+4. **Serve via the browser, certify with Orchestra.** Use the same
    certification checklist (generation, tool calls, OpenAI compat, scored
    eval) but run it in a headless browser (Playwright + WebGPU) instead of
    `mlx_vlm.server`.

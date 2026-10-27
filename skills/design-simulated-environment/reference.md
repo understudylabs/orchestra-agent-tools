@@ -80,7 +80,7 @@ release. Facts that matter when deciding where a new environment should live:
 - **Eval knobs:** `EvalConfig` has `model`, `num_tasks` (`-n`),
   `num_rollouts` (`-r`), `shuffle`, `max_concurrent`, `output_dir`; endpoint =
   `base_url` + `api_key_var` + `headers` on the client config — pointing at
-  the Understudy gateway is plain config.
+  the Orchestra gateway is plain config.
 - **Offline re-scoring:** `uv run replay` recomputes trace-only reward
   handlers and judges from saved traces without re-running any model;
   runtime-requiring signals and group rewards do not replay.

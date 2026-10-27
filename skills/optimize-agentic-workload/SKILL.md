@@ -67,7 +67,7 @@ secrets. Do not print or commit `sk_*` values; let
 [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md)
 inject them into the child process only.
 
-## Resolve CLI When Using An Understudy Route
+## Resolve CLI When Using An Orchestra Route
 
 Prefer the installed `orchestra` binary. If it is unavailable inside a
 checkout:
@@ -127,7 +127,7 @@ single-output optimization does not need a tool environment.
    If Desktop produced `understudy.environment_proposal.v1` from a JSONL drop,
    treat `status: executable` as meaningful only after
    `orchestra training validate-environment-proposal --proposal <path>` passes.
-   An Understudy draft with `status: needs_verifier` is a proposal, not a
+   An Orchestra draft with `status: needs_verifier` is a proposal, not a
    harness or score; author the missing parser/environment/oracle/sentinels and
    rerun deterministic validation before any model comparison.
 
@@ -180,7 +180,7 @@ single-output optimization does not need a tool environment.
 7. **Candidate intervention — compare models and routes.** When attribution
    points to model capability or provider/runtime behavior, compare deployable
    candidates through any backend that can honor the frozen contract. The
-   Understudy CLI is one route:
+   Orchestra CLI is one route:
 
    ```sh
    orchestra models list --json

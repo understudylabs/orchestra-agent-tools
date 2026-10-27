@@ -60,7 +60,7 @@ Key points:
   which prepends `/v1/` itself. If you put `$UNDERSTUDY_GATEWAY_URL`
   without `/v1`, the SDK hits `/chat/completions` and the gateway's
   wrong-path 404 helper will explain the fix verbatim.
-- `apiKey` is now the Understudy `sk_*` (`UNDERSTUDY_API_KEY`). The SDK
+- `apiKey` is now the Orchestra `sk_*` (`UNDERSTUDY_API_KEY`). The SDK
   sends this on `Authorization: Bearer`.
 - `defaultHeaders["x-understudy-upstream-key"]` carries the user's real
   OpenAI key. **Do not delete or rename `OPENAI_API_KEY`** anywhere — the

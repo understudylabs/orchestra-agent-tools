@@ -2,7 +2,7 @@
 
 Use this recipe when the user asks to add GEPA, optimize a prompt, improve an
 eval, or create a small DSPy-style optimizer that uses their authenticated
-Understudy API key.
+Orchestra API key.
 
 This is a cookbook, not a framework migration. Keep the implementation small,
 local, and inspectable.

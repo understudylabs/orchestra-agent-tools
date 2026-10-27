@@ -43,7 +43,7 @@ rather than blocking useful analysis.
 
 ## Inputs it handles
 
-- **Understudy capture envelopes** (`.jsonl` with a `customer_request_body`).
+- **Orchestra capture envelopes** (`.jsonl` with a `customer_request_body`).
 - **Raw request JSON** (Anthropic/OpenAI shape: `model`, `system`, `messages`, `tools`).
 - **Prompt/config files** embedded in an app (`prompts/`, route handlers, agent
   policy files, YAML/JSON configs, eval manifests).
@@ -61,7 +61,7 @@ rather than blocking useful analysis.
    request log, or existing runner. List candidate surfaces and identify which
    one appears to be the actual production or benchmark workload. If given a
    dataset or trace folder, list row/count/file sizes and pick the median +
-   largest representative cases (size drives the harness story). Understudy
+   largest representative cases (size drives the harness story). Orchestra
    captures are envelopes with a `customer_request_body`; parse that to get the
    request (`model`, `system`, `messages`, `tools`, params).
 
@@ -145,7 +145,7 @@ rather than blocking useful analysis.
    local-vs-frontier feel check. For a whole-case test a small model cannot one-shot, build a simulated
    environment only when no real resettable workload exists.
 
-For a workload hosted by Understudy, follow the draft-first branch in
+For a workload hosted by Orchestra, follow the draft-first branch in
 [`../capture-evidence/references/hosted-workload-eval.md`](../capture-evidence/references/hosted-workload-eval.md).
 Use the exact one-day raw source and repository to create the local draft, then
 run `orchestra evals check --draft`. The CLI defaults to the rolling 24 hours

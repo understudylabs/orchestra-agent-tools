@@ -7,14 +7,14 @@ Full hosted reference at
 All endpoints are `GET` requests authenticated with the developer's `sk_*` key
 under `https://api.understudylabs.com/admin/v1/orgs/:org_id/...`.
 Every response (success or error) carries an `x-understudy-request-id` header —
-quote it when reporting a problem to the Understudy team.
+quote it when reporting a problem to the Orchestra team.
 
 The primary path is **organization reporting** (org-wide usage/cost ranking
 across all projects — the grounding call) followed by **workload-status**
 (per-workload health, declared vs observed routing). Project-scoped
 **usage-summary** (cache/token detail, per-group error rate) and the
 [captures metadata list](#captures-metadata-list) (concrete request ids to
-hand the Understudy team) complete the surface. The three older endpoints
+hand the Orchestra team) complete the surface. The three older endpoints
 are deprecated — see [Legacy endpoints](#legacy-endpoints-deprecated).
 
 For cost-specific investigations, use **call cost** for one request,
@@ -27,11 +27,11 @@ customer-cost history.
 All responses use the canonical vocabulary — use the same words with the user:
 
 - Route outcomes: `primary` (customer-requested model served, includes
-  catalog-by-name), `understudy` (an Understudy-configured route moved the
+  catalog-by-name), `understudy` (an Orchestra-configured route moved the
   traffic), `fallback` (recovery re-issue after a routed attempt failed).
 - Declared config: `pin` | `steer` | `none` + `split_pct` (0–100).
 - Provider labels: `anthropic` | `openai` | `managed`. `managed` means served
-  by Understudy's serving infrastructure; no other provider names appear.
+  by Orchestra's serving infrastructure; no other provider names appear.
 - `understudy-managed` as a served model = a managed model whose catalog
   mapping hasn't synced yet (fail-closed placeholder, not an error).
 - Never say "passthrough", "BYO", or "relay" to users.
@@ -123,9 +123,9 @@ orchestra reporting workload-status --project <project> --window 24h --json
 |---|---|
 | `status` | `healthy` — traffic in window, error rate below the degraded threshold. `degraded` — 5xx rate at/above threshold. `idle` — no traffic in the window. |
 | `mode` | Dominant provider label in the window (`anthropic` \| `openai` \| `managed`); per-slice truth is `served_models[].provider_label`. `null` when idle. |
-| `declared` | Routing config as configured: `routed` is `pin` (route pinned to a deployment), `steer` (route steered to a model), or `none` (no Understudy route — traffic is `primary`, models served as requested). `split_pct` is the traffic dial; 0 when `none`. |
+| `declared` | Routing config as configured: `routed` is `pin` (route pinned to a deployment), `steer` (route steered to a model), or `none` (no Orchestra route — traffic is `primary`, models served as requested). `split_pct` is the traffic dial; 0 when `none`. |
 | `route_shares` | Observed request shares by route outcome, each 0..1: `primary`, `understudy`, `fallback`. Very old windows may sum below 1 (pre-vocabulary rows land in no bucket). |
-| `rerouted_pct` | Share of requests moved by an Understudy-configured route (= `route_shares.understudy`). THE number to watch during a ramp/cutover. Deliberately not a served-vs-requested model diff — catalog-by-name rewrites the served model while staying `primary`. |
+| `rerouted_pct` | Share of requests moved by an Orchestra-configured route (= `route_shares.understudy`). THE number to watch during a ramp/cutover. Deliberately not a served-vs-requested model diff — catalog-by-name rewrites the served model while staying `primary`. |
 | `served_models[]` | Per-model slices: `model`, `provider_label`, `requests`, `share` (0..1 of the workload's requests). |
 | `error_rate` | 5xx error rate over the window (0..1). |
 | `example_request_ids` | Request ids from failing requests. Look up via `orchestra captures get <request-id>` or quote to the team. |
@@ -141,7 +141,7 @@ an observed share of ~0 means the declared route is not actually taking effect
 **Error attribution:** `served_models[]` carries request counts/shares only —
 no per-provider error counts — so a degraded workload's 5xxs cannot be pinned
 on a provider from traffic labels. Report the workload-level `error_rate` plus
-`example_request_ids` and leave provider attribution to the Understudy team.
+`example_request_ids` and leave provider attribution to the Orchestra team.
 
 ## Usage summary
 
@@ -201,7 +201,7 @@ orchestra reporting usage --project <project> --window 7d --group-by workload,da
 
 ## Cost reporting
 
-Look up one call by its Understudy request id, upstream request id, or upstream
+Look up one call by its Orchestra request id, upstream request id, or upstream
 response/message id:
 
 ```sh
@@ -255,7 +255,7 @@ GET /admin/v1/orgs/:org_id/projects/:project_id/captures?limit=25&cursor=...
 ```
 
 Recent capture **metadata** for a project — the way to collect concrete
-request ids to hand the Understudy team when `example_request_ids` is empty
+request ids to hand the Orchestra team when `example_request_ids` is empty
 or you need more. Each item is listing metadata only: `key`, `size`,
 `uploaded`, `request_id`, `workos_org_id`, `workos_api_key_id`. `limit`
 defaults to 25 (max 100); `truncated: true` comes with an opaque R2 `cursor`

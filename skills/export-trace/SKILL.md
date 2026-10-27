@@ -27,7 +27,7 @@ flow below. For a before/after task comparison, use
   prompts, completions, and tool payloads before running it.
 - Keep outputs under `.understudy/`; never print, paste, commit, or upload trace
   bodies.
-- Never ask for API keys in chat. Use existing Understudy credentials and report
+- Never ask for API keys in chat. Use existing Orchestra credentials and report
   only auth presence or errors.
 - Never replace the trace lookup with project-wide capture pagination. If the
   lookup endpoint is unavailable, stop and report the backend dependency.

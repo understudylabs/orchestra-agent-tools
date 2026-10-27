@@ -1,6 +1,6 @@
 ---
 name: use-understudy-gateway
-description: Use when a developer wants to run inference or evals through the Understudy gateway — "route my app through Understudy", "set up my account and keys", "A/B a model on part of my traffic" — or must choose between local provider keys and the gateway route ("should I use my OpenAI key or the gateway"). Handles login, projects/keys, model routing, and runs.
+description: Use when a developer wants to run inference or evals through the Orchestra gateway — "route my app through Orchestra", "set up my account and keys", "A/B a model on part of my traffic" — or must choose between local provider keys and the gateway route ("should I use my OpenAI key or the gateway"). Handles login, projects/keys, model routing, and runs.
 metadata:
   understudy:
     mode: interactive
@@ -8,21 +8,21 @@ metadata:
     cli_required: true
 ---
 
-# Use Understudy Gateway
+# Use Orchestra Gateway
 
 Use this worker when the developer wants to run an application workload through
-Understudy-managed inference or needs the CLI to execute a durable command while
+Orchestra-managed inference or needs the CLI to execute a durable command while
 the agent monitors status and artifacts.
 
 The local evidence loop does not require auth. Route here only when the developer
-explicitly asks for Understudy inference, gateway routing, project/key
+explicitly asks for Orchestra inference, gateway routing, project/key
 management, workload route configuration, hosted execution, or authenticated
 gateway routing.
 
 **Choosing frontier access?** When an onboarding step, installer, or
 local-vs-frontier comparison needs a remote frontier model, run the decision in
 [`references/frontier-keys.md`](references/frontier-keys.md) first. Default to
-the Understudy managed catalog when the requested model is available there; use
+the Orchestra managed catalog when the requested model is available there; use
 BYO shell/`.env` keys only for unsupported models, provider-specific account
 needs, or an explicit developer preference. It keeps secrets local, asks before
 reading `.env` values, and records the choice without printing keys.
@@ -44,7 +44,7 @@ download, credential, or production-impact envelope.
 
 ## Always stream gateway inference
 
-Every inference request sent to the Understudy gateway (`/v1/messages` or
+Every inference request sent to the Orchestra gateway (`/v1/messages` or
 `/v1/chat/completions`) must set `stream: true`. This is not a style
 preference: the gateway sits behind an edge that cuts any origin response
 producing no first byte within ~125 seconds and returns a 524 to the client.
@@ -94,14 +94,14 @@ node dist/bin.js status --json
    prompts for the code inline instead. Codes expire after about 10 minutes;
    rerun `--email` to send a fresh one.
 
-   This creates or finds the developer's Understudy account, retrieves an API
+   This creates or finds the developer's Orchestra account, retrieves an API
    key through the CLI, and stores it outside the repo. The key is used for
    authenticated gateway inference, project/key management, and remote model
    routes. Do not ask the developer to paste the key.
 
    Ask the developer to read the one-time code from their inbox. An agent with
    an approved native email connector may instead search narrowly for the fresh
-   Understudy sign-in email and pass the code to `orchestra login --code`. Read
+   Orchestra sign-in email and pass the code to `orchestra login --code`. Read
    only that email, and do not persist the code anywhere else.
 
 3. Confirm project/key readiness:
@@ -111,7 +111,7 @@ node dist/bin.js status --json
    orchestra keys list --json
    ```
 
-4. For frontier-vs-Understudy comparison, list public model IDs first. If the
+4. For frontier-vs-Orchestra comparison, list public model IDs first. If the
    account is keyless for frontier providers, prefer the **keyless catalog
    sweep** recipe below: clear the workload route and vary the request-body
    `model`. Use traffic-split A/B only after confirming the non-routed
@@ -133,7 +133,7 @@ node dist/bin.js status --json
    blocking the agent. While the run is in flight, advance the loop steps that
    don't depend on its output: cost-model the candidate models, pull benchmark
    context for the comparison, and scaffold the evidence artifacts
-   ([`../understudy/reference.md`](../understudy/reference.md) § "Understudy
+   ([`../understudy/reference.md`](../understudy/reference.md) § "Orchestra
    Agent Improvement Report"). Surface a notification when the run completes;
    do not silently continue. For route work, route back to
    [`../optimize-workload/SKILL.md`](../optimize-workload/SKILL.md) once the run
@@ -154,7 +154,7 @@ HTTP 200 alone does not prove the requested model ran.
 
 Use this recipe for the fastest frontier/open-weight comparison when the
 developer does not have, or does not want to use, provider keys. The same
-Understudy key can request supported Anthropic, OpenAI, and open-weight catalog
+Orchestra key can request supported Anthropic, OpenAI, and open-weight catalog
 models by public id.
 
 1. Discover public model options:

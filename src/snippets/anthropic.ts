@@ -32,7 +32,7 @@ const msg = await client.messages
   .stream({
     model: "claude-opus-4-7",
     max_tokens: 256,
-    messages: [{ role: "user", content: "Say hello from Understudy." }],
+    messages: [{ role: "user", content: "Say hello from Orchestra." }],
   })
   .finalMessage();
 console.log(msg.content[0].type === "text" ? msg.content[0].text : "");`;

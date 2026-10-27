@@ -607,7 +607,7 @@ const TOOLS = [
       "Search local coding-agent session history. mode: bm25 = Moraine's full-text index (default, " +
       "proxied to `moraine run mcp`); keyword = substring scan over event text + Gemma scan " +
       "labels/summaries (labels ranked first); both = merged, bm25 rank first. All modes enrich hits " +
-      "with Understudy scan label/summary/cluster where available; the result's mode_used reports any " +
+      "with Orchestra scan label/summary/cluster where available; the result's mode_used reports any " +
       "fallback (e.g. bm25 backend unavailable → keyword).",
     inputSchema: {
       type: "object",
@@ -684,7 +684,7 @@ const TOOLS = [
   {
     name: "explore_tasks",
     description:
-      "Understudy-native: the cluster catalog of what the user actually works on — clusters with session " +
+      "Orchestra-native: the cluster catalog of what the user actually works on — clusters with session " +
       "counts, sample labels, and how many sessions mention evals/benchmarks. Built from scan.sqlite; " +
       "if empty, suggest `orchestra explore scan`.",
     inputSchema: { type: "object", properties: {} },
@@ -692,7 +692,7 @@ const TOOLS = [
   {
     name: "explore_status",
     description:
-      "Understudy-native: data availability — ClickHouse reachability, scan/cluster/commit/language store " +
+      "Orchestra-native: data availability — ClickHouse reachability, scan/cluster/commit/language store " +
       "counts. If has_scan is false, suggest the user run `orchestra explore scan`.",
     inputSchema: { type: "object", properties: {} },
   },

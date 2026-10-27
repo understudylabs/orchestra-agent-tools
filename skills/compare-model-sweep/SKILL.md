@@ -54,7 +54,7 @@ comparison.
    local-vs-remote boundary, max tokens, reasoning effort, pricing basis, and
    whether the model is cached or requires download.
 
-   For remote Understudy candidates, run `orchestra models list --json`;
+   For remote Orchestra candidates, run `orchestra models list --json`;
    prefer managed-catalog ids unless BYO provider-direct behavior is required.
    For OpenAI GPT-6 candidates, apply the shared
    [model and endpoint compatibility rules](../use-understudy-gateway/references/model-compatibility.md).
@@ -65,7 +65,7 @@ comparison.
    workloads, also run a synthetic read-then-write sentinel through the exact
    driver and parser: execute the read, append its result, continue, execute the
    write, and score final state. Never score an intermediate tool call as a
-   no-op. For local MLX, prefer verified filesystem paths or Understudy snapshot
+   no-op. For local MLX, prefer verified filesystem paths or Orchestra snapshot
    aliases over arbitrary Hugging Face ids. Apply the shared gates in
    [`../capture-evidence/references/evaluation-evidence-gates.md`](../capture-evidence/references/evaluation-evidence-gates.md).
    Check model identity on the smoke and every scored request, including tool
@@ -104,7 +104,7 @@ comparison.
    errors, empty responses, and caveats. If per-task latency is unavailable, use
    run-level duration and say so.
 
-   For Understudy gateway runs, capture `x-understudy-mode`,
+   For Orchestra gateway runs, capture `x-understudy-mode`,
    `x-understudy-route`, and `x-understudy-effective-model`; exclude rows where
    requested and effective model disagree unless that is the test.
 

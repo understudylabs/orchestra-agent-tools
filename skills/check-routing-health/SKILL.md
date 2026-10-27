@@ -1,6 +1,6 @@
 ---
 name: check-routing-health
-description: Use when a developer asks "is Understudy causing my errors", "which workloads are routed", "is my routing config actually taking effect", "is my provider healthy", "are there 500s on staging", "what's our error rate", "where is my gateway spend going", or wants self-service diagnostics without asking the team. Reads the hosted reporting endpoints with the developer's sk_* key.
+description: Use when a developer asks "is Orchestra causing my errors", "which workloads are routed", "is my routing config actually taking effect", "is my provider healthy", "are there 500s on staging", "what's our error rate", "where is my gateway spend going", or wants self-service diagnostics without asking the team. Reads the hosted reporting endpoints with the developer's sk_* key.
 metadata:
   understudy:
     mode: interactive
@@ -15,7 +15,7 @@ For a historical workload comparison organized by user and task, follow
 It complements aggregate health with exact private request provenance and does
 not authorize traffic changes.
 
-Use this worker when the developer wants to know whether Understudy routing is
+Use this worker when the developer wants to know whether Orchestra routing is
 causing errors, which workloads are routed, whether a declared route is really
 taking effect, or where their gateway usage and spend goes. These are read-only
 hosted endpoints that answer "is this us?" without asking the team.
@@ -39,7 +39,7 @@ Everything you say to the user must use the canonical routing vocabulary:
 
 - **Route outcomes** (`route_shares`): `primary` — the customer-requested
   model was served (includes catalog-by-name); `understudy` — an
-  Understudy-configured route moved the traffic; `fallback` — a recovery
+  Orchestra-configured route moved the traffic; `fallback` — a recovery
   re-issue after a routed attempt failed.
 - **Declared config** (`declared`): `pin` | `steer` | `none`, plus the split
   percent (`split_pct`).
@@ -116,7 +116,7 @@ node dist/bin.js status --json
      workload-level `error_rate` and the `example_request_ids`. Do NOT name a
      failing upstream from `served_models[]` — it carries request shares only,
      no per-provider error counts, so traffic labels cannot say which provider
-     produced the 5xxs. Leave provider attribution to the Understudy team and
+     produced the 5xxs. Leave provider attribution to the Orchestra team and
      quote the request ids.
    - **Declared-vs-observed drift is a finding — normalize units first.**
      `declared.split_pct` is 0–100; `route_shares.understudy` is a 0..1 share.
@@ -149,7 +149,7 @@ node dist/bin.js status --json
 
 6. If any call fails or a number looks wrong, capture the
    `x-understudy-request-id` response header and quote it when reporting the
-   problem to the Understudy team — it is the join key on their side.
+   problem to the Orchestra team — it is the join key on their side.
 
 7. If issues are found and the developer wants to roll back, route to
    [`../ramp-and-verify/SKILL.md`](../ramp-and-verify/SKILL.md) or clear the

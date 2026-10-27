@@ -1,4 +1,4 @@
-# Understudy Serving Manifest (`understudy.serving.v1`)
+# Orchestra Serving Manifest (`understudy.serving.v1`)
 
 A **machine-readable** record of the correct serving settings for a local model
 artifact, so the launcher applies them by default instead of the operator

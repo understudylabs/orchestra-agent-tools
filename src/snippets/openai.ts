@@ -32,7 +32,7 @@ const stream = await client.chat.completions.create({
   model: "gpt-4o-mini",
   max_tokens: 256,
   stream: true,
-  messages: [{ role: "user", content: "Say hello from Understudy." }],
+  messages: [{ role: "user", content: "Say hello from Orchestra." }],
 });
 let text = "";
 for await (const chunk of stream) {

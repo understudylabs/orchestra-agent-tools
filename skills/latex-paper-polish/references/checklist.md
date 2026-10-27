@@ -13,7 +13,7 @@
 ## Prose
 
 - Cut throat-clearing and repeated section summaries.
-- Replace vague nouns with actors: Understudy, provider, route, scorer, harness.
+- Replace vague nouns with actors: Orchestra, provider, route, scorer, harness.
 - Remove repeated metaphors once the analogy is established.
 - Avoid "not X, but Y" unless the contrast is genuinely the point.
 - Keep caveats concrete and close to the claim they qualify.

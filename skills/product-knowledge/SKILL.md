@@ -1,6 +1,6 @@
 ---
 name: product-knowledge
-description: Use when a user asks what Understudy is, how Understudy Desktop works, how local model serving, Fusion sidekick, evals, model candidate results, rollout labs, Product Knowledge, or Understudy product capabilities should be explained to developers, customers, or agents.
+description: Use when a user asks what Orchestra (formerly Understudy) is, how Understudy Desktop works, how local model serving, Fusion sidekick, evals, model candidate results, rollout labs, Product Knowledge, or Orchestra product capabilities should be explained to developers, customers, or agents.
 metadata:
   understudy:
     mode: interactive
@@ -10,7 +10,7 @@ metadata:
 
 # Product Knowledge
 
-Explain Understudy as backend-agnostic infrastructure for improving LLM systems from real work:
+Explain Orchestra as backend-agnostic infrastructure for improving LLM systems from real work:
 capture traces, run evals, compare model routes, optimize prompts or policies, and promote
 the route that best meets the developer's objective across quality, reliability,
 latency, cost, and constraints.
@@ -24,7 +24,7 @@ skill when the user needs the fuller story.
 
 ## Safety Gates
 
-Understudy defaults to the strongest active model and managed cloud execution
+Orchestra defaults to the strongest active model and managed cloud execution
 unless the user selects Local or names a hard constraint. Dropping a workload
 starts analysis; launching a displayed plan authorizes its bounded upload,
 provider calls, hosted work, evaluation, receipts, and cleanup. State that
@@ -52,8 +52,8 @@ node dist/bin.js status --json
 ## Product Surfaces
 
 - **Desktop app** (deprecated) — local control plane for chat, model serving, traces, evals, usage, account setup, and training workflows; see `docs/desktop-deprecation.md`.
-- **Local serving** — warm MLX slots for Understudy-suffixed local models, with first-run bootstrap for runtimes and model downloads.
-- **Chat harness** — the Understudy agent runtime streams answers, reasoning, guarded tool calls, tool results, and compaction evidence to the native UI.
+- **Local serving** — warm MLX slots for Orchestra-suffixed local models, with first-run bootstrap for runtimes and model downloads.
+- **Chat harness** — the Orchestra agent runtime streams answers, reasoning, guarded tool calls, tool results, and compaction evidence to the native UI.
 - **Fusion sidekick** — a smaller local model lane used for bounded read-only work while the main lane keeps planning, ambiguity, and final review.
 - **Evals / rollout lab** — run task suites across model candidates and harness modes, watch each rollout, persist scores, and inspect failures.
 - **Candidate results** — Test Results-style view that groups model-family task outcomes into passed, failed, running, skipped, score, latency, and drilldown rows.

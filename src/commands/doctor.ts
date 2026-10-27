@@ -30,7 +30,7 @@ export function registerDoctorCommand(
     .command("doctor")
     .description("Run local repository diagnostics or hosted readiness checks.")
     .option("--json", "Output JSON")
-    .option("--hosted", "Check hosted Understudy readiness without provider calls.")
+    .option("--hosted", "Check hosted Orchestra readiness without provider calls.")
     .option("--probe", "After hosted checks pass, run one explicit tiny gateway probe.")
     .option("--project-id <id>", "Project id for hosted checks.")
     .option("--project <slug>", "Project slug for hosted checks.")

@@ -156,7 +156,7 @@ export function resolveAuth(orgId?: string): ResolvedAuth {
 
   if (!credentials) {
     throw new Error(
-      "No Understudy credentials found. Run `orchestra login` to create ~/.understudy/credentials.json.",
+      "No Orchestra credentials found. Run `orchestra login` to create ~/.understudy/credentials.json.",
     );
   }
 
@@ -207,7 +207,7 @@ function resolveOrgId(
       `Multiple orgs in credentials (${orgs.join(", ")}). Pass --org to disambiguate.`,
     );
   }
-  throw new Error("No Understudy org configured. Run `orchestra login`.");
+  throw new Error("No Orchestra org configured. Run `orchestra login`.");
 }
 
 /**

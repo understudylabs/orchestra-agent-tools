@@ -77,7 +77,7 @@ export async function startConversationSidecar(options: {
   const token = options.token ?? process.env.UNDERSTUDY_RUNTIME_TOKEN;
   if (!token) {
     throw new Error(
-      "UNDERSTUDY_RUNTIME_TOKEN is required; start this runtime through the Understudy CLI",
+      "UNDERSTUDY_RUNTIME_TOKEN is required; start this runtime through the Orchestra CLI",
     );
   }
   const controllers = new Map<string, AbortController>();

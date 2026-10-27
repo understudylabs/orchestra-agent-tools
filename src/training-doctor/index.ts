@@ -532,7 +532,7 @@ export async function runTrainingDoctor(
       id: "server_capabilities",
       label: "training service capabilities",
       status: "fail",
-      detail: "no Understudy credentials found",
+      detail: "no Orchestra credentials found",
       next: "Run `orchestra login` to create ~/.understudy/credentials.json.",
     });
     skip(state, "run_status", "live run status", "blocked by earlier failure");

@@ -90,7 +90,7 @@ function warnIfPermissive(path: string): void {
     if ((mode & 0o077) !== 0) {
       const display = mode.toString(8).padStart(3, "0");
       process.stderr.write(
-        `warning: ${path} mode is ${display}; expected 600. Anyone on this machine can read your Understudy API key.\n`,
+        `warning: ${path} mode is ${display}; expected 600. Anyone on this machine can read your Orchestra API key.\n`,
       );
     }
   } catch {

@@ -143,10 +143,10 @@ content at the beginning for caching, using Structured Outputs instead of
 describing schemas only in prose, and tuning reasoning effort and verbosity for
 cost/latency.
 
-Important repo boundary: the Understudy gateway path in this repo is still
+Important repo boundary: the Orchestra gateway path in this repo is still
 Chat-Completions-shaped for OpenAI examples. If a customer app should move to
 the OpenAI Responses API, record that as an API-surface migration and do not
-pretend the Understudy gateway already supports Responses unless the current
+pretend the Orchestra gateway already supports Responses unless the current
 repo proves it.
 
 ## Repo Scan Checklist
@@ -274,6 +274,6 @@ When proposing an OpenAI candidate:
 - log cached tokens, reasoning tokens, latency, output length, fallback rate, and
   score in the same comparison artifact.
 
-For Understudy-gateway-backed tests in this repo, stay within currently
+For Orchestra-gateway-backed tests in this repo, stay within currently
 supported OpenAI Chat Completions examples unless the repo has added Responses
 support.

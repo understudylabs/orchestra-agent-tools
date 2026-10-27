@@ -18,7 +18,7 @@ selection and retry removal in the ingestion flow must not alter rollout counts.
 [`../capture-evidence/SKILL.md`](../capture-evidence/SKILL.md) assumes a local
 harness can be attached and run. Many workloads arrive the other way around:
 the traces already exist — in an object-store bucket, a provider log export,
-or an Understudy gateway capture export — and the job is to get them into
+or an Orchestra gateway capture export — and the job is to get them into
 local evidence artifacts without leaking anything. This worker does that
 transformation: local source → normalized captures → source-history DAG →
 machine-proposed benchmark → human judgment, all on the local machine.
@@ -60,7 +60,7 @@ Identify the source shape first:
   existing tooling (`aws s3`, `rclone`, `wrangler`); pull to a local staging
   dir.
 - **Provider log export**: JSONL/CSV of historical calls.
-- **Understudy frozen cohort**: select only workload-scoped, redacted capture
+- **Orchestra frozen cohort**: select only workload-scoped, redacted capture
   metadata, review the summary, freeze the exact references, and materialize
   that auditable cohort locally:
 

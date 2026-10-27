@@ -54,7 +54,7 @@ function routeSetupCode(opts: SetupCodeOpts, json: boolean): void {
       `Recipe: ${payload.recipe}`,
       opts.file ? `File hint: ${opts.file}` : null,
       "",
-      "Run `orchestra setup` to install the onboarding skill, then ask your coding agent to convert this repo to Understudy.",
+      "Run `orchestra setup` to install the onboarding skill, then ask your coding agent to convert this repo to Orchestra.",
       "The CLI does not rewrite source code directly.",
     ]
       .filter((line): line is string => line !== null)

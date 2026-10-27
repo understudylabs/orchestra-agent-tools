@@ -62,7 +62,7 @@ Usage: install.sh [--yes] [--non-interactive] [--resume] [--from-step N] [--only
 Installs the Orchestra CLI + detected coding-agent skill/plugin surfaces, then
 hands the user back to the selected coding agent when possible. It does not
 download model weights, start MLX, launch the ladder server, or make frontier
-calls. Those are guided by the Understudy onboarding skill after the user is in
+calls. Those are guided by the Orchestra onboarding skill after the user is in
 their coding agent.
 
 If you are already signed in, the installer signs you out by default so the
@@ -91,7 +91,7 @@ Options:
   --no-launch-claude    legacy alias for --no-launch-agent
   --launch-agent        open a supported coding agent at the end (default)
   --launch-claude       legacy alias for --launch-agent
-  --lab PATH            local Understudy runtime/log directory
+  --lab PATH            local Orchestra runtime/log directory
 
 Exit codes:
   0  success
@@ -617,7 +617,7 @@ manual_adapter_instructions() {
   say "  Codex:       codex plugin marketplace add $repo"
   say "  OpenCode:    ln -s $repo/skills/understudy \$HOME/.config/opencode/skills/understudy"
   say "  Hermes:      add $repo/skills to skills.external_dirs in $(hermes_config_path), then /reload-skills"
-  say "  Devin:       cloud-based, no local install — ask Devin to use the Understudy onboarding skill for this project"
+  say "  Devin:       cloud-based, no local install — ask Devin to use the Orchestra onboarding skill for this project"
   say "Or rerun this installer with an explicit adapter, e.g.: --agents claude-code"
 }
 summarize_agent_adapters() {
@@ -943,13 +943,13 @@ compose_initial_prompt() {
     else
       email_clause="ask me for my email, then run \`$cli login --email <my-email>\`"
     fi
-    signup="Start with the agent-first Understudy sign-up: check \`$cli status --json\`, and if signed_in is false, $email_clause — it emails me a one-time code and exits. Ask me for the code from my inbox (or fetch it yourself if you have email access, reading only the Understudy sign-in email), finish with \`$cli login --code <code>\`, and confirm with \`$cli status --json\`. Then "
+    signup="Start with the agent-first Orchestra sign-up: check \`$cli status --json\`, and if signed_in is false, $email_clause — it emails me a one-time code and exits. Ask me for the code from my inbox (or fetch it yourself if you have email access, reading only the Orchestra (or Understudy) sign-in email), finish with \`$cli login --code <code>\`, and confirm with \`$cli status --json\`. Then "
   fi
   local next_prompt
   if lower_my_ant_bill_enabled; then
-    next_prompt="use the Understudy onboarding skill with the lower-Anthropic-bill path for this project. Set my primary goal to lowering my Anthropic/Claude API bill. After the local proof, run the lower-anthropic-bill skill against this repo: inventory Anthropic call sites, re-baseline token counts for Opus 4.7+ tokenizer changes, audit prompt-cache hit opportunities, build a savings ledger, and propose measured Anthropic, OpenAI, or local route candidates. Do not spend money, upload data, or call providers without my explicit approval and a cap."
+    next_prompt="use the Orchestra onboarding skill with the lower-Anthropic-bill path for this project. Set my primary goal to lowering my Anthropic/Claude API bill. After the local proof, run the lower-anthropic-bill skill against this repo: inventory Anthropic call sites, re-baseline token counts for Opus 4.7+ tokenizer changes, audit prompt-cache hit opportunities, build a savings ledger, and propose measured Anthropic, OpenAI, or local route candidates. Do not spend money, upload data, or call providers without my explicit approval and a cap."
   else
-    next_prompt="use the Understudy onboarding skill for this project. Guide me through getting my first local Understudy, launch the ladder climb, then help me pick a real problem or find local data so we can try to make the Understudy beat the frontier on that task slice."
+    next_prompt="use the Orchestra onboarding skill for this project. Guide me through getting my first local specialist model, launch the ladder climb, then help me pick a real problem or find local data so we can try to make the specialist beat the frontier on that task slice."
   fi
   if [ -n "$signup" ]; then
     INITIAL_CLAUDE_PROMPT="${signup}${next_prompt}"
@@ -1036,7 +1036,7 @@ install_claude_plugin() {
     record_adapter "claude-code" "installed" "plugin installed"
   fi
   say "In Claude Code, type /reload-plugins once to activate the skills."
-  say "Then type /orchestra:onboard so the agent can guide the first local Understudy."
+  say "Then type /orchestra:onboard so the agent can guide your first local specialist model."
 }
 
 # Print the source path a marketplace listing (JSON on stdin) records for one
@@ -1148,7 +1148,7 @@ install_cursor_plugin() {
     record_adapter "cursor" "installed" "plugin linked"
   fi
   say "In Cursor, restart the app or run Developer: Reload Window."
-  say "Then ask Cursor Agent: Use the Understudy onboarding skill for this project."
+  say "Then ask Cursor Agent: Use the Orchestra onboarding skill for this project."
 }
 
 install_codex_plugin() {
@@ -1221,7 +1221,7 @@ install_codex_plugin() {
     fi
   fi
   say "In Codex, run /plugins, choose the orchestra-skills marketplace, and install or enable the orchestra plugin."
-  say "Then ask Codex: Use the Understudy onboarding skill for this project."
+  say "Then ask Codex: Use the Orchestra onboarding skill for this project."
 }
 
 link_opencode_path() {
@@ -1298,7 +1298,7 @@ install_opencode_adapter() {
     adapter_prereq_missing "opencode" "no skills were linked ($skipped existing path conflicts)"
   fi
   say "In OpenCode, restart the TUI or open a new session so skills and commands reload."
-  say "Then run /orchestra-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project."
+  say "Then run /orchestra-onboard, or ask OpenCode: Use the Orchestra onboarding skill for this project."
 }
 
 hermes_config_path() {
@@ -1449,7 +1449,7 @@ PY
   fi
 
   say "In Hermes, run /reload-skills (or start a new session) so it rescans skills.external_dirs."
-  say "Then run /onboard, or ask Hermes: Use the Understudy onboarding skill for this project."
+  say "Then run /onboard, or ask Hermes: Use the Orchestra onboarding skill for this project."
 }
 
 install_devin_adapter() {
@@ -1478,8 +1478,8 @@ install_devin_adapter() {
     say "This does not block skill access — Devin reads AGENTS.md and the skills/ tree directly."
     record_adapter "devin" "installed" "skills tree accessible; sentinel missing"
   fi
-  say "In Devin, ask: Use the Understudy onboarding skill for this project."
-  say "For persistent installs, add the npm install to the Devin environment blueprint."
+  say "In Devin, ask: Use the Orchestra onboarding skill for this project."
+  say "For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
 }
 
 install_agent_adapters() {
@@ -1612,7 +1612,7 @@ launch_hermes() {
   say "Start a fresh Hermes session in: $(pwd)"
   say "  hermes"
   say "In an already-open session, run /reload-skills to pick them up without restarting."
-  say "Then run /onboard, or ask Hermes: Use the Understudy onboarding skill for this project."
+  say "Then run /onboard, or ask Hermes: Use the Orchestra onboarding skill for this project."
   say "The installer does not auto-launch Hermes because piped installers cannot reliably hand it a stable interactive TTY."
   mark_step_done 3
 }
@@ -1632,8 +1632,8 @@ launch_devin() {
   section "Step 3/3 · Devin"
   say "The Orchestra CLI and skills are installed."
   say "Devin is a cloud-based agent — it reads AGENTS.md and accesses the skills/ tree directly."
-  say "Ask Devin: Use the Understudy onboarding skill for this project."
-  say "For persistent installs, add the npm install to the Devin environment blueprint."
+  say "Ask Devin: Use the Orchestra onboarding skill for this project."
+  say "For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
   mark_step_done 3
 }
 
@@ -1697,7 +1697,7 @@ if lower_my_ant_bill_enabled; then
 fi
 say ""
 say "Default install does not download weights, start MLX, launch the ladder server, or make frontier calls."
-say "Those actions happen later through the Understudy onboarding skill, where the coding agent can coach the user and ask consent."
+say "Those actions happen later through the Orchestra onboarding skill, where the coding agent can coach the user and ask consent."
 say "This installer writes only under $LAB, $HOME/.understudy, the global npm prefix, and selected coding-agent plugin state."
 if [ -n "${UNDERSTUDY_INSTALL_SOURCE_DIR:-}" ]; then
   say "Scratch checkout (UNDERSTUDY_INSTALL_SOURCE_DIR): $INSTALL_SOURCE_DIR is deleted before and after the install."
@@ -1746,11 +1746,11 @@ section "Where this goes next"
 if [ "$ADAPTERS_ATTEMPTED" != "1" ]; then
   say "The installer is done. The next experience belongs inside your coding agent:"
   say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
-  say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Understudy onboarding skill."
-  say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Understudy onboarding skill."
+  say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Orchestra onboarding skill."
+  say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Orchestra onboarding skill."
   say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
-  say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Understudy onboarding skill."
-  say "  Devin: ask Devin to use the Understudy onboarding skill for this project. For persistent installs, add the npm install to the Devin environment blueprint."
+  say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Orchestra onboarding skill."
+  say "  Devin: ask Devin to use the Orchestra onboarding skill for this project. For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
 elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
   if [ "$(normalize_agent_platform "$AGENT_PLATFORMS")" = "none" ]; then
     say "The installer is done. No coding-agent plugins were requested, so only the orchestra CLI was installed."
@@ -1768,26 +1768,26 @@ else
     say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
   fi
   if adapter_installed "cursor"; then
-    say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Understudy onboarding skill."
+    say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Orchestra onboarding skill."
   fi
   if adapter_installed "codex"; then
-    say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Understudy onboarding skill."
+    say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Orchestra onboarding skill."
   fi
   if adapter_installed "opencode"; then
     say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
   fi
   if adapter_installed "hermes"; then
-    say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Understudy onboarding skill."
+    say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Orchestra onboarding skill."
   fi
   if adapter_installed "devin"; then
-    say "  Devin: ask Devin to use the Understudy onboarding skill for this project. For persistent installs, add the npm install to the Devin environment blueprint."
+    say "  Devin: ask Devin to use the Orchestra onboarding skill for this project. For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
   fi
 fi
 if lower_my_ant_bill_enabled; then
   say "Focused path: lower Anthropic bill. Ask the agent to use onboarding with the lower-Anthropic-bill path, then run the lower-anthropic-bill skill."
 fi
 if [ "$ADAPTERS_ATTEMPTED" != "1" ] || [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ]; then
-  say "That lets the coding agent run the email-code sign-up itself, explain the first local Understudy, and open a terminal of the user's choice when needed."
+  say "That lets the coding agent run the email-code sign-up itself, explain the first local specialist model, and open a terminal of the user's choice when needed."
 fi
 if should_run_step 3; then
   launch_selected_agent

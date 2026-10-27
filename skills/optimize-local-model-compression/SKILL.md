@@ -176,7 +176,7 @@ expected fidelity vs the current artifact; and any approval still needed
   evidence table.
 - [`references/browser-webgpu-inference.md`](references/browser-webgpu-inference.md)
   — browser-based local inference via WebGPU (the Gemma 4 WebGPU Kernels
-  reference), and how to reimplement it with Understudy's stacked QAT
+  reference), and how to reimplement it with Orchestra's stacked QAT
   compression for SaaS apps that want client-side summarization, offline
   tool calling, and privacy-preserving inference.
 - [`../manage-local-models/reference.md`](../manage-local-models/reference.md)

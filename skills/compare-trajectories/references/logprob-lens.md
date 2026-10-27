@@ -12,7 +12,7 @@ prompt/schema repair, or training data.
 
 ## Artifact Dependency (read this first)
 
-The renderer expects Understudy eval-run directories with a specific shape:
+The renderer expects Orchestra eval-run directories with a specific shape:
 
 - `rows.jsonl` — per-row records joined by `input_id`, each with
   `expected_tool_call`, `predicted_tool_call`, and `usage`;

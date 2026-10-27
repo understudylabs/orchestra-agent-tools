@@ -617,7 +617,7 @@ async function createPiRuntimeSession(options: {
       .map(textContent)
       .filter(Boolean)
       .join("\n\n") ||
-    "You are the Understudy conversation runtime. Use only explicitly provided tools.";
+    "You are the Orchestra conversation runtime. Use only explicitly provided tools.";
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir: join(root, "agent"),

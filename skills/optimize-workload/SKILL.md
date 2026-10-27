@@ -79,7 +79,7 @@ validator kinds in [`reference.md`](reference.md):
   task beyond frontier; stop.
 - **Models** — student = a cheap candidate; `reflection_lm` = a strong frontier
   model (optional, but a weak one caps quality). **Inference defaults to
-  Understudy** within the activated workflow:
+  Orchestra** within the activated workflow:
   `orchestra login --email <developer-email>`, then
   `orchestra run -- <local command>`. Fall back to the developer's own
   provider keys only if they choose BYO. See reference.md → Inference.
@@ -123,13 +123,13 @@ validator kinds in [`reference.md`](reference.md):
    --execute` uses exact `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and
    `cloudpickle==3.1.2` packages on Python 3.13 and
    additionally requires separate student/reflection model names, an approved dollar cap, and explicit input
-   and output token prices before it resolves the Understudy API key. It passes
+   and output token prices before it resolves the Orchestra API key. It passes
    auth to the child process through environment only, disables client-side
    retries, and reserves each request's worst case against one price-basis ledger
    (settled to a conservative billable bound once usage returns) before
    running train/dev rows. A program bridge may bind student and reflection to
    independent credential-free routes by naming credential environment
-   variables; missing mappings use the Understudy Gateway. Receipt the
+   variables; missing mappings use the Orchestra Gateway. Receipt the
    requested alias, exact executed DSPy/LiteLLM model, and only response model
    identity actually exposed. Do not infer ZDR from a route name or
    `workload_capture: false`. Treat the resulting attribution
@@ -179,7 +179,7 @@ validator kinds in [`reference.md`](reference.md):
    record the command, model/deployment, metric-call budget, dollar cap, token
    price basis, reserved upper bound, attributed usage, seed, selected
    candidate, rejected variants when available, and whether provider calls were
-   made through Understudy.
+   made through Orchestra.
 7. Freeze the candidate before any holdout validation.
 8. Run holdout only once the candidate is frozen, and record score, failures,
    latency basis, cost basis, fallback route, demotion trigger, and caveats.

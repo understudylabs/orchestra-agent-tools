@@ -18,7 +18,7 @@ state**, so you can compare frontier vs. local and hill-climb the local model.
 
 ## Default environment first
 
-Before building a codebase-specific environment, every new local Understudy
+Before building a codebase-specific environment, every new local specialist model
 should run in a tiny **default environment** so the user has an immediate,
 repeatable baseline:
 

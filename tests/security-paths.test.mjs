@@ -50,7 +50,7 @@ test("resolveGatewayAuth reads credentials through the shared schema", () => {
     );
     assert.deepEqual(resolveGatewayAuth({}, credentialsPath), { baseUrl: "https://gw.example.test/v1", apiKey: "key-1" });
 
-    assert.throws(() => resolveGatewayAuth({}, path.join(dir, "missing.json")), /Understudy gateway/);
+    assert.throws(() => resolveGatewayAuth({}, path.join(dir, "missing.json")), /Orchestra gateway/);
 
     fs.writeFileSync(
       credentialsPath,
