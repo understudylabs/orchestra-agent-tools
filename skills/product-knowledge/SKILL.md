@@ -36,10 +36,10 @@ model slots, account credentials, or a release channel, say that directly.
 ## Resolve CLI
 
 Product explanations usually do not need the CLI. When you need live local status,
-prefer the installed `understudy` binary:
+prefer the installed `orchestra` binary:
 
 ```sh
-understudy status --json
+orchestra status --json
 ```
 
 If working inside a checkout where the binary is unavailable:
@@ -72,10 +72,10 @@ download):
 
 What a still-installed app manages vs headless: the app owns the local daemon
 (`~/.understudy/agent-card.json`), warm model slots, managed downloads, chat
-runs, and supervision — inspect it with `understudy daemon status` and the
-`understudy desktop ...` verbs (deprecated). The trace → benchmark → review → run → rigor
+runs, and supervision — inspect it with `orchestra daemon status` and the
+`orchestra desktop ...` verbs (deprecated). The trace → benchmark → review → run → rigor
 lifecycle is fully headless via the CLI and the benchmarks MCP server
-(`understudy benchmarks mcp`); see
+(`orchestra benchmarks mcp`); see
 [`../operate-benchmark-lab/SKILL.md`](../operate-benchmark-lab/SKILL.md).
 
 ## Explanation Pattern

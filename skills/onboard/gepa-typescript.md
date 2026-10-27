@@ -9,7 +9,7 @@ local, and inspectable.
 
 ## Contract
 
-- The user is authenticated through `understudy login`.
+- The user is authenticated through `orchestra login`.
 - The CLI owns credential storage. Do not read or edit
   `~/.understudy/credentials.json` directly.
 - The optimizer script may require `UNDERSTUDY_API_KEY` at runtime, but must
@@ -29,17 +29,17 @@ local, and inspectable.
 Run:
 
 ```bash
-understudy status --json
+orchestra status --json
 ```
 
 If the output is not signed in, stop and print exactly:
 
 ```text
-Run 'understudy login' once, then re-run me.
+Run 'orchestra login' once, then re-run me.
 ```
 
 If it is signed in, continue. Do not print the API key. The script may require
-`UNDERSTUDY_API_KEY`, but the normal execution path is `understudy run -- npm run gepa`,
+`UNDERSTUDY_API_KEY`, but the normal execution path is `orchestra run -- npm run gepa`,
 which injects that env var into the child process without exposing the raw key
 to the agent or writing it to disk. Make the runner fail with a clear message
 when it is executed without that env:
@@ -207,11 +207,11 @@ execute the script.
 Run a smoke test with a small example set through the authenticated CLI:
 
 ```bash
-understudy run -- npm run gepa
+orchestra run -- npm run gepa
 ```
 
-Do not echo the key. If `understudy run` reports that the user is not signed in, print
-exactly: `Run 'understudy login' once, then re-run me.`
+Do not echo the key. If `orchestra run` reports that the user is not signed in, print
+exactly: `Run 'orchestra login' once, then re-run me.`
 
 ## Report
 
@@ -221,5 +221,5 @@ End with:
 - The package script added
 - The examples or eval source used
 - The exact command to run
-- A reminder that `understudy run` injects the key into the child process and the key
+- A reminder that `orchestra run` injects the key into the child process and the key
   is not committed

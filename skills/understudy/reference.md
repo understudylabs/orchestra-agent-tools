@@ -98,8 +98,8 @@ Recommend the most efficient route across four axes:
 
 Execute and measure routes through the gateway primitives (see
 [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md)):
-`understudy models` to see public options, `understudy workloads` to route a
-workload to a model at a traffic percentage (A/B), `understudy run` to drive an
+`orchestra models` to see public options, `orchestra workloads` to route a
+workload to a model at a traffic percentage (A/B), `orchestra run` to drive an
 eval through the gateway, and the `route-decision` packet to record the choice.
 
 ### Fresh-pricing rule

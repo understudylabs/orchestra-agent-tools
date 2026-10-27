@@ -14,14 +14,14 @@ do not manufacture a receipt to bypass acquisition checks.
 ## 1. Freeze the question
 
 Resolve the installed CLI as described in `../SKILL.md`. Check
-`understudy traces review-rollout --help` before proceeding. An older binary
+`orchestra traces review-rollout --help` before proceeding. An older binary
 without this command is a version blocker, not a reason to recreate it.
 
 Run metadata-only discovery using existing credentials:
 
 ```sh
-understudy projects list --org <org-id> --json
-understudy workloads list --org <org-id> --project-id <project-id> --json
+orchestra projects list --org <org-id> --json
+orchestra workloads list --org <org-id> --project-id <project-id> --json
 ```
 
 Choose an exact workload name and ID within one organization/project. The
@@ -133,7 +133,7 @@ bounded payload download. Announce that private files may contain prompts,
 completions and tool data, then run:
 
 ```sh
-understudy traces review-rollout \
+orchestra traces review-rollout \
   --spec .understudy/rollout-reviews/<run>/spec.json \
   --out .understudy/rollout-reviews/<run>/review \
   --download --include-payload --yes
@@ -154,7 +154,7 @@ do not silently refresh the inventory to make missing records disappear.
 For an offline rebuild using the verified frozen sources:
 
 ```sh
-understudy traces review-rollout \
+orchestra traces review-rollout \
   --spec .understudy/rollout-reviews/<run>/spec.json \
   --out .understudy/rollout-reviews/<run>/review
 ```
@@ -199,7 +199,7 @@ passed to `--out`, not the `viewer/` directory. After the offline verification
 above, build the existing private trace viewer for that single saved capture:
 
 ```sh
-understudy traces build-viewer \
+orchestra traces build-viewer \
   --source .understudy/rollout-reviews/<run>/review/<source.path> \
   --output .understudy/rollout-reviews/<run>/inspection/<request-id>
 ```

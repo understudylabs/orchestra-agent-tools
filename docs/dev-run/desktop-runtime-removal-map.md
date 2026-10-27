@@ -31,7 +31,7 @@ production build, the root Node suite, public-skill validation, and the npm
 package smoke. Its observation monitor remains:
 
 ```sh
-understudy desktop migration-status --require-ready --json
+orchestra desktop migration-status --require-ready --json
 ```
 
 At promotion time, the last exact released cohort contained 5/100 qualifying
@@ -111,7 +111,7 @@ The release artifact exposes the gate directly:
 APP_VERSION=0.3.18
 RUNTIME_VERSION=0.3.18
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1 \
-understudy runtime conformance \
+orchestra runtime conformance \
   --backend pi \
   --slot <warm-desktop-slot> \
   --capabilities compaction,restart,supervision \
@@ -122,7 +122,7 @@ understudy runtime conformance \
   --output ".understudy/capture-evidence/desktop-runtime-conformance-${RUNTIME_VERSION}.json"
 npm run runtime:desktop-readiness -- \
   --output ".understudy/capture-evidence/desktop-runtime-readiness-${APP_VERSION}.json"
-understudy desktop migration-status \
+orchestra desktop migration-status \
   --conformance-evidence ".understudy/capture-evidence/desktop-runtime-conformance-${RUNTIME_VERSION}.json" \
   --readiness-evidence ".understudy/capture-evidence/desktop-runtime-readiness-${APP_VERSION}.json" \
   --require-ready --json

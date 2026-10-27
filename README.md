@@ -21,7 +21,8 @@ Orchestra (formerly Understudy) maintains this public, MIT-licensed skill
 library plus a thin CLI. It gives your coding agent the playbooks to evaluate
 an AI workload locally, optimize it, and route it to a better-value model —
 **local-first, with no uploads, no provider calls, and nothing spent by
-default**. The CLI, plugin, and skill names still use `understudy`.
+default**. The CLI is `orchestra` (`understudy` still works as an alias);
+plugin and skill names still use `understudy`.
 
 ## Get started (30 seconds)
 
@@ -136,7 +137,7 @@ flowchart LR
 ```
 
 Registration is not required for that loop. Hosted gateway access is available
-after `understudy login`; browser, channel, daemon, and desktop-runtime
+after `orchestra login`; browser, channel, daemon, and desktop-runtime
 commands remain outside this public CLI until intentionally extracted.
 
 ## How it's built
@@ -146,7 +147,7 @@ supported coding agents share the same [`skills/`](skills/) tree and differ
 only in a thin adapter: manifest, install path, reload step, and onboarding
 invocation. The adapter registry lives in
 [`docs/agent-platform-adapters.md`](docs/agent-platform-adapters.md) and is
-exposed through `understudy platforms`.
+exposed through `orchestra platforms`.
 
 | Spine | Path | Purpose |
 | --- | --- | --- |
@@ -191,26 +192,26 @@ For manual setup, removal, or adapter internals, see
 also inspect the live registry from the CLI:
 
 ```bash
-understudy platforms
-understudy platforms --inspect claude-code
-understudy --json platforms
+orchestra platforms
+orchestra platforms --inspect claude-code
+orchestra --json platforms
 ```
 
 ## First commands
 
 ```bash
-understudy spine              # prints the public workflow
-understudy skills --list      # list every installed skill
-understudy skills --search gateway
-understudy platforms          # supported agent adapters
-understudy doctor             # local environment check
-understudy models runtime doctor  # verify the pinned Apple Silicon VLM engine
+orchestra spine              # prints the public workflow
+orchestra skills --list      # list every installed skill
+orchestra skills --search gateway
+orchestra platforms          # supported agent adapters
+orchestra doctor             # local environment check
+orchestra models runtime doctor  # verify the pinned Apple Silicon VLM engine
 ```
 
 `spine` prints the public workflow and points agents at
 `skills/understudy/SKILL.md`.
 
-Understudy Desktop is deprecated; the remaining `understudy desktop` commands
+Understudy Desktop is deprecated; the remaining `orchestra desktop` commands
 print a deprecation warning and will be removed in a future release. See
 [`docs/desktop-deprecation.md`](docs/desktop-deprecation.md).
 
@@ -271,22 +272,22 @@ Everything above runs without an account. When you want the hosted gateway,
 the first auth journey is intentionally narrow:
 
 ```bash
-understudy login --email you@company.com   # emails a one-time code
-understudy login --code 123456             # completes sign-in (non-TTY shells)
-understudy doctor --hosted
-understudy workloads list
-understudy workloads create classify --capture
-understudy gateway probe --provider anthropic --project rehearsal --workload classify
-understudy captures list --project rehearsal --workload classify
-understudy captures list --project rehearsal --workload classify --from 2026-06-07T10:14:00Z --to 2026-06-07T10:16:00Z --json
-understudy captures export --request-ids-file request-ids.txt --project rehearsal --out .understudy/capture-batch --include-payload --yes
-understudy traces export <trace-id> --project rehearsal --out .understudy/trace-exports --include-payload --yes
-understudy traces export --trace-ids-file trace-ids.txt --project rehearsal --out .understudy/trace-exports --include-payload --yes
-understudy traces export --project rehearsal --workload classify --date 2026-08-29 --out .understudy/trace-exports/day --include-payload --yes
-understudy evals build --project rehearsal --workload classify --name classification-day --out .understudy/evals/classification-day --yes
-understudy routes set classify --project rehearsal --model-id glm-5.1 --traffic-pct 10
-understudy routes show classify --project rehearsal
-understudy routes clear classify --project rehearsal
+orchestra login --email you@company.com   # emails a one-time code
+orchestra login --code 123456             # completes sign-in (non-TTY shells)
+orchestra doctor --hosted
+orchestra workloads list
+orchestra workloads create classify --capture
+orchestra gateway probe --provider anthropic --project rehearsal --workload classify
+orchestra captures list --project rehearsal --workload classify
+orchestra captures list --project rehearsal --workload classify --from 2026-06-07T10:14:00Z --to 2026-06-07T10:16:00Z --json
+orchestra captures export --request-ids-file request-ids.txt --project rehearsal --out .understudy/capture-batch --include-payload --yes
+orchestra traces export <trace-id> --project rehearsal --out .understudy/trace-exports --include-payload --yes
+orchestra traces export --trace-ids-file trace-ids.txt --project rehearsal --out .understudy/trace-exports --include-payload --yes
+orchestra traces export --project rehearsal --workload classify --date 2026-08-29 --out .understudy/trace-exports/day --include-payload --yes
+orchestra evals build --project rehearsal --workload classify --name classification-day --out .understudy/evals/classification-day --yes
+orchestra routes set classify --project rehearsal --model-id glm-5.1 --traffic-pct 10
+orchestra routes show classify --project rehearsal
+orchestra routes clear classify --project rehearsal
 ```
 
 To correlate a database execution with hosted captures when no request ID was
@@ -349,11 +350,11 @@ and the [CLI command reference](https://docs.understudylabs.com/open-source/cli)
 for every command in the journey above.
 
 For agents that read loose `.claude/skills/` directories but not plugins,
-`understudy setup` remains as the legacy fallback: it copies the onboarding
+`orchestra setup` remains as the legacy fallback: it copies the onboarding
 skill into `./.claude/skills/` (`--global` for `~/.claude/skills/`). Either
 way, then ask the coding agent to convert the current repo to Orchestra or
 add a thin GEPA/DSPy optimizer. The installed onboarding skill starts by
-checking `understudy status --json` and stops with a clear login instruction
+checking `orchestra status --json` and stops with a clear login instruction
 if the user is not authenticated.
 
 </details>
@@ -402,14 +403,14 @@ recipe.
 `gateway probe` sends one explicit tiny request. It is not a daemon, proxy,
 browser, chat runtime, or hosted agent surface. Full-runtime command names such
 as `browser`, `channels`, `schedule`, `daemon`, `agent`, and `chat` are not
-registered in this public CLI. Use `understudy skills --search <query>` to find
+registered in this public CLI. Use `orchestra skills --search <query>` to find
 the relevant capability skill instead.
 
 For GEPA/DSPy work, the CLI stays as the guide and gate surface while Python is
 used only for small local optimizer environments:
 
 ```bash
-understudy optimize-workload adapter run --repo . --adapter dspy-gepa \
+orchestra optimize-workload adapter run --repo . --adapter dspy-gepa \
   --samples samples.json --input-keys question --output-keys answer \
   --model student-model --reflection-model reflection-model \
   --budget-usd <approved-usd> \

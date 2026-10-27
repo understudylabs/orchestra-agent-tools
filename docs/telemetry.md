@@ -14,8 +14,8 @@ Disable telemetry with:
 UNDERSTUDY_TELEMETRY=0
 ```
 
-The CLI discloses this state directly: `understudy login` prints a one-line
-notice on success, and `understudy status` shows a `telemetry` line (and a
+The CLI discloses this state directly: `orchestra login` prints a one-line
+notice on success, and `orchestra status` shows a `telemetry` line (and a
 `telemetry_enabled` field under `--json`).
 
 ## Destination

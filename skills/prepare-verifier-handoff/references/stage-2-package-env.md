@@ -60,7 +60,7 @@ substitute.
    conforming subclass, not a duck-typed lookalike (trainer env-workers call
    base-class methods like `set_kwargs`; a hand-rolled class that works when
    driven directly dies the moment a trainer serves it). For new trace-derived
-   environments, consume the package emitted by `understudy traces
+   environments, consume the package emitted by `orchestra traces
    build-benchmark`. On the legacy v0 API
    (`verifiers==0.2.0`, frozen upstream) that is `vf.StatefulToolEnv` (seeded
    per-rollout state via `update_tool_args`) or `vf.MultiTurnEnv`

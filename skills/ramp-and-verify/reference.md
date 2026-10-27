@@ -29,7 +29,7 @@ gate 1 only after every check below passes:
 The packet's `route_policy` block
 (`understudy.fusion_route_policy_export.v1`) is the app-side routing evidence
 a route-decision packet may cite in its `evidence` field before
-`understudy routes promote` consumes it (promote validates
+`orchestra routes promote` consumes it (promote validates
 `understudy.route_decision_packet.v1` and refuses unversioned or
 evaluate-first packets).
 

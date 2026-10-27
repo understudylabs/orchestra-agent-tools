@@ -55,7 +55,7 @@ extra wiring. (Both helpers live in the viewer's `<script>`.)
 
 The local lane is `gemma-4-e2b` (`mlx_vlm`, **$0**). Remote lanes use the
 Orchestra gateway (**billed**). At server start, gateway credentials injected by
-`understudy run` (`UNDERSTUDY_API_KEY` and `UNDERSTUDY_GATEWAY_URL`) enable
+`orchestra run` (`UNDERSTUDY_API_KEY` and `UNDERSTUDY_GATEWAY_URL`) enable
 `GET /v1/models`. Only models advertising `openai-chat` appear: this harness
 calls `/v1/chat/completions`, so Messages-only models cannot run here.
 
@@ -72,7 +72,7 @@ that request fails it offers only the local lane. To deliberately override
 remote discovery, supply exact public model ids:
 
 ```sh
-UNDERSTUDY_LADDER_REMOTE_MODELS=glm-5.3,kimi-k3.1-pro understudy run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
+UNDERSTUDY_LADDER_REMOTE_MODELS=glm-5.3,kimi-k3.1-pro orchestra run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
 ```
 
 The `lfm2.5-8b-a1b` local lane remains coded but commented out in `serve.py`.
@@ -249,7 +249,7 @@ simpler), and it stays a local demo — the path to actual RL is the export in
 
 - **Use `uv`, not system python.** The local lanes need a current mlx stack; a
   stale system `mlx_lm` can't load some models:
-  `understudy run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py`.
+  `orchestra run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py`.
 - **Model cache.** Local weights load from `~/.understudy/models/<dir>` (override
   the root with `UNDERSTUDY_MODEL_HOME`) — the `gemma-4-e2b` id resolves to the
   `gemma-4-e2b-it-qat-mlx-vlm-understudy` directory, not one named for the id. Missing

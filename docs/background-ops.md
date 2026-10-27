@@ -22,11 +22,11 @@ mlx_lm.server --model <mlx-community/repo> --port 8080 \
 SERVER_PID=$!
 echo "mlx_lm.server PID $SERVER_PID — log: .understudy/local-model-lab/server.log"
 
-# understudy run eval — long eval run, do not block on it
-understudy run -- <eval-command> \
+# orchestra run eval — long eval run, do not block on it
+orchestra run -- <eval-command> \
   >> .understudy/runs/eval.log 2>&1 &
 RUN_PID=$!
-echo "understudy run PID $RUN_PID — log: .understudy/runs/eval.log"
+echo "orchestra run PID $RUN_PID — log: .understudy/runs/eval.log"
 ```
 
 **Agent background task (preferred when the agent platform supports it):**
@@ -58,7 +58,7 @@ echo "server ready"
 - A successful `/v1/models` response means weights are loaded and the endpoint
   accepts requests — only then run the eval or smoke-test.
 
-### `understudy run` — tail the log and check exit code
+### `orchestra run` — tail the log and check exit code
 
 ```bash
 # tail output while other work runs
@@ -70,7 +70,7 @@ SECONDS=0
 while kill -0 "$RUN_PID" 2>/dev/null; do
   sleep 5
   if [ "$SECONDS" -ge 7200 ]; then
-    echo "understudy run timed out after 2 hours — check .understudy/runs/eval.log"
+    echo "orchestra run timed out after 2 hours — check .understudy/runs/eval.log"
     kill "$RUN_PID" 2>/dev/null
     kill $TAIL_PID 2>/dev/null
     exit 1
@@ -81,9 +81,9 @@ EXIT=$?
 kill $TAIL_PID 2>/dev/null
 
 if [ $EXIT -eq 0 ]; then
-  echo "understudy run succeeded — inspect artifacts"
+  echo "orchestra run succeeded — inspect artifacts"
 else
-  echo "understudy run exited $EXIT — check .understudy/runs/eval.log"; exit $EXIT
+  echo "orchestra run exited $EXIT — check .understudy/runs/eval.log"; exit $EXIT
 fi
 ```
 

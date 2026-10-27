@@ -153,7 +153,7 @@ exploits. Full mapping in
   file listings, error messages, or record fields the read tools can reach.
   Grep the reachable synthetic state for gold keys/values; anything findable
   by a read call is a leak. For trace-compiled environments this is now
-  partly automatic: `understudy traces build-benchmark` splits fixtures into
+  partly automatic: `orchestra traces build-benchmark` splits fixtures into
   candidate-readable pre-state (`fixtures.json`, task_id-scoped) and
   scorer-only post-state (`gold.json`, never served to a rollout), and runs a
   tiered leakage audit — tier 1 verbatim matches are `findings`, tier 2 fuzzy
@@ -169,7 +169,7 @@ exploits. Full mapping in
   are guessable — a coin-flip agent clears them half the time. Prefer gold
   states with multiple required keys/values plus forbidden writes, so recall,
   precision, and policy must all hold at once.
-- **Attest it.** For a benchmark directory, `understudy benchmarks rigor
+- **Attest it.** For a benchmark directory, `orchestra benchmarks rigor
   <dir>` writes `rigor-report.md` — the ABC attestation over the artifacts on
   disk (oracle solvability, null/spam trivial-arm floors from
   `calibration.json`, incumbent calibration, per-task contract complexity,
@@ -211,7 +211,7 @@ Caveat: the bricks look independent, but the **parser must match the model** (an
 the trainer's renderer must too) — that's the seam that breaks on a new model arch.
 When you swap the model brick, re-check the parser/renderer.
 
-For trace-derived work, generate the environment through `understudy traces
+For trace-derived work, generate the environment through `orchestra traces
 build-benchmark`; do not begin from the legacy v0 example. The helper was
 live-verified on 2026-07-29 against Prime Intellect Verifiers `0.2.1`
 (release commit `ab65b6e8d34b03d162408d4bcb854430a86809e6`). It emits the current typed
@@ -239,7 +239,7 @@ the same formats work in reverse as export targets:
   pinning inputs by **sha256 digests**. Our per-task `version` +
   `content_hashes` map onto that shape directly.
 - **verifiers / Prime Intellect Environments Hub** — package the env as a
-  `verifiers` v1 environment (the shape `understudy traces build-benchmark`
+  `verifiers` v1 environment (the shape `orchestra traces build-benchmark`
   already generates) and publish to the Environments Hub; record the hub
   slug and pinned version so a re-import round-trips through
   `imported_from`.
@@ -254,7 +254,7 @@ validator's axes; the oracle's perfect score; and each candidate model's
 recall/precision/policy + cost/latency — with the local-model gap to close.
 
 When starting from a portable JSONL training plan, first render
-`understudy training goal-card --plan <plan.json> --preview 0` and validate the
+`orchestra training goal-card --plan <plan.json> --preview 0` and validate the
 resulting `understudy.environment_proposal.v1` artifact. Increase the preview
 only when useful; it is bounded to three TRAIN rows and never exposes held-out
 targets. Model-authored environment proposals are design input only and remain

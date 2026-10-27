@@ -20,7 +20,7 @@ table and agent loop in `docs/agent-operator-surface.md`.
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. If it is unavailable inside a repo
+Prefer the installed `orchestra` binary. If it is unavailable inside a repo
 checkout, run through the package script:
 
 ```sh
@@ -30,32 +30,32 @@ node dist/bin.js benchmarks mcp --root <dir>
 
 MCP registration (Claude Code `~/.claude.json` → `mcpServers`):
 `{ "understudy-benchmarks": { "type": "stdio", "command": "understudy", "args": ["benchmarks", "mcp"] } }`
-— or let the CLI write it: `claude mcp add --scope user understudy-benchmarks -- understudy benchmarks mcp`
+— or let the CLI write it: `claude mcp add --scope user understudy-benchmarks -- orchestra benchmarks mcp`
 (`--scope user` matches the top-level entry above; the default `local` scope is per-project).
 Default root `~/.understudy/benchmarks`; add `--root` per extra directory.
 
 ## Safety Gates
 
-- **Queueing is not executing.** `queue_run` / `understudy runs queue` only
+- **Queueing is not executing.** `queue_run` / `orchestra runs queue` only
   writes a request file. Model rollouts spend gateway money only when an
   executor picks the request up; say which executor will, before queueing.
 - **Trust posture, not per-call dialogs.** Spend-adjacent shapes (multi-arm
   or multi-rollout runs, implicit all-task runs, experiment
   approval/verdict patches) consult the one-time posture in
-  `~/.understudy/trust.json` (`understudy trust set`, levels `local_sandbox`
+  `~/.understudy/trust.json` (`orchestra trust set`, levels `local_sandbox`
   < `bounded_experiments` < `hosted_ops`). At `bounded_experiments`+ they
   proceed with a visible one-line notice (arm count, rough cost) — surface
   that notice to the user, then keep moving. Below that, the guard returns
-  the one action to offer (`understudy trust set bounded_experiments`);
+  the one action to offer (`orchestra trust set bounded_experiments`);
   `confirm: true` after explicit in-chat consent stays a per-call escape
   hatch. There is NO default spend cap: the posture's
   `allow_spend_usd_per_run` is an opt-in generous stop-loss (warn at 1x with
   a recorded `spend_warning`; hard stop only at 2x with `spend_stop`). When
-  offering the raise, offer it with the flag: `understudy trust set
+  offering the raise, offer it with the flag: `orchestra trust set
   bounded_experiments --spend-stop-loss <usd>`, sized to roughly 2x the
   estimated matrix cost. The stop-loss counts recorded costs only, so arms
   that report no cost never trip it. The guard and notice run in the chat
-  tools and the benchmarks MCP server; `understudy runs queue` has neither,
+  tools and the benchmarks MCP server; `orchestra runs queue` has neither,
   so on that path state arms x tasks x rollouts and the rough cost yourself
   before queueing.
 - **Local arms are machine-aware.** On predicted OOM (onboarding profile /
@@ -140,8 +140,8 @@ The method-ladder decision contract is in
    verifier's (did scoring reflect what actually happened). Fixture-test the
    verifier (one valid pass, one plausible-wrong fail — see Safety Gates).
    Only after that pilot task survives audit do you batch-author the rest.
-1. **Build.** Captured traces → `understudy traces build-benchmark`, then
-   `understudy traces author-tasks` (gateway) for legible task definitions.
+1. **Build.** Captured traces → `orchestra traces build-benchmark`, then
+   `orchestra traces author-tasks` (gateway) for legible task definitions.
    The generated environment already ships the fixtures pre/post split
    (candidate-readable `fixtures.json` vs scorer-only `gold.json`) and the
    tiered gold-leakage audit (tier 1 verbatim findings, tier 2 fuzzy
@@ -157,10 +157,10 @@ The method-ladder decision contract is in
    benchmarks running `review-policy.json` `default_decision: "pending"`
    (the old explicit-accept flow).
    Task or environment wrong? `submit_feedback` appends the ledger entry and
-   returns the regenerate-env handoff (`understudy traces regenerate-env`).
+   returns the regenerate-env handoff (`orchestra traces regenerate-env`).
 3. **Promote and calibrate.** Gate promotion on
-   `understudy benchmarks rigor <dir> --ci` (nonzero exit = findings to fix
-   first), then `understudy traces promote` unlocks full runs.
+   `orchestra benchmarks rigor <dir> --ci` (nonzero exit = findings to fix
+   first), then `orchestra traces promote` unlocks full runs.
    Queue the incumbent (`--incumbent` / `incumbent_models`) plus
    `trivial_arms: ["null_agent", "spam_agent"]`. Read `calibration.json`:
    `null_floor`/`spam_floor` with `floor_exceeded: true` (> 5%) names the
@@ -172,12 +172,12 @@ The method-ladder decision contract is in
    suffix appended to each task's system prompt) so prompt and model arms
    land in the same run under distinct arm labels.
 5. **Execute.** Make sure exactly one executor is running:
-   `understudy runs execute --benchmark <dir> --watch` (daemon; polls every
+   `orchestra runs execute --benchmark <dir> --watch` (daemon; polls every
    30s) or omit `--watch` for a single pass. Poll `run_status` until rows
    land; `rollout_timeout` kills hung rollouts into anomaly rows.
 6. **Read results rigorously.** `read_rollout` / `diff_rollouts`
    (`tool_sequence.diverges_at`, unmet obligations), then
-   `understudy benchmarks rigor <dir>` → `rigor-report.md` — the ABC
+   `orchestra benchmarks rigor <dir>` → `rigor-report.md` — the ABC
    attestation (oracle solvability, floors, calibration, contract
    complexity, anomalies, contamination provenance; honest UNKNOWN rows for
    unchecked items). Bootstrap CIs per `docs/benchmark-rigor.md`.
@@ -206,7 +206,7 @@ status).
 
 Operate it with three verbs:
 
-- **`understudy runs regrade --benchmark <dir> [--run <id>] [--task <id>...]
+- **`orchestra runs regrade --benchmark <dir> [--run <id>] [--task <id>...]
   [--dry-run]`** — verifier-only change: re-scores retained trajectory
   evidence offline against the CURRENT verifier and writes fresh rows under
   `<run>-regrade-<n>` (source-run provenance, original cost/latency
@@ -215,14 +215,14 @@ Operate it with three verbs:
   next to their regrades. Never queues rollouts, never spends gateway
   money. If you're about to rerun after a gold/rubric fix, stop — regrade
   instead.
-- **`understudy benchmarks upgrade <dir> --against <old-benchmark.json>`** —
+- **`orchestra benchmarks upgrade <dir> --against <old-benchmark.json>`** —
   diffs the current manifest against the archived previous one and prints
   the minimal plan first: which task ids **rerun**, which **regrade**, which
   **reuse**, and the resulting version bump; then appends one
   `versions.jsonl` line (`--dry-run` skips the append). Nothing executes;
   `--queue --model <id>` writes run requests for the rerun set only.
-- **`understudy benchmarks rigor <dir>... --ci`** — the gate before
-  `understudy traces promote` and before publishing any new version: exits
+- **`orchestra benchmarks rigor <dir>... --ci`** — the gate before
+  `orchestra traces promote` and before publishing any new version: exits
   nonzero on hard findings (floors exceeded, oracle unsolved, verbatim
   leakage, contamination) instead of just writing the report; UNKNOWN is
   fatal only with `--strict`. Run it in the upgrade path too — a version
@@ -242,13 +242,13 @@ aggregates, counted and named, never silently dropped or silently included.
 - **Check first**: `ps`/events for a live `runs execute` watcher; the first
   stderr line prints `executor version <v> (pid <n>)`. A live foreign claim
   is respected; a dead claim is taken over (staleness takeover).
-- **Start**: `understudy runs execute --benchmark <dir> --watch` in the
+- **Start**: `orchestra runs execute --benchmark <dir> --watch` in the
   background; single-pass (no `--watch`) for one drain. Stop safely by
   killing the watcher between polls — requests are re-claimable; in-flight
   rollouts past the timeout become anomaly rows, never silent hangs.
 - **Desktop app daemon** (separate thing — local model serving, not the run
-  queue): `understudy daemon status` pid-checks and health-probes
-  `~/.understudy/agent-card.json`; then `understudy desktop capabilities` /
+  queue): `orchestra daemon status` pid-checks and health-probes
+  `~/.understudy/agent-card.json`; then `orchestra desktop capabilities` /
   `status` / `model|slot|download|chat` verbs. See
   [`reference.md`](reference.md) for what the app covers vs headless CLI.
 

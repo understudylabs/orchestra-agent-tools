@@ -65,7 +65,7 @@ Identify the source shape first:
   that auditable cohort locally:
 
   ```sh
-  understudy evals create --project <slug> --workload <name> \
+  orchestra evals create --project <slug> --workload <name> \
     --last 14d --name <name>
   ```
 
@@ -75,12 +75,12 @@ Identify the source shape first:
   redacted selection before freezing it:
 
   ```sh
-  understudy evals catalog --project <slug> --workload <name> \
+  orchestra evals catalog --project <slug> --workload <name> \
     --from <iso> --to <iso> --limit 50 --seed <seed> \
     --out .understudy/evals/catalog.json --json
-  understudy evals cohort create --project <slug> --workload <name> \
+  orchestra evals cohort create --project <slug> --workload <name> \
     --from-catalog .understudy/evals/catalog.json --name <name> --json
-  understudy evals cohort export <cohort-id> --project <slug> \
+  orchestra evals cohort export <cohort-id> --project <slug> \
     --workload <name> --out .understudy/evals/<cohort-id> --yes
   ```
 
@@ -112,7 +112,7 @@ For a local, call-by-call inspection of one trace, build the bundled trace
 viewer first:
 
 ```sh
-understudy traces build-viewer \
+orchestra traces build-viewer \
   --source .understudy/captures \
   --trace-id <trace-id> \
   --output .understudy/trace-viewer/<trace-id>
@@ -127,7 +127,7 @@ input aliases, output contract, and privacy boundary.
 For multi-turn tool workloads, start the deterministic foundry with:
 
 ```sh
-understudy traces build-benchmark \
+orchestra traces build-benchmark \
   --source .understudy/captures \
   --output .understudy/benchmarks/latest \
   --max-age-days 3

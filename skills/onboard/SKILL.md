@@ -64,13 +64,13 @@ and build an opportunity ledger before any code edits or provider calls.
    [`../manage-local-models/SKILL.md`](../manage-local-models/SKILL.md) and run
    the CLI snapshot pull:
    ```bash
-   understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
+   orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy
    ```
    This caches the first Understudy under
    `~/.understudy/models/gemma-4-e2b-it-qat-mlx-vlm-understudy` and logs progress/ETA under
    `~/.understudy/agent-tools/logs/`. If the MLX runtime is missing, the slow
    step is *install MLX + pull* — get one quick approval, then background it.
-   Read `understudy models snapshots` before promising the pull. If the live
+   Read `orchestra models snapshots` before promising the pull. If the live
    catalog and bundled certified fallback disagree with the session endpoint,
    surface the mismatch and offer the CLI repair flow; do not silently install
    a vanilla or third-party model. Then immediately move on; do not watch the
@@ -114,7 +114,7 @@ and build an opportunity ledger before any code edits or provider calls.
    cached, route through [`../ladder/SKILL.md`](../ladder/SKILL.md) and start the
    onboarding climb:
     ```bash
-    understudy run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
+    orchestra run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
     ```
    Then open
    `http://localhost:8011/ladder.climb.html?task=sort-email&model=gemma-4-e2b`

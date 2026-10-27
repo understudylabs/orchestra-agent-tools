@@ -18,7 +18,7 @@ ideally within the **same family**, so prompts and behavior transfer:
 
 ```
 local (small, $0 inference, private, ZDR/SOC2-safe)
-        →  remote (larger, via Understudy: `understudy models` / `workloads` route)
+        →  remote (larger, via Understudy: `orchestra models` / `workloads` route)
 same family ⇒ optimized prompts carry over with minimal rework
 ```
 
@@ -105,9 +105,9 @@ fits comfortably on a 32 GB+ machine; a 120B-A12B needs ~64–80 GB.
 
 ```bash
 # remote: pick a catalog model and route a workload to it
-understudy models
-understudy workloads route <workload-id> --project-id <project-id> --model-id nemotron-3-nano --traffic-pct 100
-understudy run -- <your eval>
+orchestra models
+orchestra workloads route <workload-id> --project-id <project-id> --model-id nemotron-3-nano --traffic-pct 100
+orchestra run -- <your eval>
 
 # local: serve a small model OpenAI-compatibly and run the same eval
 #   ollama run gemma-4-e4b   (or a Nemotron 3 Nano GGUF)

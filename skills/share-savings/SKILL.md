@@ -40,7 +40,7 @@ receipts.
    If missing, create one with the value-report workflow before sharing:
 
    ```sh
-   understudy value report --workload-card <path> --route-decision <path> --requests-per-month <n>
+   orchestra value report --workload-card <path> --route-decision <path> --requests-per-month <n>
    ```
 
 2. Build a dry-run payload. Add intervention labels that match the real fix:

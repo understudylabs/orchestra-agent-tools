@@ -32,7 +32,7 @@ reading `.env` values, and records the choice without printing keys.
 Do not ask the developer to paste an API key. Use the CLI registration flow and
 let the CLI store credentials outside the repo.
 
-Do not print, commit, or write `sk_*` values into artifacts. `understudy run`
+Do not print, commit, or write `sk_*` values into artifacts. `orchestra run`
 injects `UNDERSTUDY_API_KEY`, `UNDERSTUDY_GATEWAY_URL`, and the non-secret
 `UNDERSTUDY_ORG_ID` when known only into the child process environment.
 
@@ -64,7 +64,7 @@ per client (Anthropic SDK, OpenAI SDK, raw fetch/SSE) are in
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. If it is unavailable inside a repo
+Prefer the installed `orchestra` binary. If it is unavailable inside a repo
 checkout, run through the package script:
 
 ```sh
@@ -77,14 +77,14 @@ node dist/bin.js status --json
 1. Check whether auth is already configured:
 
    ```sh
-   understudy status --json
+   orchestra status --json
    ```
 
 2. If not signed in, register/sign in with the two-phase email-code flow:
 
    ```sh
-   understudy login --email <developer-email>   # emails a one-time code, then exits
-   understudy login --code <one-time-code>      # completes the sign-in
+   orchestra login --email <developer-email>   # emails a one-time code, then exits
+   orchestra login --code <one-time-code>      # completes the sign-in
    ```
 
    In a non-TTY shell (an agent's shell) the first command sends the code and
@@ -101,14 +101,14 @@ node dist/bin.js status --json
 
    Ask the developer to read the one-time code from their inbox. An agent with
    an approved native email connector may instead search narrowly for the fresh
-   Understudy sign-in email and pass the code to `understudy login --code`. Read
+   Understudy sign-in email and pass the code to `orchestra login --code`. Read
    only that email, and do not persist the code anywhere else.
 
 3. Confirm project/key readiness:
 
    ```sh
-   understudy projects list --json
-   understudy keys list --json
+   orchestra projects list --json
+   orchestra keys list --json
    ```
 
 4. For frontier-vs-Understudy comparison, list public model IDs first. If the
@@ -120,7 +120,7 @@ node dist/bin.js status --json
 5. Run the local command through the gateway wrapper only after approval:
 
    ```sh
-   understudy run -- <local command>
+   orchestra run -- <local command>
    ```
 
    **Run this as a background task — do not block the agent thread on it.**
@@ -160,7 +160,7 @@ models by public id.
 1. Discover public model options:
 
    ```sh
-   understudy models list --json
+   orchestra models list --json
    ```
 
 2. Ensure the eval workload exists on the gateway, then has **no route
@@ -169,13 +169,13 @@ models by public id.
    then clear:
 
    ```sh
-   understudy workloads create --project-id <project-id> \
+   orchestra workloads create --project-id <project-id> \
      --from-card .understudy/workload-discovery/workload-card.json
-   understudy workloads route <workload-name> --project-id <project-id> --clear
+   orchestra workloads route <workload-name> --project-id <project-id> --clear
    ```
 
    Use the card's `workload_name` when set, otherwise its `workload_id`, as
-   `<workload-name>`. Skip create if `understudy workloads list` already shows
+   `<workload-name>`. Skip create if `orchestra workloads list` already shows
    that name.
 
 3. Run the frozen eval once per catalog model. Keep the evaluation contract
@@ -208,7 +208,7 @@ comparing a workload's quality and cost across the split.
 1. Discover public model options (public model IDs only; no supplier detail):
 
    ```sh
-   understudy models list --json
+   orchestra models list --json
    ```
 
    The same catalog is enumerable in-band via OpenAI-compatible
@@ -248,11 +248,11 @@ comparing a workload's quality and cost across the split.
    card id that was never registered returns not-found.
 
    ```sh
-   understudy workloads create --project-id <project-id> \
+   orchestra workloads create --project-id <project-id> \
      --from-card .understudy/workload-discovery/workload-card.json
    ```
 
-   Skip create when `understudy workloads list` already shows the card's
+   Skip create when `orchestra workloads list` already shows the card's
    `workload_name` (or `workload_id` when name is null).
 
 3. Route a workload to a model at a traffic percentage — a per-request split
@@ -261,7 +261,7 @@ comparing a workload's quality and cost across the split.
    name create used (card `workload_name` or `workload_id`):
 
    ```sh
-   understudy workloads route <workload-name> --project-id <project-id> --model-id gemma-4-12b --traffic-pct 30
+   orchestra workloads route <workload-name> --project-id <project-id> --model-id gemma-4-12b --traffic-pct 30
    ```
 
    Clearing the route (`--clear` in place of the model/traffic flags) returns the
@@ -272,7 +272,7 @@ comparing a workload's quality and cost across the split.
    local command works; an eval harness like a verifiers `vf-eval` run is typical.
 
    ```sh
-   understudy run -- vf-eval <eval-id>
+   orchestra run -- vf-eval <eval-id>
    ```
 
 5. Prerequisite for a frontier comparison. For the split to compare the routed

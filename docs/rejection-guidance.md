@@ -55,7 +55,7 @@ the model at a compliant retry. So:
   lookahead cross a journal boundary.
 - `readRolloutJournals(benchmarkDir)` reads `runs/live/*.jsonl` read-only.
 
-`understudy benchmarks rigor` surfaces this as the **"Guidance effectiveness"**
+`orchestra benchmarks rigor` surfaces this as the **"Guidance effectiveness"**
 row: overall recovered/rejections within the window, per-class breakdown, and
 a FLAG when any class with ≥5 rejections recovers under 50% — those classes
 are the guidance-message targets.
@@ -68,7 +68,7 @@ Guidance optimization is prompt optimization with a measurable objective:
    `understudy.rejection_guidance.v1` files (mutate wording, add/remove
    examples, reorder emphasis). The generated default is the seed candidate.
 2. **Install a variant.**
-   `understudy traces regenerate-env --benchmark <dir> --guidance <file>`
+   `orchestra traces regenerate-env --benchmark <dir> --guidance <file>`
    rebuilds the environment in place with the variant as
    `servers/guidance.json` (validated for schema id; still leakage-audited).
    Tasks, reviews, and authored blocks are untouched.

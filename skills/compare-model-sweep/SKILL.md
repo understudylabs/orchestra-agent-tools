@@ -54,7 +54,7 @@ comparison.
    local-vs-remote boundary, max tokens, reasoning effort, pricing basis, and
    whether the model is cached or requires download.
 
-   For remote Understudy candidates, run `understudy models list --json`;
+   For remote Understudy candidates, run `orchestra models list --json`;
    prefer managed-catalog ids unless BYO provider-direct behavior is required.
    For OpenAI GPT-6 candidates, apply the shared
    [model and endpoint compatibility rules](../use-understudy-gateway/references/model-compatibility.md).
@@ -91,7 +91,7 @@ comparison.
    `calibration.json`), the trivial floors
    (`trivial_arms: ["null_agent", "spam_agent"]` — a candidate beating a
    floor-exceeded benchmark proves nothing), and prompt experiments as
-   `prompt_overrides` arms — and let `understudy runs execute` score them all
+   `prompt_overrides` arms — and let `orchestra runs execute` score them all
    through the identical contract scorer. Operating manual:
    [`../operate-benchmark-lab/SKILL.md`](../operate-benchmark-lab/SKILL.md).
    A built-in Pareto view and CSV export over these rows are landing now in

@@ -7,7 +7,7 @@ Persist a machine-readable goal state and append-only event log beneath
 `.understudy/benchmarks/<run>/`. Each event records input hashes, attempted
 action, outputs, validation, blockers, and next action.
 
-`understudy traces build-benchmark --batch-size 10` owns these artifacts as
+`orchestra traces build-benchmark --batch-size 10` owns these artifacts as
 `capture-ledger.jsonl`, `goal-events.jsonl`, and `goal-state.json`. Resume by
 running the same command against the same output directory; do not infer
 progress from chat history or rewrite the ledger.

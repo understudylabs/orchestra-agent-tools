@@ -32,7 +32,7 @@ stop.
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. If it is unavailable inside a repo
+Prefer the installed `orchestra` binary. If it is unavailable inside a repo
 checkout, run through the package script:
 
 ```sh
@@ -93,7 +93,7 @@ tier). The dial's hosted split semantics are documented at
 [docs.understudylabs.com/concepts/routing](https://docs.understudylabs.com/concepts/routing).
 At each tier:
 
-1. `understudy routes set <workload> --project <p> --model-id <id>
+1. `orchestra routes set <workload> --project <p> --model-id <id>
    --traffic-pct <pct>` — after approval.
 2. **Soak.** Hold the tier for an agreed window (hours at 5%, a day at 25%)
    while traffic accumulates.
@@ -119,7 +119,7 @@ At each tier:
    pre-ramp measurement, stop the ramp and re-diagnose. Follow
    [`../capture-evidence/references/evaluation-evidence-gates.md`](../capture-evidence/references/evaluation-evidence-gates.md).
 5. **Advance or roll back.** Advance only when the tier window is clean.
-   Rollback triggers — any one fires `understudy routes rollback` (or
+   Rollback triggers — any one fires `orchestra routes rollback` (or
    `routes clear`) immediately: error rate or schema-validity regression vs
    passthrough, tail-latency regression beyond the agreed bound, instability
    above the pre-ramp measurement, or the developer's call. After a rollback,

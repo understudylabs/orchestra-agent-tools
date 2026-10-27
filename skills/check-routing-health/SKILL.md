@@ -30,7 +30,7 @@ does not write routes or change traffic.
 These endpoints are read-only and carry no side effects. They do not change
 routes, traffic percentages, or provider configuration. Do not print the full
 `sk_*` key in output — mask it to the last 4 characters. Prefer the first-class
-`understudy reporting` commands, which resolve the signed-in organization and
+`orchestra reporting` commands, which resolve the signed-in organization and
 project without exposing credentials to a child process.
 
 ## Vocabulary — use these words, exactly
@@ -52,14 +52,14 @@ Everything you say to the user must use the canonical routing vocabulary:
 
 ## Prerequisites
 
-The developer must be signed in (`understudy status --json` shows
+The developer must be signed in (`orchestra status --json` shows
 `signed_in: true`) and have a project configured. If not, route to
 [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md) for
 auth setup first.
 
 ## Resolve CLI
 
-Prefer the installed `understudy` binary. If it is unavailable inside a repo
+Prefer the installed `orchestra` binary. If it is unavailable inside a repo
 checkout, run through the package script:
 
 ```sh
@@ -72,11 +72,11 @@ node dist/bin.js status --json
 1. Confirm auth and project:
 
    ```sh
-   understudy status --json
+   orchestra status --json
    ```
 
    Extract `org_id` and `project_slug` from the output. Resolve the project
-   slug to a project id via `understudy projects list --json` if needed — the
+   slug to a project id via `orchestra projects list --json` if needed — the
    API path requires the `proj_...` id, not the slug. If not signed in, route
    to [`../use-understudy-gateway/SKILL.md`](../use-understudy-gateway/SKILL.md).
 
@@ -85,7 +85,7 @@ node dist/bin.js status --json
    the whole org:
 
    ```sh
-   understudy reporting summary --window 7d --group-by workload --json
+   orchestra reporting summary --window 7d --group-by workload --json
    ```
 
    Rank by `customer_cost_usd` and `requests` (`group_by` defaults to
@@ -97,13 +97,13 @@ node dist/bin.js status --json
    low-leverage generic advice about workloads that barely run.
 
    Organization reporting has no pricing-coverage block. Use
-   `understudy reporting cost-breakdown` before treating the cost ranking as
+   `orchestra reporting cost-breakdown` before treating the cost ranking as
    complete enough for an exact billing claim.
 
 3. Pull the unified per-workload view:
 
    ```sh
-   understudy reporting workload-status --project <project> --window 24h --json
+   orchestra reporting workload-status --project <project> --window 24h --json
    ```
 
    One row per workload: `status` (healthy | degraded | idle), the declared
@@ -135,7 +135,7 @@ node dist/bin.js status --json
 5. If `example_request_ids` are present, offer to look them up:
 
    ```sh
-   understudy captures get <request-id> --project <project>
+   orchestra captures get <request-id> --project <project>
    ```
 
    If they are empty (or the team needs more ids), pull recent capture
@@ -144,7 +144,7 @@ node dist/bin.js status --json
    ([`reference.md`](reference.md) § Captures metadata list):
 
    ```sh
-   understudy captures list --project <project> --limit 25 --json
+   orchestra captures list --project <project> --limit 25 --json
    ```
 
 6. If any call fails or a number looks wrong, capture the
@@ -153,7 +153,7 @@ node dist/bin.js status --json
 
 7. If issues are found and the developer wants to roll back, route to
    [`../ramp-and-verify/SKILL.md`](../ramp-and-verify/SKILL.md) or clear the
-   route immediately with `understudy routes clear <workload> --project <project>`.
+   route immediately with `orchestra routes clear <workload> --project <project>`.
 
 **Project-scoped alternatives.** `usage-summary` remains the detail tool
 within one project when the org-wide view isn't enough: it carries what
@@ -162,7 +162,7 @@ org reporting doesn't — the computed `cache_read_pct` share, a per-group
 cache token counts are in both:
 
 ```sh
-understudy reporting usage --project <project> --window 7d --group-by workload,day --json
+orchestra reporting usage --project <project> --window 7d --group-by workload,day --json
 ```
 
 See [`reference.md`](reference.md) § Usage summary. The

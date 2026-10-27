@@ -50,13 +50,13 @@ itself never spends — it is lineage, not a launcher.
 CLI (JSON in / JSON out; `--input` accepts inline JSON or `@file`):
 
 ```sh
-understudy benchmarks experiment create <dir> --input '{"hypothesis": …, "data_selection": …, "training": …}'
-understudy benchmarks experiment update <dir> <experiment_id> --input '{"status": "training", "training": {"approvals": [ … ]}}'
-understudy benchmarks experiment list <dir>
-understudy benchmarks experiment show <dir> <experiment_id>
+orchestra benchmarks experiment create <dir> --input '{"hypothesis": …, "data_selection": …, "training": …}'
+orchestra benchmarks experiment update <dir> <experiment_id> --input '{"status": "training", "training": {"approvals": [ … ]}}'
+orchestra benchmarks experiment list <dir>
+orchestra benchmarks experiment show <dir> <experiment_id>
 ```
 
-MCP (`understudy benchmarks mcp`): `create_experiment`, `update_experiment`,
+MCP (`orchestra benchmarks mcp`): `create_experiment`, `update_experiment`,
 `list_experiments`; `read_benchmark` additively surfaces
 `experiments: {count, latest: [{experiment_id, status, decision, summary}]}`.
 

@@ -63,9 +63,9 @@ Trace capture and proxy work should start with metadata: route, model, timing,
 token counts, schema status, and error class. Raw prompts, completions, tool
 payloads, source snippets, and eval rows require opt-in handling.
 
-Hosted capture CLI commands keep the same boundary. `understudy captures list`
-and `understudy captures get` print redacted summaries only: payload-bearing
-fields are represented as present/absent booleans. `understudy captures export`
+Hosted capture CLI commands keep the same boundary. `orchestra captures list`
+and `orchestra captures get` print redacted summaries only: payload-bearing
+fields are represented as present/absent booleans. `orchestra captures export`
 writes redacted metadata by default. Full capture export requires
 `--include-payload --yes`, writes to a file, and must not print raw prompts,
 completions, or tool payloads to stdout. The same boundary applies to
@@ -74,14 +74,14 @@ only to local files (mode `600` on Unix), redacted `.summary.json` files cannot
 be mistaken for full-payload `.payload.json` files during resume, and stdout
 contains counts and paths rather than capture content.
 
-With `--from` and `--to`, `understudy captures list` reads only the hosted
+With `--from` and `--to`, `orchestra captures list` reads only the hosted
 workload index and returns matching request IDs and request-start timestamps.
 It downloads no capture objects and prints no signed download URLs or storage
 keys. This mode requires an explicit workload and a time window of at most
 24 hours. Inspecting or exporting a selected request remains a separate command
 with the existing payload boundary.
 
-`understudy traces export` supports two bounded modes. Explicit mode accepts one
+`orchestra traces export` supports two bounded modes. Explicit mode accepts one
 hosted `trace_id` or a private file of explicit trace IDs, resolves membership
 through the customer trace request-ID endpoint, and passes those IDs to the
 capture batch exporter. Workload-window mode requires an explicit workload and
@@ -114,7 +114,7 @@ together.
 
 ## Supervision Correction Exports
 
-`understudy desktop supervision export` is an explicit local action. It reads
+`orchestra desktop supervision export` is an explicit local action. It reads
 the running desktop's authenticated loopback API and writes correction-pair
 JSONL plus aggregate metrics under `~/.understudy/exports/supervision/` by
 default. The files are content-addressed, owner-only on Unix, and never replace

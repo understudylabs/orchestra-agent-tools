@@ -85,12 +85,12 @@ anything that the developer has not approved.
    the repo read-only for model clients, prompt strings, eval suites, and trace
    exports. Do not duplicate that scan here; carry its inventory forward.
 2. **Determine whether gateway routing is already present.** Check whether calls
-   already go through an Understudy gateway base URL / the `understudy run`
+   already go through an Understudy gateway base URL / the `orchestra run`
    wrapper, or hit a provider SDK directly. This decides whether capture is a
    config flip or needs a collector in front of the existing client.
 
    ```sh
-   understudy status --json
+   orchestra status --json
    ```
 3. **Configure trace capture, preserving the app interface.** Prefer the path
    that leaves the application code untouched:
@@ -101,7 +101,7 @@ anything that the developer has not approved.
      [docs.understudylabs.com/concepts/capture](https://docs.understudylabs.com/concepts/capture).
    - *Provider SDK direct* — point the existing client's base URL at the gateway
      (an OpenAI-compatible base URL plus the injected key from
-     `understudy run`), so the SDK, request shape, and response shape are
+     `orchestra run`), so the SDK, request shape, and response shape are
      unchanged and only the endpoint moves. The gateway's header contract is
      documented at
      [reference/request-headers](https://docs.understudylabs.com/reference/request-headers)
@@ -160,8 +160,8 @@ upload, spend, credential, deploy, or route change.
    decides the split. The traffic percentage is a per-request share.
 
    ```sh
-   understudy models list --json
-   understudy workloads route <workload-id> --project-id <project-id> --model-id glm-5.1 --traffic-pct 10
+   orchestra models list --json
+   orchestra workloads route <workload-id> --project-id <project-id> --model-id glm-5.1 --traffic-pct 10
    ```
 
    See [`SKILL.md`](SKILL.md) → A/B model routing for the full split mechanics
@@ -180,7 +180,7 @@ upload, spend, credential, deploy, or route change.
    change that is clearing the route back to full passthrough:
 
    ```sh
-   understudy workloads route <workload-id> --project-id <project-id> --clear
+   orchestra workloads route <workload-id> --project-id <project-id> --clear
    ```
 
    For a local artifact, rollback is restoring the previous `understudy.yaml` /
@@ -190,7 +190,7 @@ upload, spend, credential, deploy, or route change.
    metric and split as the baseline.
 
    ```sh
-   understudy run -- <eval command>
+   orchestra run -- <eval command>
    ```
 7. **Show before/after metrics and list regressions.** Report the baseline and
    candidate side by side on every affected axis — quality, cost (tokens and

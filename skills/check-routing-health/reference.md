@@ -58,7 +58,7 @@ endpoints).
 | `project_id`, `workload_id` | — | Optional filters (max 255 chars). |
 
 ```sh
-understudy reporting summary --window 7d --group-by workload --json
+orchestra reporting summary --window 7d --group-by workload --json
 ```
 
 The response carries `totals` (`requests`, `input_tokens`,
@@ -86,7 +86,7 @@ metrics by hand.
 | `window` | `24h` | Lookback window. Accepts `30m`, `1h`, `6h`, up to `24h`. |
 
 ```sh
-understudy reporting workload-status --project <project> --window 24h --json
+orchestra reporting workload-status --project <project> --window 24h --json
 ```
 
 ```jsonc
@@ -128,7 +128,7 @@ understudy reporting workload-status --project <project> --window 24h --json
 | `rerouted_pct` | Share of requests moved by an Understudy-configured route (= `route_shares.understudy`). THE number to watch during a ramp/cutover. Deliberately not a served-vs-requested model diff — catalog-by-name rewrites the served model while staying `primary`. |
 | `served_models[]` | Per-model slices: `model`, `provider_label`, `requests`, `share` (0..1 of the workload's requests). |
 | `error_rate` | 5xx error rate over the window (0..1). |
-| `example_request_ids` | Request ids from failing requests. Look up via `understudy captures get <request-id>` or quote to the team. |
+| `example_request_ids` | Request ids from failing requests. Look up via `orchestra captures get <request-id>` or quote to the team. |
 
 **Drift check (always run it) — normalize units first.** `declared.split_pct`
 is a 0–100 dial; `route_shares.understudy` and `rerouted_pct` are 0..1 shares.
@@ -162,7 +162,7 @@ within one project.
 | `group_by` | — | Comma-separated subset of the server-side allowlist: `workload`, `model`, `day`. |
 
 ```sh
-understudy reporting usage --project <project> --window 7d --group-by workload,day --json
+orchestra reporting usage --project <project> --window 7d --group-by workload,day --json
 ```
 
 ```jsonc
@@ -205,7 +205,7 @@ Look up one call by its Understudy request id, upstream request id, or upstream
 response/message id:
 
 ```sh
-understudy reporting cost <request-or-upstream-id> --json
+orchestra reporting cost <request-or-upstream-id> --json
 ```
 
 `customer_cost_usd` and `cost_categories` are customer pricing, not supplier
@@ -217,7 +217,7 @@ category or source data.
 For a project-wide rollup by workload and token category:
 
 ```sh
-understudy reporting cost-breakdown --project <project> --window 7d --json
+orchestra reporting cost-breakdown --project <project> --window 7d --json
 ```
 
 The output separates `requests` from `priced_requests` and preserves
@@ -234,9 +234,9 @@ These commands are read-only. Balance reads the authoritative billing ledger;
 summary and trend read metered tokens plus derived customer pricing:
 
 ```sh
-understudy billing balance --json
-understudy billing summary --from <inclusive-timestamp-with-timezone> --to <exclusive-timestamp-with-timezone> --json
-understudy billing trend --from <inclusive-timestamp-with-timezone> --to <exclusive-timestamp-with-timezone> --json
+orchestra billing balance --json
+orchestra billing summary --from <inclusive-timestamp-with-timezone> --to <exclusive-timestamp-with-timezone> --json
+orchestra billing trend --from <inclusive-timestamp-with-timezone> --to <exclusive-timestamp-with-timezone> --json
 ```
 
 Keep the sources distinct: balance is the ledger position, while summary and
@@ -262,7 +262,7 @@ defaults to 25 (max 100); `truncated: true` comes with an opaque R2 `cursor`
 to pass back verbatim for the next page.
 
 ```sh
-understudy captures list --project <project> --limit 25 --json
+orchestra captures list --project <project> --limit 25 --json
 ```
 
 Capture **content** (request/response bodies) is not readable with an `sk_*`
@@ -287,7 +287,7 @@ Every error envelope carries `request_id`, and every response carries the
 ## Calling without the CLI
 
 The endpoints accept a standard `Authorization: Bearer sk_*` header. Prefer
-the first-class `understudy reporting` commands so credentials come from the
+the first-class `orchestra reporting` commands so credentials come from the
 CLI's credential store. To call curl directly instead, first export the key in
 your own shell:
 

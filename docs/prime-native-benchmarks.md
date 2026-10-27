@@ -45,9 +45,9 @@ declared incumbent strictly passes every frozen task.
 ## Build and reopen
 
 ```sh
-understudy benchmarks import-prime config.json
-understudy benchmarks build-scorecard config.json
-understudy benchmarks serve-gallery --root .understudy/benchmarks --port 4317
+orchestra benchmarks import-prime config.json
+orchestra benchmarks build-scorecard config.json
+orchestra benchmarks serve-gallery --root .understudy/benchmarks --port 4317
 ```
 
 `serve-gallery` binds to loopback by default. The gallery discovers
@@ -61,12 +61,12 @@ explicit private-data transfer acknowledgement and delegates directly to
 `prime eval --plain run`:
 
 ```bash
-understudy benchmarks run-prime model-eval.toml \
+orchestra benchmarks run-prime model-eval.toml \
   --allow-provider-data-transfer
-understudy benchmarks watch-prime config.json
-understudy benchmarks import-prime config.json
-understudy benchmarks build-scorecard config.json
-understudy benchmarks reopen-prime config.json
+orchestra benchmarks watch-prime config.json
+orchestra benchmarks import-prime config.json
+orchestra benchmarks build-scorecard config.json
+orchestra benchmarks reopen-prime config.json
 ```
 
 `run-prime --dry-run` validates and prints the exact invocation without provider
@@ -84,7 +84,7 @@ Provider execution remains a CLI boundary with explicit operator authorization.
 Review is append-only:
 
 ```sh
-understudy benchmarks review-prime <aggregate-dir> \
+orchestra benchmarks review-prime <aggregate-dir> \
   --decision approve \
   --reviewer <stable-reviewer-id> \
   --note "Incumbent passes and sampled traces match production behavior."
@@ -94,7 +94,7 @@ Freezing requires both incumbent calibration and a latest benchmark-scope
 approval:
 
 ```sh
-understudy benchmarks freeze-prime <aggregate-dir> \
+orchestra benchmarks freeze-prime <aggregate-dir> \
   --note "Frozen task set v1."
 ```
 
@@ -128,16 +128,16 @@ provider-correct request field. Current OpenAI GPT/reasoning deployments receive
 `max_tokens`.
 
 ```sh
-understudy benchmarks plan-prime-run execution.json
-understudy benchmarks run-prime-workflow execution.json --dry-run \
+orchestra benchmarks plan-prime-run execution.json
+orchestra benchmarks run-prime-workflow execution.json --dry-run \
   --allow-provider-data-transfer
-understudy benchmarks run-prime-workflow execution.json \
+orchestra benchmarks run-prime-workflow execution.json \
   --allow-provider-data-transfer
-understudy benchmarks validate-prime-run execution.json
-understudy benchmarks resume-prime execution.json \
+orchestra benchmarks validate-prime-run execution.json
+orchestra benchmarks resume-prime execution.json \
   --allow-provider-data-transfer
-understudy benchmarks import-prime import.json
-understudy benchmarks build-scorecard import.json
+orchestra benchmarks import-prime import.json
+orchestra benchmarks build-scorecard import.json
 ```
 
 The execution identity is immutable across benchmark version, environment hash,

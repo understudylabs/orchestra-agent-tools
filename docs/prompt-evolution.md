@@ -1,6 +1,6 @@
 # Prompt Evolution for Agentic Benchmarks
 
-`understudy benchmarks evolve <dir> --model <id>` is the automatic
+`orchestra benchmarks evolve <dir> --model <id>` is the automatic
 (GEPA-style) counterpart to the hand-written `--prompt-override` experiment:
 an authoring model proposes system-prompt suffixes, each proposal becomes a
 `prompt_overrides` arm ({arm_label, model, system_prompt_suffix}) of a normal
@@ -26,7 +26,7 @@ loop lives in `src/prompt-evolution.ts`; the sidecar it writes is
    It must answer with a strict JSON array of new suffixes.
 3. **Queue.** The proposals become override arms of ONE run request queued
    through the shared `createRunRequest` writer. This command **never
-   executes models**: `understudy runs execute --benchmark <dir> --watch`
+   executes models**: `orchestra runs execute --benchmark <dir> --watch`
    must be running; if the request sits unclaimed the command tells you to
    start one (it will not spawn an executor itself).
 4. **Wait + score.** The run-request file is polled with backoff until it

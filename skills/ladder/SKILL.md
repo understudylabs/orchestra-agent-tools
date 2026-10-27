@@ -39,9 +39,9 @@ workload, hand off to `run-local-model-lab`.
 - The local model cached at `~/.understudy/models/gemma-4-e2b-it-qat-mlx-vlm-understudy` —
   the `gemma-4-e2b` id resolves to **that** directory, not a dir literally named
   `gemma-4-e2b`. If it's missing, pull it with the `manage-local-models` skill
-  (`understudy models pull gemma-4-e2b-it-qat-mlx-vlm-understudy`); the server
+  (`orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy`); the server
   prints an actionable error if it's absent.
-- **Remote lanes only:** run `understudy login` once so `understudy run` can
+- **Remote lanes only:** run `orchestra login` once so `orchestra run` can
   inject the gateway key and org id. Without it a remote lane returns the literal
   notice `[gateway not configured …]` rather than erroring — don't mistake that
   for a real run.
@@ -49,7 +49,7 @@ workload, hand off to `run-local-model-lab`.
 Run from the repo root (the path below is relative):
 
 ```sh
-understudy run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
+orchestra run -- uv run --with mlx-vlm --with mlx-lm python skills/ladder/serve.py
 ```
 
 First invocation builds the mlx stack from PyPI (network, a few minutes) and the

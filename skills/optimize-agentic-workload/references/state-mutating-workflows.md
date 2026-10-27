@@ -211,7 +211,7 @@ untouched after the first baseline.
 ```json
 {
   "schema_version": "understudy.baseline.v1",
-  "command": "understudy run -- ${HARNESS_CMD} --model incumbent-model-id --rows dev.jsonl --export-json .understudy/capture-evidence/baseline-export.json",
+  "command": "orchestra run -- ${HARNESS_CMD} --model incumbent-model-id --rows dev.jsonl --export-json .understudy/capture-evidence/baseline-export.json",
   "split": "dev",
   "sample_size": 8,
   "quality": {
@@ -342,12 +342,12 @@ route changed. Understudy, provider-native, and existing application runners
 are all eligible when they preserve the frozen comparison and data contract.
 
 ```sh
-understudy run -- "$HARNESS_CMD" \
+orchestra run -- "$HARNESS_CMD" \
   --model incumbent-model-id \
   --rows dev.jsonl \
   --export-json .understudy/capture-evidence/baseline-incumbent.json
 
-understudy run -- "$HARNESS_CMD" \
+orchestra run -- "$HARNESS_CMD" \
   --model candidate-model-id \
   --rows dev.jsonl \
   --export-json .understudy/capture-evidence/candidate-local.json

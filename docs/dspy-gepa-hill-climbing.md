@@ -1,6 +1,6 @@
 # Hill-climbing prompts with `dspy-gepa`
 
-This is the operating guide for `understudy optimize-workload adapter run
+This is the operating guide for `orchestra optimize-workload adapter run
 --adapter dspy-gepa`: what the adapter uses from DSPy 3.4 and GEPA 0.1.4, which
 flags turn those features on, how to watch a run while it happens, and how to
 climb past a single GEPA pass without fooling yourself about the result.
@@ -51,7 +51,7 @@ and the GEPA log behind. Two ways back:
 
   ```bash
   cp .understudy/optimize-workload/dspy-gepa/best-so-far.json seeds/round-1.json
-  understudy optimize-workload adapter run ... --seed-instructions seeds/round-1.json \
+  orchestra optimize-workload adapter run ... --seed-instructions seeds/round-1.json \
     --log-dir .understudy/optimize-workload/dspy-gepa/gepa-log-round-2
   ```
 
@@ -228,7 +228,7 @@ carries the input, one gold value per predictor, and a split:
 ```
 
 ```bash
-understudy optimize-workload adapter run --adapter dspy-gepa --execute \
+orchestra optimize-workload adapter run --adapter dspy-gepa --execute \
   --repo . --samples samples.json \
   --task-spec docs/dspy-gepa-facility-support-task-spec.json \
   --model <student> --reflection-model <stronger-model> \
@@ -313,7 +313,7 @@ seed prompt on dev, then scores baseline and "optimized" (identical) on the
 holdout, for a few cents:
 
 ```bash
-understudy optimize-workload adapter run --adapter dspy-gepa --execute \
+orchestra optimize-workload adapter run --adapter dspy-gepa --execute \
   --repo . --samples samples.json --input-keys message --output-keys urgency \
   --model <student> --reflection-model <reflector> --module cot \
   --match-mode case-insensitive \
@@ -326,7 +326,7 @@ little to climb. Otherwise, the climb that worked best in the experiments
 below, with the tutorial's reflection settings passed explicitly:
 
 ```bash
-understudy optimize-workload adapter run --adapter dspy-gepa --execute \
+orchestra optimize-workload adapter run --adapter dspy-gepa --execute \
   --repo . --samples samples.json --input-keys message --output-keys urgency \
   --model <student> --reflection-model <stronger-model> --module cot \
   --match-mode case-insensitive \

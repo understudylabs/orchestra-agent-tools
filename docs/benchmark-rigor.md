@@ -63,7 +63,7 @@ a finished run extends `calibration.json` additively with `null_floor` /
 calibration threshold, with `floor_exceeded: true` plus the offending
 `passed_task_ids` when the floor exceeds 5%.
 
-`understudy benchmarks rigor <dir>` generates `rigor-report.md` in the
+`orchestra benchmarks rigor <dir>` generates `rigor-report.md` in the
 benchmark dir — the ABC attestation artifact: oracle solvability, null/spam
 floors, incumbent calibration, per-task contract complexity (obligation
 counts by kind from `tasks.jsonl`), anomaly counts, and split/contamination
@@ -72,14 +72,14 @@ calls). Items it cannot check yet appear as honest UNKNOWN rows.
 
 ### Rigor as a CI gate
 
-`understudy benchmarks rigor <dir...> --ci` runs the machine-checkable subset
+`orchestra benchmarks rigor <dir...> --ci` runs the machine-checkable subset
 (`runRigorCiChecks` in `src/rigor-report.ts`: manifest schema, oracle
 solvability, trivial floors, reward-hack sentinels, gold leakage,
 contamination) and exits non-zero on any FAIL — UNKNOWN stays honest and
 non-fatal unless `--strict`. `--changed-only --base <ref>` limits checking to
 benchmark dirs touched since the git base. `scripts/rigor-ci.mjs` is the CI
 entry point (wired as the `rigor` job in `.github/workflows/ci.yml`), and
-`understudy traces promote` runs the same checks first, refusing promotion on
+`orchestra traces promote` runs the same checks first, refusing promotion on
 hard failures unless `--override-rigor <reason>` — the override is recorded
 in `promotion-record.json` under `rigor_gate`.
 
@@ -113,7 +113,7 @@ the FULL task content) can see a gold or instruction edit; surface rehashing
 would misfile it as "none => reuse". The unstamped fallback still rehashes
 surface fields (conservatively, unknown => env).
 
-`understudy runs regrade` participates in the same ledger: writing regraded
+`orchestra runs regrade` participates in the same ledger: writing regraded
 rows appends one MINOR `versions.jsonl` line covering the regraded tasks, so
 the superseded source rows go stale in leaderboard aggregates rather than
 double-counting alongside their regrades. Regrades are also first-class in

@@ -157,8 +157,8 @@ Two principles hold across every target and lane:
 Optimization may need inference. Never inspect or print secret values. A named
 activated workflow may run its declared provider calls without repeated
 confirmation. Use
-`understudy login --email <developer-email>` plus
-`understudy run -- <local command>` for the Understudy inference path, or
+`orchestra login --email <developer-email>` plus
+`orchestra run -- <local command>` for the Understudy inference path, or
 record BYO provider-key readiness only as redacted presence/source metadata.
 Keep the selected provider, model, budget, and data class in the run artifact.
 

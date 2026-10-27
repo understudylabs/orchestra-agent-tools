@@ -5,7 +5,7 @@ request or trace ID, search for candidate captures in that time window. These
 examples use invented project names and timestamps.
 
 ```sh
-understudy captures list --project rehearsal --workload classify \
+orchestra captures list --project rehearsal --workload classify \
   --from 2026-06-07T10:14:00Z --to 2026-06-07T10:16:00Z --json
 ```
 
@@ -32,7 +32,7 @@ matches request starts inside the window; it does not infer execution overlap.
 Inspect a candidate using the same scope:
 
 ```sh
-understudy captures get <request-id> --project rehearsal --workload classify --json
+orchestra captures get <request-id> --project rehearsal --workload classify --json
 ```
 
 This returns the existing redacted summary, including a trace ID when one is
@@ -46,7 +46,7 @@ which user or agent produced a call. Save the chosen request IDs, one per line,
 in a private file such as `.understudy/request-ids.txt`, then export them:
 
 ```sh
-understudy captures export --project rehearsal --workload classify \
+orchestra captures export --project rehearsal --workload classify \
   --request-ids-file .understudy/request-ids.txt \
   --out .understudy/selected-captures --include-payload --yes
 ```

@@ -9,7 +9,7 @@ This reference backs the long-form implementation notes in `SKILL.md`.
 New trace-derived environments target the Verifiers v1 Taskset/Harness API in
 Prime Intellect Verifiers `0.2.1`, release commit
 `ab65b6e8d34b03d162408d4bcb854430a86809e6`. Generate them with
-`understudy traces build-benchmark`; the helper writes and pins the typed
+`orchestra traces build-benchmark`; the helper writes and pins the typed
 Taskset, per-rollout State and Toolset, Harness, loaders, canonical benchmark,
 oracle, and sentinels. Smoke-install the generated package against the recorded
 commit. The v0 notes below apply only to the checked-in legacy compatibility

@@ -217,7 +217,7 @@ through MLX on Apple Silicon (see
   16 GB). E4B is the first capability climb; 12B is the dense quality rung;
   26B-A4B is the sparse fast-quality rung. Each passed the frozen runtime
   suite and includes `SHA256SUMS` plus `understudy.serving.json`.
-- **Publication status** — read `understudy models snapshots`; do not guess
+- **Publication status** — read `orchestra models snapshots`; do not guess
   session URLs. An `unknown model` response for one of those four ids is a
   catalog deployment mismatch. Surface and repair it rather than silently
   substituting a vanilla or BF16 artifact.

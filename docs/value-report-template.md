@@ -80,7 +80,7 @@ baseline and candidate evidence.
     "public savings claims"
   ],
   "caveats": [],
-  "recommended_next_command": "understudy optimize-workload check --repo ."
+  "recommended_next_command": "orchestra optimize-workload check --repo ."
 }
 ```
 
