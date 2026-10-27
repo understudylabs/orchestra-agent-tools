@@ -75,7 +75,7 @@ Usage: install.sh [--yes] [--non-interactive] [--resume] [--from-step N] [--only
 Installs the Orchestra CLI, signs you in to your Orchestra account in this
 terminal, and installs the Orchestra plugin into every detected coding agent
 (--advanced to choose). With --local-models on Apple Silicon it also starts the
-managed MLX runtime install and the Gemma 4 E2B download (about 3.6 GB) in the
+managed MLX runtime install and the Orchestra 2B model download (about 3.6 GB) in the
 background. It makes no frontier calls and spends nothing.
 
 An existing sign-in is kept. --fresh-login signs you out first (credentials are
@@ -92,7 +92,7 @@ Options:
   --keep-login          keep an existing sign-in (default)
   --fresh-login         sign out an existing sign-in first, for demos
   --local-models        Apple Silicon only: start the MLX runtime install and the
-                        Gemma 4 E2B download (about 3.6 GB) in the background
+                        Orchestra 2B model download (about 3.6 GB) in the background
   --advanced            choose which coding agents get the plugin
   --from-source         build the CLI from the GitHub source instead of npm
   --lower-my-ant-bill   focus onboarding on lowering Anthropic/Claude API spend
@@ -493,7 +493,7 @@ choose_setup() {
   section "What do you want to set up?"
   say "  ${G2}1.${R} Orchestra account + plugin for your coding agents ${D}(recommended, about a minute)${R}"
   if local_models_supported; then
-    say "  ${G3}2.${R} Option 1 + local model lab ${D}(MLX runtime + Gemma 4 E2B, about 3.6 GB, downloads in the background)${R}"
+    say "  ${G3}2.${R} Option 1 + local model lab ${D}(MLX runtime + Orchestra 2B model, about 3.6 GB, downloads in the background)${R}"
   fi
   say "  ${G4}3.${R} CLI only"
   say "  ${G5}a.${R} Advanced: choose which coding agents get the plugin"
@@ -1084,7 +1084,8 @@ sign_in_in_terminal() {
 
 # ── local model lab ──────────────────────────────────────────────────
 # Opt-in (--local-models or setup option 2), Apple Silicon only. Starts the
-# managed MLX runtime install and the bootstrap Gemma 4 E2B snapshot download
+# managed MLX runtime install and the Orchestra 2B snapshot download (our MLX
+# build of Gemma 4 E2B; catalog id $LOCAL_MODEL_ID)
 # in the background so the user is never waiting on them; the onboarding skill
 # reads $STATE_DIR/local-model-lab.json to report progress. uv is never
 # installed silently: with Homebrew the user is asked first, otherwise they get
@@ -1126,7 +1127,7 @@ start_local_model_lab() {
   fi
   nohup orchestra models pull "$LOCAL_MODEL_ID" >"$pull_log" 2>&1 </dev/null &
   pull_pid="$!"
-  ok "Downloading $LOCAL_MODEL_ID (about 3.6 GB) in the background."
+  ok "Downloading the Orchestra 2B model (about 3.6 GB) in the background."
   node -e '
     const [file, model, runtimeLog, runtimePid, pullLog, pullPid] = process.argv.slice(1);
     const lab = { model, started_at: new Date().toISOString(),
@@ -1872,7 +1873,7 @@ else
 fi
 say "  ${G4}2.${R} $(agent_plan_label)"
 if [ "$LOCAL_MODELS" = "1" ]; then
-  say "  ${G5}·${R}  Start the local model lab in the background (MLX runtime + Gemma 4 E2B, about 3.6 GB)."
+  say "  ${G5}·${R}  Start the local model lab in the background (MLX runtime + Orchestra 2B model, about 3.6 GB)."
 fi
 say "  ${G5}3.${R} Offer to open Claude Code here, or finish with reload instructions."
 if lower_my_ant_bill_enabled; then

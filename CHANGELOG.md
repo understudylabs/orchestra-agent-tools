@@ -24,7 +24,7 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
   code), and an existing sign-in is kept instead of being reset
   (`--fresh-login` restores the old reset for demos; `--skip-login` skips).
   The local model lab (`--local-models`) starts the managed MLX runtime install
-  and the Gemma 4 E2B download in the background; uv is never installed
+  and the Orchestra 2B model download in the background; uv is never installed
   without asking. The CLI installs from the npm release
   `@orchestraai/agent-tools`, falling back to the source build when npm has
   none (`--from-source` forces it). Claude Code opens only if you say yes, in

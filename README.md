@@ -38,7 +38,8 @@ You need Node.js 20+ (for npm). The installer asks one question:
    installs the plugin into every coding agent it detects: Claude Code,
    Cursor, Codex, OpenCode, Hermes Agent, Devin.
 2. **Option 1 + local model lab** (Apple Silicon only). Also starts the
-   managed MLX runtime install and the Gemma 4 E2B download (about 3.6 GB) in
+   managed MLX runtime install and the Orchestra 2B model download (about 3.6 GB,
+   our MLX build of Gemma 4 E2B) in
    the background. The MLX runtime needs [uv](https://docs.astral.sh/uv/); if
    it is missing the installer asks before running `brew install uv`.
 3. **CLI only.**

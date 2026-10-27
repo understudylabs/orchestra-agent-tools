@@ -65,8 +65,9 @@ and build an opportunity ledger before any code edits or provider calls.
    names and report progress in one line (done, percent, or failed with the
    log tail); do not watch it. Without that file, do not download anything.
    On an Apple Silicon Mac, mention once that the lab is available; if the
-   user wants it, name the model (`gemma-4-e2b-it-qat-mlx-vlm-understudy`,
-   Gemma 4 E2B QAT converted to MLX 4-bit, about 3.6 GB), get a yes, and start
+   user wants it, name the model (**Orchestra 2B**, catalog id
+   `gemma-4-e2b-it-qat-mlx-vlm-understudy`: our MLX 4-bit build of Gemma 4 E2B
+   QAT, about 3.6 GB), get a yes, and start
    `orchestra models runtime install` (needs `uv`) and
    `orchestra models pull gemma-4-e2b-it-qat-mlx-vlm-understudy` in the
    background through [`../manage-local-models/SKILL.md`](../manage-local-models/SKILL.md).

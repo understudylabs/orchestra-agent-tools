@@ -1458,7 +1458,7 @@ describe("install.sh", () => {
     const result = runFlow(["--non-interactive", "--from-step", "2", "--agents", "none", "--local-models"], stubs);
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Downloading gemma-4-e2b-it-qat-mlx-vlm-understudy \(about 3\.6 GB\) in the background/);
+    assert.match(result.stdout, /Downloading the Orchestra 2B model \(about 3\.6 GB\) in the background/);
     waitForCalls(stubs.calls, /models runtime install[\s\S]*models pull|models pull[\s\S]*models runtime install/);
     const callsText = readFileSync(stubs.calls, "utf8");
     assert.match(callsText, /orchestra models runtime install/);
