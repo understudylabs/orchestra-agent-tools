@@ -222,7 +222,7 @@ test("ordinary scanners keep the informational skip without a private term polic
     { path: ".codex-plugin/plugin.json" },
     { path: ".cursor-plugin/plugin.json" },
     { path: ".opencode/adapter.json" },
-    { path: ".opencode/commands/understudy-onboard.md" },
+    { path: ".opencode/commands/orchestra-onboard.md" },
     { path: ".hermes/adapter.json" },
     { path: "skills/install-agent-adapter/SKILL.md" },
     { path: "skills/install-agent-adapter/reference.md" },

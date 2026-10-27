@@ -1,12 +1,12 @@
 {
-  "name": "understudy-skills",
+  "name": "orchestra-skills",
   "metadata": {
-    "description": "Understudy skills for improving LLM apps with local-first evidence, evals, optimization, local models, and routing.",
+    "description": "Orchestra skills for improving LLM apps with local-first evidence, evals, optimization, local models, and routing.",
     "version": "0.6.41"
   },
   "plugins": [
     {
-      "name": "understudy",
+      "name": "orchestra",
       "source": {
         "source": "local",
         "path": "./"
@@ -17,8 +17,8 @@
       },
       "category": "Productivity",
       "interface": {
-        "displayName": "Understudy",
-        "description": "Improve LLM apps from traces: capture evidence, build evals, optimize, compare models, and route through Understudy."
+        "displayName": "Orchestra",
+        "description": "Improve LLM apps from traces: capture evidence, build evals, optimize, compare models, and route through Orchestra."
       }
     }
   ]

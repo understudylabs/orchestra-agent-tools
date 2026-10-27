@@ -30,7 +30,7 @@ Activation is in Codex:
 /plugins
 ```
 
-Choose `understudy-skills`, install or enable `understudy`, then ask:
+Choose `orchestra-skills`, install or enable `orchestra`, then ask:
 
 ```text
 Use the Understudy onboarding skill for this project.

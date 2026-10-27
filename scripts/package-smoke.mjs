@@ -36,7 +36,7 @@ const requiredPackageMembers = [
   ".codex-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
   ".opencode/adapter.json",
-  ".opencode/commands/understudy-onboard.md",
+  ".opencode/commands/orchestra-onboard.md",
   ".hermes/adapter.json",
   "skills/install-agent-adapter/SKILL.md",
   "skills/install-agent-adapter/reference.md",

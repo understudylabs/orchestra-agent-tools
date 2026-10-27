@@ -17,6 +17,13 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Added
 
+- **`orchestra` plugin.** The coding-agent plugin is now `orchestra`
+  (marketplace `orchestra-skills`), so onboarding is `/orchestra:onboard` in
+  Claude Code and `/orchestra-onboard` in OpenCode; the Cursor plugin links at
+  `~/.cursor/plugins/local/orchestra`. Rerunning the installer removes the old
+  `understudy@understudy-skills` plugin and marketplace, the old Cursor link
+  and the old OpenCode command when they point at an Orchestra checkout, so
+  skills aren't loaded twice. Skill names are unchanged.
 - **`~/.orchestra` home directory.** Rerunning the installer moves
   `~/.understudy` to `~/.orchestra` and leaves a `~/.understudy` symlink,
   so Python helpers, skills, older CLIs, and scripts keep working

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -344,13 +344,13 @@ describe("install.sh", () => {
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /Orchestra Cursor plugin linked/);
-    assert.equal(existsSync(join(home, ".cursor", "plugins", "local", "understudy")), true);
+    assert.equal(existsSync(join(home, ".cursor", "plugins", "local", "orchestra")), true);
   });
 
   it("does not overwrite an existing Cursor plugin path", () => {
     const script = readFileSync("install.sh", "utf8");
     const home = join(root, "home");
-    const dest = join(home, ".cursor", "plugins", "local", "understudy");
+    const dest = join(home, ".cursor", "plugins", "local", "orchestra");
     mkdirSync(dest, { recursive: true });
     writeFileSync(join(dest, "marker.txt"), "keep me\n");
 
@@ -530,7 +530,7 @@ describe("install.sh", () => {
       readlinkSync(join(home, ".config", "opencode", "skills", "understudy")),
       /skills\/understudy$/,
     );
-    assert.equal(existsSync(join(home, ".config", "opencode", "commands", "understudy-onboard.md")), true);
+    assert.equal(existsSync(join(home, ".config", "opencode", "commands", "orchestra-onboard.md")), true);
   });
 
   it("hands off to OpenCode without auto-launching it", () => {
@@ -571,7 +571,7 @@ describe("install.sh", () => {
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /OpenCode skills and commands are installed/);
     assert.match(result.stdout, /Open a fresh OpenCode TUI session/);
-    assert.match(result.stdout, /Then run \/understudy-onboard/);
+    assert.match(result.stdout, /Then run \/orchestra-onboard/);
     assert.doesNotMatch(result.stdout, /OpenCode exited with status/);
   });
 
@@ -712,8 +712,96 @@ describe("install.sh", () => {
     assert.match(result.stdout, /Orchestra OpenCode skills linked/);
     const callsText = readFileSync(calls, "utf8");
     assert.match(callsText, /claude plugin marketplace add /);
-    assert.match(callsText, /claude plugin install understudy@understudy-skills/);
+    assert.match(callsText, /claude plugin install orchestra@orchestra-skills/);
     assert.match(callsText, /codex plugin marketplace add /);
+  });
+
+  it("replaces pre-rename understudy plugin installs with orchestra", () => {
+    const script = readFileSync("install.sh", "utf8");
+    const home = join(root, "home");
+    const bin = join(root, "bin");
+    const calls = join(root, "agent-calls.txt");
+    const oldCheckout = join(root, "old", "understudy-agent-tools");
+    mkdirSync(join(home, ".cursor", "plugins", "local"), { recursive: true });
+    mkdirSync(join(home, ".config", "opencode", "commands"), { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    symlinkSync(oldCheckout, join(home, ".cursor", "plugins", "local", "understudy"));
+    symlinkSync(
+      join(oldCheckout, ".opencode", "commands", "understudy-onboard.md"),
+      join(home, ".config", "opencode", "commands", "understudy-onboard.md"),
+    );
+    writeFileSync(
+      join(bin, "claude"),
+      `#!/usr/bin/env bash\nprintf 'claude %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "plugin list --json") printf '[{"id":"understudy@understudy-skills"}]\\n' ;;\n  "plugin marketplace list") printf 'understudy-skills\\n' ;;\nesac\nexit 0\n`,
+    );
+    writeFileSync(join(bin, "codex"), `#!/usr/bin/env bash\nprintf 'codex %s\\n' "$*" >> "${calls}"\nexit 0\n`);
+    writeFileSync(join(bin, "opencode"), `#!/usr/bin/env bash\nexit 0\n`);
+    for (const name of ["claude", "codex", "opencode"]) chmodSync(join(bin, name), 0o755);
+
+    const result = spawnSync(
+      "bash",
+      ["-s", "--", "--non-interactive", "--only-step", "2", "--no-launch-claude", "--lab", join(root, "lab")],
+      {
+        cwd: process.cwd(),
+        input: script,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
+          HOME: home,
+          HERMES_HOME: join(home, ".hermes"),
+          PATH: `${bin}:${process.env.PATH}`,
+          UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Removed the old understudy plugin/);
+    const callsText = readFileSync(calls, "utf8");
+    assert.match(callsText, /claude plugin uninstall understudy@understudy-skills/);
+    assert.match(callsText, /claude plugin marketplace remove understudy-skills/);
+    assert.match(callsText, /claude plugin install orchestra@orchestra-skills/);
+    assert.match(callsText, /codex plugin marketplace remove understudy-skills/);
+    // lstat, not existsSync: the old links point at a checkout that no longer exists.
+    assert.throws(() => lstatSync(join(home, ".cursor", "plugins", "local", "understudy")), { code: "ENOENT" });
+    assert.equal(lstatSync(join(home, ".cursor", "plugins", "local", "orchestra")).isSymbolicLink(), true);
+    assert.throws(() => lstatSync(join(home, ".config", "opencode", "commands", "understudy-onboard.md")), { code: "ENOENT" });
+    assert.equal(
+      lstatSync(join(home, ".config", "opencode", "commands", "orchestra-onboard.md")).isSymbolicLink(),
+      true,
+    );
+  });
+
+  it("leaves a pre-rename Cursor path alone when it is not an Orchestra checkout", () => {
+    const script = readFileSync("install.sh", "utf8");
+    const home = join(root, "home");
+    const foreign = join(home, ".cursor", "plugins", "local", "understudy");
+    mkdirSync(foreign, { recursive: true });
+    writeFileSync(join(foreign, "keep.txt"), "mine\n");
+
+    const result = spawnSync(
+      "bash",
+      ["-s", "--", "--non-interactive", "--only-step", "2", "--agents", "cursor", "--no-launch-claude", "--lab", join(root, "lab")],
+      {
+        cwd: process.cwd(),
+        input: script,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
+          HOME: home,
+          HERMES_HOME: join(home, ".hermes"),
+          UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(readFileSync(join(foreign, "keep.txt"), "utf8"), "mine\n");
+    assert.equal(lstatSync(join(home, ".cursor", "plugins", "local", "orchestra")).isSymbolicLink(), true);
   });
 
   it("surfaces an interactive install-target selector for human installs", () => {
@@ -770,7 +858,7 @@ describe("install.sh", () => {
     mkdirSync(bin, { recursive: true });
     writeFileSync(
       join(bin, "codex"),
-      `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "${calls}"\ncase "$*" in\n  plugin\\ marketplace\\ add*) echo "Error: --ref is only supported for git marketplace sources" >&2; exit 1 ;;\n  "plugin marketplace upgrade understudy-skills") echo "Error: marketplace is not configured as a Git marketplace" >&2; exit 1 ;;\nesac\nexit 0\n`,
+      `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "${calls}"\ncase "$*" in\n  plugin\\ marketplace\\ add*) echo "Error: --ref is only supported for git marketplace sources" >&2; exit 1 ;;\n  "plugin marketplace upgrade orchestra-skills") echo "Error: marketplace is not configured as a Git marketplace" >&2; exit 1 ;;\nesac\nexit 0\n`,
     );
     chmodSync(join(bin, "codex"), 0o755);
 
@@ -808,12 +896,12 @@ describe("install.sh", () => {
     assert.equal(result.status, 3, result.stderr || result.stdout);
     assert.match(result.stdout, /Codex marketplace add failed; trying marketplace refresh/);
     assert.match(result.stdout, /Codex marketplace registration failed; continuing/);
-    assert.match(result.stdout, /Manual recovery: run `codex plugin marketplace remove understudy-skills`/);
+    assert.match(result.stdout, /Manual recovery: run `codex plugin marketplace remove orchestra-skills`/);
     assert.match(result.stdout, /codex: failed — marketplace registration failed/);
     assert.match(result.stdout, /NO CODING-AGENT PLUGIN WAS INSTALLED/);
     const callsText = readFileSync(calls, "utf8");
     assert.match(callsText, /plugin marketplace add /);
-    assert.match(callsText, /plugin marketplace upgrade understudy-skills/);
+    assert.match(callsText, /plugin marketplace upgrade orchestra-skills/);
   });
 
   it("rejects ambiguous mixed agent adapter modes", () => {
@@ -864,7 +952,7 @@ describe("install.sh", () => {
     assert.match(result.stdout, /Hermes adapter not selected or not detected/);
     assert.match(result.stdout, /No coding-agent plugins were requested/);
     assert.doesNotMatch(result.stdout, /NO CODING-AGENT PLUGIN WAS INSTALLED/);
-    assert.equal(existsSync(join(home, ".cursor", "plugins", "local", "understudy")), false);
+    assert.equal(existsSync(join(home, ".cursor", "plugins", "local", "orchestra")), false);
   });
 
   it("logs the resolved adapter selection to stdout and the install log", () => {
@@ -939,9 +1027,9 @@ describe("install.sh", () => {
     assert.match(result.stdout, /explicitly requested but the claude CLI is not on PATH/);
     assert.match(result.stdout, /claude-code: failed — the claude CLI is not on PATH/);
     assert.match(result.stdout, /NO CODING-AGENT PLUGIN WAS INSTALLED/);
-    assert.match(result.stdout, /claude plugin marketplace add .+ && claude plugin install understudy@understudy-skills/);
+    assert.match(result.stdout, /claude plugin marketplace add .+ && claude plugin install orchestra@orchestra-skills/);
     assert.match(result.stdout, /skills are NOT ready in any coding agent/);
-    assert.doesNotMatch(result.stdout, /Claude Code: run \/reload-plugins and then \/understudy:onboard\./);
+    assert.doesNotMatch(result.stdout, /Claude Code: run \/reload-plugins and then \/orchestra:onboard\./);
   });
 
   it("only prints next steps for adapters that actually installed", () => {
@@ -989,7 +1077,7 @@ describe("install.sh", () => {
     assert.match(result.stdout, /Adapter summary/);
     assert.match(result.stdout, /claude-code: plugin installed/);
     assert.match(result.stdout, /cursor: skipped — not selected or not detected/);
-    assert.match(result.stdout, /Claude Code: run \/reload-plugins and then \/understudy:onboard\./);
+    assert.match(result.stdout, /Claude Code: run \/reload-plugins and then \/orchestra:onboard\./);
     assert.doesNotMatch(result.stdout, /Cursor: restart Cursor or run Developer: Reload Window/);
     assert.doesNotMatch(result.stdout, /Codex: run \/plugins/);
     assert.doesNotMatch(result.stdout, /NO CODING-AGENT PLUGIN WAS INSTALLED/);

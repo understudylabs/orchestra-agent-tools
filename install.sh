@@ -608,8 +608,8 @@ manual_adapter_instructions() {
   local repo
   repo="$(resolve_skill_repo 2>/dev/null || printf '%s' "$PKG_DIR")"
   say "Manual install commands, per platform:"
-  say "  Claude Code: claude plugin marketplace add $repo && claude plugin install understudy@understudy-skills"
-  say "  Cursor:      ln -s $repo \$HOME/.cursor/plugins/local/understudy"
+  say "  Claude Code: claude plugin marketplace add $repo && claude plugin install orchestra@orchestra-skills"
+  say "  Cursor:      ln -s $repo \$HOME/.cursor/plugins/local/orchestra"
   say "  Codex:       codex plugin marketplace add $repo"
   say "  OpenCode:    ln -s $repo/skills/understudy \$HOME/.config/opencode/skills/understudy"
   say "  Hermes:      add $repo/skills to skills.external_dirs in $(hermes_config_path), then /reload-skills"
@@ -1003,7 +1003,7 @@ install_claude_plugin() {
   fi
   if ! need claude; then
     say "Claude Code CLI not found; skipping plugin install."
-    say "Later, from a checkout, run: claude plugin marketplace add <repo> && claude plugin install understudy@understudy-skills"
+    say "Later, from a checkout, run: claude plugin marketplace add <repo> && claude plugin install orchestra@orchestra-skills"
     adapter_prereq_missing "claude-code" "the claude CLI is not on PATH"
     return 0
   fi
@@ -1016,17 +1016,36 @@ install_claude_plugin() {
   fi
 
   say "Installing the Orchestra Claude Code plugin from $repo."
-  if claude plugin list --json 2>/dev/null | grep -q 'understudy@understudy-skills'; then
+  remove_legacy_claude_plugin
+  if claude plugin list --json 2>/dev/null | grep -q 'orchestra@orchestra-skills'; then
     ok "Orchestra plugin already appears installed."
     record_adapter "claude-code" "installed" "already installed"
   else
     run_logged "Register the plugin marketplace" claude plugin marketplace add "$repo"
-    run_logged "Install the Orchestra plugin" claude plugin install understudy@understudy-skills
+    run_logged "Install the Orchestra plugin" claude plugin install orchestra@orchestra-skills
     ok "Orchestra plugin installed."
     record_adapter "claude-code" "installed" "plugin installed"
   fi
   say "In Claude Code, type /reload-plugins once to activate the skills."
-  say "Then type /understudy:onboard so the agent can guide the first local Understudy."
+  say "Then type /orchestra:onboard so the agent can guide the first local Understudy."
+}
+
+# Before the rename the plugin was understudy@understudy-skills. Left in place
+# it would load every skill twice, so remove it and its marketplace (which
+# points at this same checkout). Best-effort: a failure only leaves duplicates.
+remove_legacy_claude_plugin() {
+  if claude plugin list --json 2>/dev/null | grep -q 'understudy@understudy-skills'; then
+    log "RUN claude plugin uninstall understudy@understudy-skills"
+    if claude plugin uninstall understudy@understudy-skills >>"$LOG_FILE" 2>&1; then
+      ok "Removed the old understudy plugin (now orchestra)."
+    else
+      warn "Could not remove the old understudy plugin; run: claude plugin uninstall understudy@understudy-skills"
+    fi
+  fi
+  if claude plugin marketplace list 2>/dev/null | grep -q 'understudy-skills'; then
+    log "RUN claude plugin marketplace remove understudy-skills"
+    claude plugin marketplace remove understudy-skills >>"$LOG_FILE" 2>&1 || true
+  fi
 }
 
 install_cursor_plugin() {
@@ -1043,9 +1062,17 @@ install_cursor_plugin() {
     return 0
   fi
 
-  dest="$HOME/.cursor/plugins/local/understudy"
+  dest="$HOME/.cursor/plugins/local/orchestra"
   say "Installing the Orchestra Cursor plugin from $repo."
   mkdir -p "$(dirname "$dest")"
+  # Pre-rename installs linked the same checkout at local/understudy; only
+  # remove that link when it is ours.
+  local legacy="$HOME/.cursor/plugins/local/understudy"
+  if [ -L "$legacy" ]; then
+    case "$(readlink "$legacy" 2>/dev/null || true)" in
+      *understudy-agent-tools) rm -f "$legacy" ;;
+    esac
+  fi
   if [ -L "$dest" ] && [ "$(readlink "$dest" 2>/dev/null || true)" = "$repo" ]; then
     ok "Orchestra Cursor plugin already points at $repo."
     record_adapter "cursor" "installed" "already installed"
@@ -1116,24 +1143,28 @@ install_codex_plugin() {
   fi
 
   say "Registering the Orchestra Codex marketplace from $repo."
+  # The marketplace was understudy-skills before the rename and points at the
+  # same checkout; drop it so Codex doesn't list the skills twice.
+  log "RUN codex plugin marketplace remove understudy-skills"
+  codex plugin marketplace remove understudy-skills >>"$LOG_FILE" 2>&1 || true
   if codex plugin marketplace add "$repo" >>"$LOG_FILE" 2>&1; then
     ok "Orchestra Codex marketplace registered."
     record_adapter "codex" "installed" "marketplace registered"
   else
     say "Codex marketplace add failed; trying marketplace refresh."
-    log "RUN codex plugin marketplace upgrade understudy-skills"
-    if codex plugin marketplace upgrade understudy-skills >>"$LOG_FILE" 2>&1; then
+    log "RUN codex plugin marketplace upgrade orchestra-skills"
+    if codex plugin marketplace upgrade orchestra-skills >>"$LOG_FILE" 2>&1; then
       ok "Orchestra Codex marketplace refreshed."
       record_adapter "codex" "installed" "marketplace refreshed"
     else
       warn "Codex marketplace registration failed; continuing with the rest of the install."
-      say "Manual recovery: run \`codex plugin marketplace remove understudy-skills\`, then \`codex plugin marketplace add $repo\`."
+      say "Manual recovery: run \`codex plugin marketplace remove orchestra-skills\`, then \`codex plugin marketplace add $repo\`."
       say "Codex details are in the install log: $LOG_FILE"
       record_adapter_failure "codex" "marketplace registration failed"
       return 0
     fi
   fi
-  say "In Codex, run /plugins, choose the understudy-skills marketplace, and install or enable the understudy plugin."
+  say "In Codex, run /plugins, choose the orchestra-skills marketplace, and install or enable the orchestra plugin."
   say "Then ask Codex: Use the Understudy onboarding skill for this project."
 }
 
@@ -1192,10 +1223,16 @@ install_opencode_adapter() {
     fi
   done
 
-  command_src="$repo/.opencode/commands/understudy-onboard.md"
-  command_dest="$command_root/understudy-onboard.md"
+  command_src="$repo/.opencode/commands/orchestra-onboard.md"
+  command_dest="$command_root/orchestra-onboard.md"
   if [ -f "$command_src" ]; then
     link_opencode_path "$command_src" "$command_dest" "command" || true
+  fi
+  # Pre-rename command; drop it only when it links into an Orchestra checkout.
+  if [ -L "$command_root/understudy-onboard.md" ]; then
+    case "$(readlink "$command_root/understudy-onboard.md" 2>/dev/null || true)" in
+      *understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/understudy-onboard.md" ;;
+    esac
   fi
 
   ok "Orchestra OpenCode skills linked: $linked; skipped existing conflicts: $skipped."
@@ -1205,7 +1242,7 @@ install_opencode_adapter() {
     adapter_prereq_missing "opencode" "no skills were linked ($skipped existing path conflicts)"
   fi
   say "In OpenCode, restart the TUI or open a new session so skills and commands reload."
-  say "Then run /understudy-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project."
+  say "Then run /orchestra-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project."
 }
 
 hermes_config_path() {
@@ -1420,16 +1457,16 @@ launch_claude_code() {
   fi
   if ! need claude; then
     if adapter_installed "claude-code"; then
-      say "Claude Code CLI not found; open Claude Code manually and run /reload-plugins then /understudy:onboard."
+      say "Claude Code CLI not found; open Claude Code manually and run /reload-plugins then /orchestra:onboard."
     else
-      say "Claude Code CLI not found and the Orchestra plugin is not installed; install Claude Code, rerun this installer (or the manual plugin commands above), then run /reload-plugins and /understudy:onboard."
+      say "Claude Code CLI not found and the Orchestra plugin is not installed; install Claude Code, rerun this installer (or the manual plugin commands above), then run /reload-plugins and /orchestra:onboard."
     fi
     mark_step_done 3
     return 0
   fi
   if ! { : </dev/tty >/dev/tty; } 2>/dev/null; then
     say "No interactive terminal is available for Claude Code."
-    say "Open Claude Code in this directory, then run /reload-plugins and /understudy:onboard."
+    say "Open Claude Code in this directory, then run /reload-plugins and /orchestra:onboard."
     mark_step_done 3
     return 0
   fi
@@ -1497,7 +1534,7 @@ launch_opencode() {
   section "Step 3/3 · Open OpenCode"
   say "OpenCode skills and commands are installed."
   say "Open a fresh OpenCode TUI session in: $(pwd)"
-  say "Then run /understudy-onboard."
+  say "Then run /orchestra-onboard."
   say "The installer does not auto-launch OpenCode because piped installers cannot reliably hand Bun/OpenCode a stable interactive TTY."
   mark_step_done 3
 }
@@ -1652,10 +1689,10 @@ section "Where this goes next"
 # instructions instead of claiming the skills are ready.
 if [ "$ADAPTERS_ATTEMPTED" != "1" ]; then
   say "The installer is done. The next experience belongs inside your coding agent:"
-  say "  Claude Code: run /reload-plugins and then /understudy:onboard."
+  say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
   say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Understudy onboarding skill."
-  say "  Codex: run /plugins, install or enable understudy, then ask Codex to use the Understudy onboarding skill."
-  say "  OpenCode: restart the TUI or open a new session, then run /understudy-onboard."
+  say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Understudy onboarding skill."
+  say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
   say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Understudy onboarding skill."
   say "  Devin: ask Devin to use the Understudy onboarding skill for this project. For persistent installs, add the npm install to the Devin environment blueprint."
 elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
@@ -1672,16 +1709,16 @@ elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
 else
   say "The installer is done. The next experience belongs inside your coding agent:"
   if adapter_installed "claude-code"; then
-    say "  Claude Code: run /reload-plugins and then /understudy:onboard."
+    say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
   fi
   if adapter_installed "cursor"; then
     say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Understudy onboarding skill."
   fi
   if adapter_installed "codex"; then
-    say "  Codex: run /plugins, install or enable understudy, then ask Codex to use the Understudy onboarding skill."
+    say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Understudy onboarding skill."
   fi
   if adapter_installed "opencode"; then
-    say "  OpenCode: restart the TUI or open a new session, then run /understudy-onboard."
+    say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
   fi
   if adapter_installed "hermes"; then
     say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Understudy onboarding skill."

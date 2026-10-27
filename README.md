@@ -2,7 +2,7 @@
 
 # Orchestra Agent Tools
 
-**Type `/understudy:onboard` in Claude Code — or the matching onboarding
+**Type `/orchestra:onboard` in Claude Code — or the matching onboarding
 command in your agent — and it walks your LLM app from captured traces to a
 measured, cheaper — often local — model, with evidence you can trust.**
 
@@ -21,8 +21,8 @@ Orchestra (formerly Understudy) maintains this public, MIT-licensed skill
 library plus a thin CLI. It gives your coding agent the playbooks to evaluate
 an AI workload locally, optimize it, and route it to a better-value model —
 **local-first, with no uploads, no provider calls, and nothing spent by
-default**. The CLI is `orchestra` (`understudy` still works as an alias);
-plugin and skill names still use `understudy`.
+default**. The CLI and plugin are `orchestra` (`understudy` still works as a
+CLI alias, and rerunning the installer replaces the old `understudy` plugin).
 
 ## Get started (30 seconds)
 
@@ -49,7 +49,7 @@ Then, in Claude Code:
 
 ```text
 /reload-plugins
-/understudy:onboard
+/orchestra:onboard
 ```
 
 That's it. Onboarding profiles your machine, interviews you about your
@@ -176,10 +176,10 @@ the agent-run install/update/verify flow for every platform.
 
 | Agent harness | Default installer behavior | Activation |
 | --- | --- | --- |
-| Claude Code | Autodetected when `claude` is on `PATH`; installs the local Claude plugin. | Run `/reload-plugins`, then `/understudy:onboard`. |
-| Cursor | Autodetected when Cursor is present; links this repo into `~/.cursor/plugins/local/understudy`. | Restart Cursor or run **Developer: Reload Window**, then ask Cursor Agent to use the Understudy onboarding skill. |
-| Codex | Autodetected when `codex` is on `PATH`; registers the local Codex marketplace from `.agents/plugins/marketplace.json`. | Run `/plugins`, choose `understudy-skills`, install or enable `understudy`, then start a new thread if needed. |
-| OpenCode | Autodetected when `opencode` is on `PATH` or OpenCode config/data exists; links the shared skills into `~/.config/opencode/skills`. | Restart OpenCode or open a new TUI session, then run `/understudy-onboard`. |
+| Claude Code | Autodetected when `claude` is on `PATH`; installs the local Claude plugin. | Run `/reload-plugins`, then `/orchestra:onboard`. |
+| Cursor | Autodetected when Cursor is present; links this repo into `~/.cursor/plugins/local/orchestra`. | Restart Cursor or run **Developer: Reload Window**, then ask Cursor Agent to use the Understudy onboarding skill. |
+| Codex | Autodetected when `codex` is on `PATH`; registers the local Codex marketplace from `.agents/plugins/marketplace.json`. | Run `/plugins`, choose `orchestra-skills`, install or enable `orchestra`, then start a new thread if needed. |
+| OpenCode | Autodetected when `opencode` is on `PATH` or OpenCode config/data exists; links the shared skills into `~/.config/opencode/skills`. | Restart OpenCode or open a new TUI session, then run `/orchestra-onboard`. |
 | Hermes Agent | Autodetected when `hermes` is on `PATH` or `~/.hermes` exists; registers a stable `~/.understudy/skills` symlink in `skills.external_dirs`. | Run `/reload-skills` (or start a new `hermes` session), then `/onboard` or ask Hermes to use the Understudy onboarding skill. |
 | Devin | Autodetected when the `DEVIN` or `DEVIN_SESSION_ID` env var is set or `~/.devin` exists; the installer builds the GitHub source and links the CLI globally. | Ask Devin: *Use the Understudy onboarding skill for this project.* |
 

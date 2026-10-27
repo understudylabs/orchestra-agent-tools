@@ -23,14 +23,14 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     install: [
       'REPO="$(git rev-parse --show-toplevel)"',
       'claude plugin marketplace add "$REPO"',
-      "claude plugin install understudy@understudy-skills",
+      "claude plugin install orchestra@orchestra-skills",
     ],
     reload: "Run /reload-plugins in Claude Code.",
     uninstall: [
-      "claude plugin uninstall understudy@understudy-skills",
-      "claude plugin marketplace remove understudy-skills",
+      "claude plugin uninstall orchestra@orchestra-skills",
+      "claude plugin marketplace remove orchestra-skills",
     ],
-    onboarding: "Run /understudy:onboard.",
+    onboarding: "Run /orchestra:onboard.",
     notes: [
       "Best current default for guided onboarding.",
       "The agent cannot run Claude slash commands; the developer runs reload and onboarding.",
@@ -45,11 +45,11 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
     install: [
       'REPO="$(git rev-parse --show-toplevel)"',
       'mkdir -p "$HOME/.cursor/plugins/local"',
-      'rm -rf "$HOME/.cursor/plugins/local/understudy"',
-      'ln -s "$REPO" "$HOME/.cursor/plugins/local/understudy"',
+      'rm -rf "$HOME/.cursor/plugins/local/orchestra"',
+      'ln -s "$REPO" "$HOME/.cursor/plugins/local/orchestra"',
     ],
     reload: "Restart Cursor or run Developer: Reload Window.",
-    uninstall: ['rm -f "$HOME/.cursor/plugins/local/understudy"'],
+    uninstall: ['rm -f "$HOME/.cursor/plugins/local/orchestra"'],
     onboarding: "Ask Cursor Agent: Use the Understudy onboarding skill for this project.",
     notes: [
       "Uses Cursor's local plugin loader rather than a VSIX wrapper.",
@@ -66,8 +66,8 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
       'REPO="$(git rev-parse --show-toplevel)"',
       'codex plugin marketplace add "$REPO"',
     ],
-    reload: "Open /plugins in Codex, install or enable the understudy plugin, then start a new thread if needed.",
-    uninstall: ["codex plugin marketplace remove understudy-skills"],
+    reload: "Open /plugins in Codex, install or enable the orchestra plugin, then start a new thread if needed.",
+    uninstall: ["codex plugin marketplace remove orchestra-skills"],
     onboarding: "Ask Codex: Use the Understudy onboarding skill for this project.",
     notes: [
       "The CLI registers the marketplace; the Codex plugin browser owns final install/enable.",
@@ -84,14 +84,14 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
       'REPO="$(git rev-parse --show-toplevel)"',
       'mkdir -p "$HOME/.config/opencode/skills" "$HOME/.config/opencode/commands"',
       'for skill in "$REPO"/skills/*; do [ -f "$skill/SKILL.md" ] || continue; dest="$HOME/.config/opencode/skills/$(basename "$skill")"; [ -e "$dest" ] || [ -L "$dest" ] || ln -s "$skill" "$dest"; done',
-      '[ -e "$HOME/.config/opencode/commands/understudy-onboard.md" ] || ln -s "$REPO/.opencode/commands/understudy-onboard.md" "$HOME/.config/opencode/commands/understudy-onboard.md"',
+      '[ -e "$HOME/.config/opencode/commands/orchestra-onboard.md" ] || ln -s "$REPO/.opencode/commands/orchestra-onboard.md" "$HOME/.config/opencode/commands/orchestra-onboard.md"',
     ],
     reload: "Restart OpenCode or open a new TUI session so it reloads global skills and commands.",
     uninstall: [
       'find "$HOME/.config/opencode/skills" -type l -lname "*/understudy-agent-tools/skills/*" -delete',
-      'rm -f "$HOME/.config/opencode/commands/understudy-onboard.md"',
+      'rm -f "$HOME/.config/opencode/commands/orchestra-onboard.md"',
     ],
-    onboarding: "Run /understudy-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project.",
+    onboarding: "Run /orchestra-onboard, or ask OpenCode: Use the Understudy onboarding skill for this project.",
     notes: [
       ".opencode/adapter.json is an Understudy version/staleness sentinel, not an OpenCode plugin manifest.",
       "OpenCode JS/TS plugins are for lifecycle hooks; this adapter intentionally uses native skills and commands.",

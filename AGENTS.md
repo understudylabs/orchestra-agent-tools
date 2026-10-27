@@ -42,7 +42,7 @@ available:
 
 ```bash
 claude plugin marketplace add "$(git rev-parse --show-toplevel)"
-claude plugin install understudy@understudy-skills
+claude plugin install orchestra@orchestra-skills
 ```
 
 The user then types `/reload-plugins` once — **no restart needed**. You cannot
@@ -54,8 +54,8 @@ Installing is low-risk and fully reversible. Tell the user the uninstall path up
 front so saying yes feels safe:
 
 ```bash
-claude plugin uninstall understudy@understudy-skills   # remove the plugin
-claude plugin marketplace remove understudy-skills      # forget the local source
+claude plugin uninstall orchestra@orchestra-skills   # remove the plugin
+claude plugin marketplace remove orchestra-skills      # forget the local source
 ```
 
 For the Claude Code default, installation touches only Claude Code's plugin

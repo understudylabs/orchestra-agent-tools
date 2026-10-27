@@ -22,7 +22,7 @@ current symlink install:
 
 ```bash
 REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
-dest="$HOME/.cursor/plugins/local/understudy"
+dest="$HOME/.cursor/plugins/local/orchestra"
 mkdir -p "$(dirname "$dest")"
 if [ ! -f "$REPO/.cursor-plugin/plugin.json" ]; then
   echo "not an Understudy checkout: $REPO"
@@ -55,7 +55,7 @@ must not authenticate, upload data, inspect secret values, download model
 weights, start hosted jobs, or make provider calls.
 
 - Only replace an Understudy-owned symlink at the exact
-  `~/.cursor/plugins/local/understudy` path; leave any other file, directory,
+  `~/.cursor/plugins/local/orchestra` path; leave any other file, directory,
   or symlink there unchanged and tell the developer.
 - Do not edit Cursor internal settings databases.
 - Do not copy private traces, keys, or `.understudy/` state into the plugin.
