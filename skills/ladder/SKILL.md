@@ -69,7 +69,7 @@ service — though the SSE endpoint is browserless-friendly for an agent.
 - **VS mode** — two models race the same task side by side. Local-vs-local
   serializes on the one GPU; local-vs-gateway runs concurrently.
 
-Remote runs go through the Understudy gateway and are **billed**. The picker
+Remote runs go through the Orchestra gateway and are **billed**. The picker
 marks every gateway-backed lane and every such run is disclosed.
 
 ## What you can actually run ($0 vs billed)
@@ -106,7 +106,7 @@ The stream ends with a `done` event carrying the result (`correct`, `response`,
   requests whose `Host` is not `127.0.0.1`/`localhost` or that a browser marks
   cross-site (`Sec-Fetch-Site`/`Origin`), so a web page open in your browser
   cannot start billed runs. The viewer and `curl` are unaffected.
-- **Gateway runs are billed.** Remote lanes go through the Understudy gateway and
+- **Gateway runs are billed.** Remote lanes go through the Orchestra gateway and
   cost money. The picker marks them and every such run is disclosed in the UI —
   do not route to one without the developer understanding it bills.
 - **Synthetic data only.** The "Larkfield" world is invented; no real customer or

@@ -55,15 +55,29 @@ LOCAL_MODELS = {
     "gemma-4-e2b":   ("mlx_vlm", os.path.join(MODEL_HOME, "gemma-4-e2b-it-qat-mlx-vlm-understudy"), "gemma-4-e2b · thinking", {"temp": 1.0, "top_p": 0.95, "top_k": 64}),
 }
 
-# Static stand-in when the live gateway catalog is unreachable. Keep this list
-# to models the gateway still serves — deprecated ids fail mid-demo. glm-5.1,
-# gemma-4-31b-it, and kimi-k2.6 were removed after their 2026-06-29 deprecation.
+# Offline snapshot of active releases, checked 2026-10-26. The authenticated
+# public catalog is preferred so new releases appear on the next server start.
 FALLBACK_REMOTE_MODELS = [
-    ("glm-5.2", "GLM 5.2"),
+    ("beam-501b-a23b", "Reflection Beam 501B A23B"),
+    ("gemini-4-argon", "Gemini 4 Argon"),
+    ("lfm-2.5-24b-a2b", "LiquidAI LFM2.5 24B A2B"),
+    ("mimo-v2.6-pro", "MiMo V2.6 Pro"),
+    ("mistral-large-4", "Mistral Large 4"),
+    ("muse-spark-open", "Muse Spark Open"),
+    ("nemotron-3.5-super-vl", "NVIDIA Nemotron 3.5 Super VL"),
+    ("gpt-6.1-sol", "GPT-6.1 Sol"),
+    ("gpt-6.1-terra", "GPT-6.1 Terra"),
+    ("glm-5.3", "GLM 5.3"),
+    ("glm-5.3-flash", "GLM 5.3 Flash"),
+    ("qwen3.8-27b", "Qwen3.8 27B"),
+    ("qwen3.8-max", "Qwen 3.8 Max"),
+    ("kimi-k3", "Kimi K3"),
+    ("kimi-k3.1-pro", "Kimi K3.1 Pro"),
+    ("deepseek-v4-flash", "DeepSeek V4 Flash"),
+    ("deepseek-v4.1-flash-1017", "DeepSeek V4.1 Flash 1017"),
+    ("deepseek-v4-pro", "DeepSeek V4 Pro"),
     ("minimax-m3", "MiniMax M3"),
-    ("minimax-m2.7", "MiniMax M2.7"),
-    ("nemotron-3-nano", "Nemotron 3 Nano"),
-    ("nemotron-3-super", "Nemotron 3 Super"),
+    ("nemotron-3.5-lightning", "NVIDIA Nemotron 3.5 Lightning 30B A3B"),
     ("nemotron-3-ultra", "Nemotron 3 Ultra"),
 ]
 
@@ -89,37 +103,47 @@ def _configured_gateway_models():
 
 
 def _live_gateway_models():
-    """Best-effort org catalog refresh. Falls back silently when the ladder is
-    launched without org context or while offline; model calls still go through
+    """Best-effort public catalog refresh. Falls back when the ladder is
+    launched without gateway credentials or while offline; model calls still go through
     /v1/chat/completions with the selected id."""
-    org_id = os.environ.get("UNDERSTUDY_ORG_ID")
     api_key = os.environ.get("UNDERSTUDY_API_KEY")
     gateway_url = os.environ.get("UNDERSTUDY_GATEWAY_URL")
-    if not (org_id and api_key and gateway_url):
+    if not (api_key and gateway_url):
         return None
     try:
         import urllib.request
         req = urllib.request.Request(
-            gateway_url.rstrip("/") + "/admin/v1/orgs/%s/models" % org_id,
+            gateway_url.rstrip("/") + "/v1/models",
             headers={"Authorization": "Bearer " + api_key, "Accept": "application/json"},
             method="GET")
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+            raise ValueError("invalid public model catalog")
+        out = {}
+        for item in data["data"]:
+            if not isinstance(item, dict):
+                raise ValueError("invalid public model entry")
+            if item.get("active") is False or "openai-chat" not in item.get("wire_shapes", []):
+                continue
+            mid = item.get("id")
+            if not isinstance(mid, str) or not mid:
+                continue
+            label = item.get("display_name") or item.get("name") or mid
+            out[mid] = _gateway_spec(mid, label)
+        # An empty successful catalog is authoritative: do not resurrect retired ids.
+        return out
     except Exception as e:
-        sys.stderr.write("[models] live catalog unavailable: %s: %s\n" % (type(e).__name__, str(e)[:160])); sys.stderr.flush()
+        sys.stderr.write("[models] live catalog unavailable: %s\n" % type(e).__name__); sys.stderr.flush()
         return None
-    out = {}
-    for item in data.get("models") or []:
-        mid = item.get("id")
-        if not mid:
-            continue
-        label = item.get("display_name") or item.get("name") or mid
-        out[mid] = _gateway_spec(mid, label)
-    return out or None
 
 
 def build_model_catalog():
-    remote = _configured_gateway_models() or _live_gateway_models() or _fallback_gateway_models()
+    remote = _configured_gateway_models()
+    if remote is None:
+        remote = _live_gateway_models()
+    if remote is None:
+        remote = _fallback_gateway_models()
     out = dict(LOCAL_MODELS)
     out.update(remote)
     return out
@@ -442,7 +466,7 @@ def _gateway_request(model_id, messages, samp, max_tokens, tools=None, timeout=1
 
 
 def stream_gateway(model_id, system, user, samp, max_tokens):
-    """Stream a frontier model through the Understudy gateway (classify lane, BILLED).
+    """Stream a frontier model through the Orchestra gateway (classify lane, BILLED).
     Yields (channel, text) with channel in {thinking, response}."""
     if not _gateway_ready():
         yield ("response", "[gateway not configured — launch serve.py via `understudy run`]")
@@ -964,7 +988,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404); self.end_headers(); return
         ctype = ("text/html" if fp.endswith(".html")
                  else "application/javascript" if fp.endswith(".js")
-                 else "application/json" if fp.endswith(".json") else "text/plain")
+                 else "application/json" if fp.endswith(".json")
+                 else "image/svg+xml" if fp.endswith(".svg")
+                 else "font/woff2" if fp.endswith(".woff2") else "text/plain")
         with open(fp, "rb") as f:
             b = f.read()
         self.send_response(200)
@@ -1036,7 +1062,7 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--agent":
         task_id = sys.argv[2] if len(sys.argv) > 2 else "hard.renewal_save_route"
         model_id = (sys.argv[3] if len(sys.argv) > 3
-                    else next((m for m, s in MODELS.items() if s[0] == "gateway"), "glm-5.2"))
+                    else next((m for m, s in MODELS.items() if s[0] == "gateway"), "gemma-4-e2b"))
         return _cli_agent(task_id, model_id)
     sys.stderr.write(f"ladder live server: http://{HOST}:{PORT}  (viewer: {VIEWER_DIR})\n")
     sys.stderr.write(f"  try: curl -N 'http://{HOST}:{PORT}/run?task=sort-email&model=gemma-4-e2b'\n")
