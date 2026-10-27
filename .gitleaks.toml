@@ -1,4 +1,4 @@
-# gitleaks configuration for understudy-agent-tools.
+# gitleaks configuration for orchestra-agent-tools.
 #
 # Extends the built-in rules. The allowlist below covers values that look like
 # credentials to entropy-based rules but are not: content hashes, idempotency
@@ -6,7 +6,7 @@
 # fixture that exercises the tiebreaker's redaction. Keep this list short and
 # specific; a new entry should name why the match is not a secret.
 
-title = "understudy-agent-tools"
+title = "orchestra-agent-tools"
 
 [extend]
 useDefault = true

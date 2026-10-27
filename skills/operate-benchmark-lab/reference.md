@@ -158,7 +158,7 @@ claimed/completed lines into `runs/events.jsonl`.
 ## Desktop app: what it is, what it covers
 
 **Distribution:** Understudy Desktop is deprecated. The last build is GitHub
-release `desktop-v0.3.44-mvp` on `understudylabs/understudy-agent-tools`
+release `desktop-v0.3.44-mvp` on `understudylabs/orchestra-agent-tools`
 (macOS Apple Silicon only); it no longer self-updates and no further releases
 are planned. Do not point users at a download; point them at the CLI and
 `docs/desktop-deprecation.md`. The guidance below applies only to a copy that

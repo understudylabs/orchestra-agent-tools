@@ -3,7 +3,9 @@
 set -euo pipefail
 
 LAB="${UNDERSTUDY_LAB:-$HOME/.understudy/agent-tools}"
-INSTALL_REPO_URL="${UNDERSTUDY_INSTALL_REPO_URL:-https://github.com/UnderstudyLabs/understudy-agent-tools.git}"
+PACKAGE_NAME="orchestra-agent-tools"
+LEGACY_PACKAGE_NAME="@understudylabs/understudy-agent-tools"
+INSTALL_REPO_URL="${UNDERSTUDY_INSTALL_REPO_URL:-https://github.com/understudylabs/orchestra-agent-tools.git}"
 INSTALL_REF="${UNDERSTUDY_INSTALL_REF:-main}"
 INSTALL_PACKAGE="${UNDERSTUDY_INSTALL_PACKAGE:-}"
 INSTALL_COMMIT="${UNDERSTUDY_INSTALL_COMMIT:-}"
@@ -98,10 +100,10 @@ Exit codes:
 
 Environment overrides:
   UNDERSTUDY_LAB                 local runtime/log directory, default ~/.understudy/agent-tools
-  UNDERSTUDY_INSTALL_REPO_URL    public repo URL, default https://github.com/UnderstudyLabs/understudy-agent-tools.git
+  UNDERSTUDY_INSTALL_REPO_URL    public repo URL, default https://github.com/understudylabs/orchestra-agent-tools.git
   UNDERSTUDY_INSTALL_REF         Git ref for public repo install, default main
   UNDERSTUDY_INSTALL_COMMIT      optional full commit SHA the checkout of UNDERSTUDY_INSTALL_REF must match
-  UNDERSTUDY_INSTALL_SOURCE_DIR  scratch checkout the installer deletes and re-clones, default $UNDERSTUDY_LAB/source/understudy-agent-tools
+  UNDERSTUDY_INSTALL_SOURCE_DIR  scratch checkout the installer deletes and re-clones, default $UNDERSTUDY_LAB/source/orchestra-agent-tools
   UNDERSTUDY_INSTALL_STATE_DIR   install markers, default $UNDERSTUDY_LAB/install-state
   UNDERSTUDY_INSTALL_LOG_DIR     install logs, default $UNDERSTUDY_LAB/logs
   UNDERSTUDY_INSTALL_LOG_FILE    exact install log path
@@ -127,7 +129,7 @@ EOF
   shift
 done
 
-INSTALL_SOURCE_DIR="${UNDERSTUDY_INSTALL_SOURCE_DIR:-$LAB/source/understudy-agent-tools}"
+INSTALL_SOURCE_DIR="${UNDERSTUDY_INSTALL_SOURCE_DIR:-$LAB/source/orchestra-agent-tools}"
 STATE_DIR="${UNDERSTUDY_INSTALL_STATE_DIR:-$LAB/install-state}"
 LOG_DIR="${UNDERSTUDY_INSTALL_LOG_DIR:-$LAB/logs}"
 LOG_FILE="${UNDERSTUDY_INSTALL_LOG_FILE:-$LOG_DIR/install-$(date -u +"%Y%m%dT%H%M%SZ").log}"
@@ -713,30 +715,34 @@ confirm() {
 }
 
 remove_previous_global_package() {
-  local global_root global_prefix package_path bin_path bin_name
+  local global_root global_prefix package_name package_path bin_path bin_name
   global_root="$(npm root -g)"
   global_prefix="$(npm prefix -g)"
-  package_path="$global_root/@understudylabs/understudy-agent-tools"
 
-  if [ -e "$package_path" ] || [ -L "$package_path" ]; then
-    say "Removing previous global Orchestra install at $package_path"
-    npm uninstall -g @understudylabs/understudy-agent-tools >/dev/null 2>&1 || true
+  # The package was @understudylabs/understudy-agent-tools before the rename.
+  for package_name in "$PACKAGE_NAME" "$LEGACY_PACKAGE_NAME"; do
+    package_path="$global_root/$package_name"
     if [ -e "$package_path" ] || [ -L "$package_path" ]; then
-      rm -rf "$package_path"
+      say "Removing previous global Orchestra install at $package_path"
+      npm uninstall -g "$package_name" >/dev/null 2>&1 || true
+      if [ -e "$package_path" ] || [ -L "$package_path" ]; then
+        rm -rf "$package_path"
+      fi
     fi
-  fi
+  done
+  rmdir "$global_root/@understudylabs" 2>/dev/null || true
 
   # The package installs `orchestra` and the legacy `understudy` alias.
   for bin_name in orchestra understudy; do
     for bin_path in "$global_prefix/bin/$bin_name" "$HOME/.local/bin/$bin_name"; do
       [ -e "$bin_path" ] || [ -L "$bin_path" ] || continue
-      if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -q 'understudy-agent-tools'; then
+      if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -qE 'orchestra-agent-tools|understudy-agent-tools'; then
         say "Removing stale Orchestra command at $bin_path"
         rm -f "$bin_path"
       elif [ -f "$bin_path" ] && [ "$bin_path" != "$global_prefix/bin/$bin_name" ]; then
         # Not created by npm or this installer: a user's own wrapper stays.
         warn "Leaving existing $bin_path in place; if its directory precedes $global_prefix/bin in PATH it will shadow the newly installed $bin_name command."
-      elif [ -f "$bin_path" ] && grep -q 'understudy-agent-tools' "$bin_path" 2>/dev/null; then
+      elif [ -f "$bin_path" ] && grep -qE 'orchestra-agent-tools|understudy-agent-tools' "$bin_path" 2>/dev/null; then
         say "Removing stale Orchestra command at $bin_path"
         rm -f "$bin_path"
       fi
@@ -823,7 +829,7 @@ install_understudy_package() {
     -p "$INSTALL_SOURCE_DIR/tsconfig.install.json"
   run_logged "Prepare the CLI" node "$INSTALL_SOURCE_DIR/scripts/ensure-bin-mode.mjs"
   package_version="$(node -p 'require(process.argv[1] + "/package.json").version' "$INSTALL_SOURCE_DIR")"
-  package_tarball="$STATE_DIR/understudylabs-understudy-agent-tools-$package_version.tgz"
+  package_tarball="$STATE_DIR/orchestra-agent-tools-$package_version.tgz"
   rm -f "$package_tarball"
   # npm pack always runs `prepare` for directory inputs. The installer already
   # produced dist with its no-typecheck build, so remove prepare only from this
@@ -1017,6 +1023,7 @@ install_claude_plugin() {
 
   say "Installing the Orchestra Claude Code plugin from $repo."
   remove_legacy_claude_plugin
+  repoint_claude_marketplace "$repo"
   if claude plugin list --json 2>/dev/null | grep -q 'orchestra@orchestra-skills'; then
     ok "Orchestra plugin already appears installed."
     record_adapter "claude-code" "installed" "already installed"
@@ -1028,6 +1035,41 @@ install_claude_plugin() {
   fi
   say "In Claude Code, type /reload-plugins once to activate the skills."
   say "Then type /orchestra:onboard so the agent can guide the first local Understudy."
+}
+
+# Print the source path a marketplace listing (JSON on stdin) records for one
+# marketplace name; Claude uses "path", Codex "root". Empty when absent.
+marketplace_path() {
+  node -e '
+    let raw = "";
+    process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      try {
+        const data = JSON.parse(raw);
+        const list = Array.isArray(data) ? data : data.marketplaces || [];
+        const hit = list.find((m) => m && m.name === process.argv[1]);
+        if (hit) process.stdout.write(String(hit.path || hit.root || ""));
+      } catch {}
+    });
+  ' "$1"
+}
+
+# orchestra-skills records the package folder it was added from. When the
+# package moved (it was @understudylabs/understudy-agent-tools), drop the
+# stale marketplace and plugin so the normal install below re-adds them from
+# $1. A marketplace outside an Orchestra install is left alone.
+repoint_claude_marketplace() {
+  local repo="$1" current
+  current="$(claude plugin marketplace list --json 2>/dev/null | marketplace_path orchestra-skills)"
+  [ -n "$current" ] && [ "$current" != "$repo" ] || return 0
+  case "$current" in
+    *orchestra-agent-tools|*understudy-agent-tools) ;;
+    *) return 0 ;;
+  esac
+  say "Moving the Orchestra Claude Code plugin from $current."
+  log "RUN claude plugin uninstall orchestra@orchestra-skills"
+  claude plugin uninstall orchestra@orchestra-skills >>"$LOG_FILE" 2>&1 || true
+  log "RUN claude plugin marketplace remove orchestra-skills"
+  claude plugin marketplace remove orchestra-skills >>"$LOG_FILE" 2>&1 || true
 }
 
 # Before the rename the plugin was understudy@understudy-skills. Left in place
@@ -1070,7 +1112,7 @@ install_cursor_plugin() {
   local legacy="$HOME/.cursor/plugins/local/understudy"
   if [ -L "$legacy" ]; then
     case "$(readlink "$legacy" 2>/dev/null || true)" in
-      *understudy-agent-tools) rm -f "$legacy" ;;
+      *orchestra-agent-tools|*understudy-agent-tools) rm -f "$legacy" ;;
     esac
   fi
   if [ -L "$dest" ] && [ "$(readlink "$dest" 2>/dev/null || true)" = "$repo" ]; then
@@ -1080,7 +1122,7 @@ install_cursor_plugin() {
     local current
     current="$(readlink "$dest" 2>/dev/null || true)"
     case "$current" in
-      *understudy-agent-tools)
+      *orchestra-agent-tools|*understudy-agent-tools)
         rm -f "$dest"
         ln -s "$repo" "$dest"
         ok "Orchestra Cursor plugin refreshed at $dest."
@@ -1147,6 +1189,18 @@ install_codex_plugin() {
   # same checkout; drop it so Codex doesn't list the skills twice.
   log "RUN codex plugin marketplace remove understudy-skills"
   codex plugin marketplace remove understudy-skills >>"$LOG_FILE" 2>&1 || true
+  # Same for an orchestra-skills marketplace left at the pre-rename package
+  # folder (Codex keys enabled plugins by name, not by folder).
+  local current
+  current="$(codex plugin marketplace list --json 2>/dev/null | marketplace_path orchestra-skills)"
+  if [ -n "$current" ] && [ "$current" != "$repo" ]; then
+    case "$current" in
+      *orchestra-agent-tools|*understudy-agent-tools)
+        log "RUN codex plugin marketplace remove orchestra-skills"
+        codex plugin marketplace remove orchestra-skills >>"$LOG_FILE" 2>&1 || true
+        ;;
+    esac
+  fi
   if codex plugin marketplace add "$repo" >>"$LOG_FILE" 2>&1; then
     ok "Orchestra Codex marketplace registered."
     record_adapter "codex" "installed" "marketplace registered"
@@ -1176,7 +1230,7 @@ link_opencode_path() {
       return 0
     fi
     case "$current" in
-      *understudy-agent-tools/skills/*|*understudy-agent-tools/.opencode/commands/*)
+      *orchestra-agent-tools/skills/*|*orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/skills/*|*understudy-agent-tools/.opencode/commands/*)
         rm -f "$dest"
         ln -s "$src" "$dest"
         return 0
@@ -1231,7 +1285,7 @@ install_opencode_adapter() {
   # Pre-rename command; drop it only when it links into an Orchestra checkout.
   if [ -L "$command_root/understudy-onboard.md" ]; then
     case "$(readlink "$command_root/understudy-onboard.md" 2>/dev/null || true)" in
-      *understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/understudy-onboard.md" ;;
+      *orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/understudy-onboard.md" ;;
     esac
   fi
 
@@ -1287,7 +1341,7 @@ hermes_register_dir() {
       printf '%s\n' "$stable_link"; return 0
     fi
     case "$current" in
-      *understudy-agent-tools/skills)
+      *orchestra-agent-tools/skills|*understudy-agent-tools/skills)
         rm -f "$stable_link"
         ln -s "$skills_dir" "$stable_link"
         printf '%s\n' "$stable_link"; return 0
@@ -1648,12 +1702,12 @@ if [ -n "${UNDERSTUDY_INSTALL_SOURCE_DIR:-}" ]; then
 fi
 confirm "Continue with this Orchestra installation?" || exit 1
 
-PKG_DIR="$(npm root -g)/@understudylabs/understudy-agent-tools"
+PKG_DIR="$(npm root -g)/$PACKAGE_NAME"
 
 if should_run_step 1; then
   section "Step 1/3 · Install the CLI"
   install_understudy_package
-  PKG_DIR="$(npm root -g)/@understudylabs/understudy-agent-tools"
+  PKG_DIR="$(npm root -g)/$PACKAGE_NAME"
   # Move ~/.understudy to ~/.orchestra (leaving a symlink) now, before the
   # coding agent starts; every path this installer writes later goes through
   # the symlink. The CLI only does this when asked, so stderr stays visible.

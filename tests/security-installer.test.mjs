@@ -105,7 +105,7 @@ describe("install.sh security", () => {
   it("refuses an unowned default checkout and normalized home aliases", () => {
     const home = join(root, "home");
     const lab = join(root, "lab");
-    const checkout = join(lab, "source", "understudy-agent-tools");
+    const checkout = join(lab, "source", "orchestra-agent-tools");
     const bin = join(root, "bin");
     stubNpm(bin, join(root, "npm-root"));
     mkdirSync(checkout, { recursive: true });

@@ -1,5 +1,5 @@
 ---
-name: understudy-agent-tools
+name: orchestra-agent-tools
 purpose: Public OSS conventions for Understudy agent tools.
 updated: 2026-06-03
 status: draft

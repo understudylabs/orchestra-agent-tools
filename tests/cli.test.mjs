@@ -1369,7 +1369,7 @@ describe("understudy CLI", () => {
   it("prints the public spine", () => {
     const result = run(["spine"]);
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /understudy-agent-tools/);
+    assert.match(result.stdout, /orchestra-agent-tools/);
     assert.match(result.stdout, /skills\/understudy\/SKILL\.md/);
   });
 

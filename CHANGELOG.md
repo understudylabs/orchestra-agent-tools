@@ -17,6 +17,15 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Added
 
+- **`orchestra-agent-tools` package and repo.** The package is now
+  `orchestra-agent-tools` (was `@understudylabs/understudy-agent-tools`) and
+  the repo is `understudylabs/orchestra-agent-tools`; old GitHub URLs redirect.
+  Rerunning the installer removes the old global package and its commands,
+  and moves the Claude Code and Codex marketplaces, Cursor link, OpenCode
+  skills and Hermes skills link to the new package folder. Paths that aren't an
+  Orchestra install are left alone. The Devin adapter now installs with the
+  installer instead of `npm install -g` (the package was never on the npm
+  registry).
 - **`orchestra` plugin.** The coding-agent plugin is now `orchestra`
   (marketplace `orchestra-skills`), so onboarding is `/orchestra:onboard` in
   Claude Code and `/orchestra-onboard` in OpenCode; the Cursor plugin links at

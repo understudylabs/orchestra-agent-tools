@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -442,7 +442,7 @@ describe("install.sh", () => {
     const home = join(root, "home");
     const bin = join(root, "bin");
     const npmRoot = join(root, "npm-root");
-    const packageLink = join(npmRoot, "@understudylabs", "understudy-agent-tools");
+    const packageLink = join(npmRoot, "orchestra-agent-tools");
     const calls = join(root, "codex-realpath-calls.txt");
     mkdirSync(dirname(packageLink), { recursive: true });
     mkdirSync(bin, { recursive: true });
@@ -772,6 +772,144 @@ describe("install.sh", () => {
       lstatSync(join(home, ".config", "opencode", "commands", "orchestra-onboard.md")).isSymbolicLink(),
       true,
     );
+  });
+
+  it("moves Claude and Codex marketplaces left at the pre-rename package folder", () => {
+    const script = readFileSync("install.sh", "utf8");
+    const home = join(root, "home");
+    const bin = join(root, "bin");
+    const calls = join(root, "agent-calls.txt");
+    const oldPackage = join(root, "npm-root", "@understudylabs", "understudy-agent-tools");
+    mkdirSync(home, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    const claudeList = JSON.stringify([{ name: "orchestra-skills", source: "directory", path: oldPackage }]);
+    const codexList = JSON.stringify({ marketplaces: [{ name: "orchestra-skills", root: oldPackage }] });
+    writeFileSync(
+      join(bin, "claude"),
+      `#!/usr/bin/env bash\nprintf 'claude %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "plugin list --json") [ -e "${calls}.uninstalled" ] && printf '[]\\n' || printf '[{"id":"orchestra@orchestra-skills"}]\\n' ;;\n  "plugin uninstall orchestra@orchestra-skills") : > "${calls}.uninstalled" ;;\n  "plugin marketplace list --json") printf '%s\\n' '${claudeList}' ;;\nesac\nexit 0\n`,
+    );
+    writeFileSync(
+      join(bin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'codex %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "plugin marketplace list --json") printf '%s\\n' '${codexList}' ;;\nesac\nexit 0\n`,
+    );
+    chmodSync(join(bin, "claude"), 0o755);
+    chmodSync(join(bin, "codex"), 0o755);
+
+    const result = spawnSync(
+      "bash",
+      ["-s", "--", "--non-interactive", "--only-step", "2", "--agents", "claude-code,codex", "--no-launch-agent", "--lab", join(root, "lab")],
+      {
+        cwd: process.cwd(),
+        input: script,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
+          HOME: home,
+          HERMES_HOME: join(home, ".hermes"),
+          PATH: `${bin}:${process.env.PATH}`,
+          UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Moving the Orchestra Claude Code plugin from .*understudy-agent-tools/);
+    const callsText = readFileSync(calls, "utf8");
+    assert.match(callsText, /claude plugin uninstall orchestra@orchestra-skills/);
+    assert.match(callsText, /claude plugin marketplace remove orchestra-skills/);
+    assert.match(callsText, /claude plugin marketplace add /);
+    assert.match(callsText, /codex plugin marketplace remove orchestra-skills/);
+    assert.match(callsText, /codex plugin marketplace add /);
+  });
+
+  it("leaves Claude and Codex marketplaces that are current or not Orchestra's", () => {
+    const script = readFileSync("install.sh", "utf8");
+    const foreign = join(root, "elsewhere", "my-skills");
+    // Each run pairs one adapter already at this checkout with one whose
+    // orchestra-skills marketplace is someone else's folder.
+    for (const [index, [claudePath, codexRoot]] of [[process.cwd(), foreign], [foreign, realpathSync(process.cwd())]].entries()) {
+    const home = join(root, `home-${index}`);
+    const bin = join(root, `bin-${index}`);
+    const calls = join(root, `agent-calls-${index}.txt`);
+    mkdirSync(home, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    const claudeList = JSON.stringify([{ name: "orchestra-skills", source: "directory", path: claudePath }]);
+    const codexList = JSON.stringify({ marketplaces: [{ name: "orchestra-skills", root: codexRoot }] });
+    writeFileSync(
+      join(bin, "claude"),
+      `#!/usr/bin/env bash\nprintf 'claude %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "plugin list --json") printf '[{"id":"orchestra@orchestra-skills"}]\\n' ;;\n  "plugin marketplace list --json") printf '%s\\n' '${claudeList}' ;;\nesac\nexit 0\n`,
+    );
+    writeFileSync(
+      join(bin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'codex %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "plugin marketplace list --json") printf '%s\\n' '${codexList}' ;;\nesac\nexit 0\n`,
+    );
+    chmodSync(join(bin, "claude"), 0o755);
+    chmodSync(join(bin, "codex"), 0o755);
+
+    const result = spawnSync(
+      "bash",
+      ["-s", "--", "--non-interactive", "--only-step", "2", "--agents", "claude-code,codex", "--no-launch-agent", "--lab", join(root, "lab")],
+      {
+        cwd: process.cwd(),
+        input: script,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
+          HOME: home,
+          HERMES_HOME: join(home, ".hermes"),
+          PATH: `${bin}:${process.env.PATH}`,
+          UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Orchestra plugin already appears installed/);
+    const callsText = readFileSync(calls, "utf8");
+    assert.doesNotMatch(callsText, /plugin uninstall orchestra@orchestra-skills/);
+    assert.doesNotMatch(callsText, /marketplace remove orchestra-skills/);
+    }
+  });
+
+  it("removes the pre-rename global package and its commands but not a user's own", () => {
+    const script = readFileSync("install.sh", "utf8");
+    const start = script.indexOf("remove_previous_global_package() {");
+    const fn = script.slice(start, script.indexOf("\n}\n", start) + 3);
+    const npmRoot = join(root, "prefix", "lib", "node_modules");
+    const prefixBin = join(root, "prefix", "bin");
+    const legacy = join(npmRoot, "@understudylabs", "understudy-agent-tools");
+    const home = join(root, "home");
+    const bin = join(root, "bin");
+    mkdirSync(join(legacy, "dist"), { recursive: true });
+    writeFileSync(join(legacy, "dist", "bin.js"), "");
+    mkdirSync(prefixBin, { recursive: true });
+    mkdirSync(join(home, ".local", "bin"), { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    symlinkSync(join(legacy, "dist", "bin.js"), join(prefixBin, "understudy"));
+    symlinkSync(join(legacy, "dist", "bin.js"), join(prefixBin, "orchestra"));
+    writeFileSync(join(home, ".local", "bin", "orchestra"), "#!/bin/sh\necho mine\n");
+    writeFileSync(
+      join(bin, "npm"),
+      `#!/usr/bin/env bash\ncase "$*" in\n  "root -g") printf '%s\\n' "${npmRoot}" ;;\n  "prefix -g") printf '%s\\n' "${join(root, "prefix")}" ;;\nesac\nexit 0\n`,
+    );
+    chmodSync(join(bin, "npm"), 0o755);
+
+    const harness = `say() { printf '%s\\n' "$*"; }\nwarn() { printf 'warn: %s\\n' "$*"; }\nPACKAGE_NAME="orchestra-agent-tools"\nLEGACY_PACKAGE_NAME="@understudylabs/understudy-agent-tools"\n${fn}\nremove_previous_global_package\n`;
+    const result = spawnSync("bash", ["-c", harness], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` },
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(existsSync(legacy), false);
+    assert.equal(existsSync(join(npmRoot, "@understudylabs")), false);
+    assert.throws(() => lstatSync(join(prefixBin, "understudy")), { code: "ENOENT" });
+    assert.throws(() => lstatSync(join(prefixBin, "orchestra")), { code: "ENOENT" });
+    assert.equal(readFileSync(join(home, ".local", "bin", "orchestra"), "utf8"), "#!/bin/sh\necho mine\n");
   });
 
   it("leaves a pre-rename Cursor path alone when it is not an Orchestra checkout", () => {

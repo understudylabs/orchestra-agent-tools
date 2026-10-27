@@ -58,7 +58,7 @@ For a full Understudy update, rerun the public installer first. It refreshes
 the managed GitHub checkout, rebuilds the CLI, and then reinstalls adapters:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UnderstudyLabs/understudy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
 The platform steps below refresh skill discovery for an existing checkout.
