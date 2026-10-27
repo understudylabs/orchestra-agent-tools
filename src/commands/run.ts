@@ -4,7 +4,6 @@ import { Command } from "commander";
 import kleur from "kleur";
 
 import { CLI_NAME, DEFAULT_GATEWAY_URL } from "../config/defaults.js";
-import { withBothEnvPrefixes } from "../config/env-aliases.js";
 import { readCredentials } from "../config/credentials.js";
 import { readProjectConfig } from "../config/index.js";
 import { isJsonMode, runAction } from "../internal/output.js";
@@ -23,8 +22,7 @@ interface ResolvedRunEnv {
 
 /**
  * `orchestra run -- <command>` — run an arbitrary child command with the
- * authenticated key injected into that process only, under both the
- * `ORCHESTRA_*` and legacy `UNDERSTUDY_*` names.
+ * authenticated Understudy key injected into that process only.
  *
  * This is the agent-first bridge: skills can execute local inference
  * or cookbook scripts through Understudy without reading the credential
@@ -51,11 +49,6 @@ async function runWithUnderstudyEnv(
     throw new Error("Usage: orchestra run -- <command>");
   }
 
-  const injectedEnv = withBothEnvPrefixes({
-    UNDERSTUDY_API_KEY: resolved.apiKey,
-    UNDERSTUDY_GATEWAY_URL: resolved.gatewayUrl,
-    ...(resolved.orgId ? { UNDERSTUDY_ORG_ID: resolved.orgId } : {}),
-  });
   const startedAt = Date.now();
   const commandKind = classifyCommand(bin, args);
   trackRunStarted({
@@ -72,7 +65,11 @@ async function runWithUnderstudyEnv(
       `${JSON.stringify({
         ok: true,
         command: [bin, ...args],
-        injected: Object.keys(injectedEnv),
+        injected: [
+          "UNDERSTUDY_API_KEY",
+          "UNDERSTUDY_GATEWAY_URL",
+          ...(resolved.orgId ? ["UNDERSTUDY_ORG_ID"] : []),
+        ],
         org_id: resolved.orgId,
         project_slug: resolved.projectSlug,
         source: resolved.source,
@@ -80,14 +77,16 @@ async function runWithUnderstudyEnv(
     );
   } else {
     process.stderr.write(
-      `${kleur.gray(CLI_NAME)} injecting ORCHESTRA_API_KEY and UNDERSTUDY_API_KEY into child process\n`,
+      `${kleur.gray(CLI_NAME)} injecting UNDERSTUDY_API_KEY into child process\n`,
     );
   }
 
   const child = spawn(bin, args, {
     env: {
       ...process.env,
-      ...injectedEnv,
+      UNDERSTUDY_API_KEY: resolved.apiKey,
+      UNDERSTUDY_GATEWAY_URL: resolved.gatewayUrl,
+      ...(resolved.orgId ? { UNDERSTUDY_ORG_ID: resolved.orgId } : {}),
     },
     stdio: "inherit",
   });
