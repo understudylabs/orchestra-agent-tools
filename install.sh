@@ -241,13 +241,12 @@ banner() {
     return 0
   fi
   printf '\n'
-  printf '  %s%s%s\n' "$G1" '                   __               __            __' "$R"
-  printf '  %s%s%s\n' "$G2" '  __  ______  ____/ /__  __________/ /___  ______/ /_  __' "$R"
-  printf '  %s%s%s\n' "$G3" ' / / / / __ \/ __  / _ \/ ___/ ___/ __/ / / / __  / / / /' "$R"
-  printf '  %s%s%s\n' "$G4" '/ /_/ / / / / /_/ /  __/ /  (__  ) /_/ /_/ / /_/ / /_/ /' "$R"
-  printf '  %s%s%s\n' "$G5" '\__,_/_/ /_/\__,_/\___/_/  /____/\__/\__,_/\__,_/\__, /' "$R"
-  printf '  %s%s%s\n' "$G6" '                                                /____/' "$R"
-  printf '\n  %severy frontier model deserves an understudy%s\n' "$D" "$R"
+  printf '  %s%s%s\n' "$G1" '                   __              __' "$R"
+  printf '  %s%s%s\n' "$G2" '  ____  __________/ /_  ___  _____/ /__________ _' "$R"
+  printf '  %s%s%s\n' "$G3" ' / __ \/ ___/ ___/ __ \/ _ \/ ___/ __/ ___/ __ `/' "$R"
+  printf '  %s%s%s\n' "$G5" '/ /_/ / /  / /__/ / / /  __(__  ) /_/ /  / /_/ /' "$R"
+  printf '  %s%s%s\n' "$G6" '\____/_/   \___/_/ /_/\___/____/\__/_/   \__,_/' "$R"
+  printf '\n  %sTurn AI spend into AI you own.%s\n' "$D" "$R"
 }
 # run_logged <label> <command...> — run quietly into the install log,
 # with a live spinner on a TTY and a plain line everywhere else.
