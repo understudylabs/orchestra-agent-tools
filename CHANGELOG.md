@@ -18,13 +18,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 ### Added
 
 - **`orchestra` command.** The CLI now installs as `orchestra`; `understudy`
-  stays installed as an alias and behaves identically. `ORCHESTRA_*`
-  environment variables are accepted everywhere `UNDERSTUDY_*` ones are
-  (the `ORCHESTRA_*` value wins when both are set), and `orchestra run`
-  injects the API key, gateway URL, and org ID under both prefixes. Help,
-  hints, the installer, skills, and docs now say `orchestra <command>`.
-  Paths (`~/.understudy`, `.understudy/`), plugin and skill names, and
-  gateway headers are unchanged.
+  stays installed as an alias and behaves identically. Help, hints, the
+  installer, skills, and docs now say `orchestra <command>`. Environment
+  variables stay `UNDERSTUDY_*` (`ORCHESTRA_API_KEY` belongs to
+  getorchestra.io and is never read or set). Paths (`~/.understudy`,
+  `.understudy/`), plugin and skill names, and gateway headers are
+  unchanged.
 
 ### Removed
 
