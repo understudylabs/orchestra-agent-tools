@@ -4689,14 +4689,7 @@ class ChainOfThought(Predict):
 
       assert.equal(result.status, 0, result.stderr);
       const runMeta = JSON.parse(result.stderr.trim().split("\n").find((line) => line.startsWith("{")));
-      assert.deepEqual(runMeta.injected, [
-        "UNDERSTUDY_API_KEY",
-        "ORCHESTRA_API_KEY",
-        "UNDERSTUDY_GATEWAY_URL",
-        "ORCHESTRA_GATEWAY_URL",
-        "UNDERSTUDY_ORG_ID",
-        "ORCHESTRA_ORG_ID",
-      ]);
+      assert.deepEqual(runMeta.injected, ["UNDERSTUDY_API_KEY", "UNDERSTUDY_GATEWAY_URL", "UNDERSTUDY_ORG_ID"]);
       assert.equal(runMeta.org_id, "org_1");
       const childEnv = JSON.parse(result.stdout.trim());
       assert.equal(childEnv.api, true);
@@ -4728,12 +4721,7 @@ class ChainOfThought(Predict):
 
       assert.equal(result.status, 0, result.stderr);
       const runMeta = JSON.parse(result.stderr.trim().split("\n").find((line) => line.startsWith("{")));
-      assert.deepEqual(runMeta.injected, [
-        "UNDERSTUDY_API_KEY",
-        "ORCHESTRA_API_KEY",
-        "UNDERSTUDY_GATEWAY_URL",
-        "ORCHESTRA_GATEWAY_URL",
-      ]);
+      assert.deepEqual(runMeta.injected, ["UNDERSTUDY_API_KEY", "UNDERSTUDY_GATEWAY_URL"]);
       assert.equal(runMeta.org_id, null);
       const childEnv = JSON.parse(result.stdout.trim());
       assert.equal(childEnv.api, true);
@@ -4745,43 +4733,30 @@ class ChainOfThought(Predict):
     }
   });
 
-  it("accepts ORCHESTRA_* env, prefers it over UNDERSTUDY_*, and injects both names", async () => {
-    const home = mkdtempSync(join(tmpdir(), "orchestra-run-env-home-"));
-    const repo = mkdtempSync(join(tmpdir(), "orchestra-run-env-repo-"));
-    const printEnv =
-      "console.log(JSON.stringify({o:process.env.ORCHESTRA_API_KEY,u:process.env.UNDERSTUDY_API_KEY,og:process.env.ORCHESTRA_GATEWAY_URL,ug:process.env.UNDERSTUDY_GATEWAY_URL}))";
+  it("leaves a third-party ORCHESTRA_API_KEY alone in run", async () => {
+    // getorchestra.io's SDK reads ORCHESTRA_API_KEY; `orchestra run` must
+    // neither use it as our key nor overwrite it in the child.
+    const home = mkdtempSync(join(tmpdir(), "orchestra-run-foreign-key-home-"));
+    const repo = mkdtempSync(join(tmpdir(), "orchestra-run-foreign-key-repo-"));
     try {
-      const both = await runWithEnvAsync(
-        ["run", "node", "-e", printEnv],
+      const result = await runWithEnvAsync(
+        [
+          "run",
+          "node",
+          "-e",
+          "console.log(JSON.stringify({o:process.env.ORCHESTRA_API_KEY,u:process.env.UNDERSTUDY_API_KEY}))",
+        ],
         {
           HOME: home,
           USERPROFILE: home,
-          ORCHESTRA_API_KEY: "sk_new",
-          UNDERSTUDY_API_KEY: "sk_old",
-          ORCHESTRA_GATEWAY_URL: "https://gateway.example.test",
+          ORCHESTRA_API_KEY: "third_party_key",
+          UNDERSTUDY_API_KEY: "sk_ours",
+          UNDERSTUDY_GATEWAY_URL: "https://gateway.example.test",
         },
         repo,
       );
-      assert.equal(both.status, 0, both.stderr);
-      assert.deepEqual(JSON.parse(both.stdout.trim()), {
-        o: "sk_new",
-        u: "sk_new",
-        og: "https://gateway.example.test",
-        ug: "https://gateway.example.test",
-      });
-
-      const legacyOnly = await runWithEnvAsync(
-        ["run", "node", "-e", printEnv],
-        { HOME: home, USERPROFILE: home, UNDERSTUDY_API_KEY: "sk_old", UNDERSTUDY_GATEWAY_URL: "https://legacy.example.test" },
-        repo,
-      );
-      assert.equal(legacyOnly.status, 0, legacyOnly.stderr);
-      assert.deepEqual(JSON.parse(legacyOnly.stdout.trim()), {
-        o: "sk_old",
-        u: "sk_old",
-        og: "https://legacy.example.test",
-        ug: "https://legacy.example.test",
-      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout.trim()), { o: "third_party_key", u: "sk_ours" });
     } finally {
       rmSync(home, { recursive: true, force: true });
       rmSync(repo, { recursive: true, force: true });
