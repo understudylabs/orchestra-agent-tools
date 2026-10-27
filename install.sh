@@ -1067,7 +1067,7 @@ install_cursor_plugin() {
   mkdir -p "$(dirname "$dest")"
   # Pre-rename installs linked the same checkout at local/understudy; only
   # remove that link when it is ours.
-  local legacy="$HOME/.cursor/plugins/local/orchestra"
+  local legacy="$HOME/.cursor/plugins/local/understudy"
   if [ -L "$legacy" ]; then
     case "$(readlink "$legacy" 2>/dev/null || true)" in
       *understudy-agent-tools) rm -f "$legacy" ;;
@@ -1229,9 +1229,9 @@ install_opencode_adapter() {
     link_opencode_path "$command_src" "$command_dest" "command" || true
   fi
   # Pre-rename command; drop it only when it links into an Orchestra checkout.
-  if [ -L "$command_root/orchestra-onboard.md" ]; then
-    case "$(readlink "$command_root/orchestra-onboard.md" 2>/dev/null || true)" in
-      *understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/orchestra-onboard.md" ;;
+  if [ -L "$command_root/understudy-onboard.md" ]; then
+    case "$(readlink "$command_root/understudy-onboard.md" 2>/dev/null || true)" in
+      *understudy-agent-tools/.opencode/commands/*) rm -f "$command_root/understudy-onboard.md" ;;
     esac
   fi
 

@@ -764,9 +764,10 @@ describe("install.sh", () => {
     assert.match(callsText, /claude plugin marketplace remove understudy-skills/);
     assert.match(callsText, /claude plugin install orchestra@orchestra-skills/);
     assert.match(callsText, /codex plugin marketplace remove understudy-skills/);
-    assert.equal(existsSync(join(home, ".cursor", "plugins", "local", "understudy")), false);
+    // lstat, not existsSync: the old links point at a checkout that no longer exists.
+    assert.throws(() => lstatSync(join(home, ".cursor", "plugins", "local", "understudy")), { code: "ENOENT" });
     assert.equal(lstatSync(join(home, ".cursor", "plugins", "local", "orchestra")).isSymbolicLink(), true);
-    assert.equal(existsSync(join(home, ".config", "opencode", "commands", "understudy-onboard.md")), false);
+    assert.throws(() => lstatSync(join(home, ".config", "opencode", "commands", "understudy-onboard.md")), { code: "ENOENT" });
     assert.equal(
       lstatSync(join(home, ".config", "opencode", "commands", "orchestra-onboard.md")).isSymbolicLink(),
       true,
