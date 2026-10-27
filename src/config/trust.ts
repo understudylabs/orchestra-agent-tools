@@ -30,8 +30,8 @@
  * budget.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { globalConfigDir } from "./paths.js";
 
 export const TRUST_POSTURE_SCHEMA = "understudy.trust_posture.v1";
 
@@ -73,7 +73,7 @@ const asObject = (value: unknown): Obj =>
 /** `UNDERSTUDY_TRUST_FILE` overrides for tests/sandboxes; default is the global config dir. */
 export function trustPosturePath(env: NodeJS.ProcessEnv = process.env): string {
   const override = env.UNDERSTUDY_TRUST_FILE?.trim();
-  return override ? override : join(homedir(), ".understudy", "trust.json");
+  return override ? override : join(globalConfigDir(), "trust.json");
 }
 
 const isTrustLevel = (value: unknown): value is TrustLevel =>

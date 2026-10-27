@@ -18,6 +18,7 @@ import {
 } from "../dist/runtime/conversation/benchmark-extension.js";
 import { piPreinstalledSkillPaths } from "../dist/runtime/conversation/pi-runtime.js";
 import { BENCHMARKS_TOOLS, callBenchmarksTool } from "../dist/benchmarks-mcp.js";
+import { globalConfigDir } from "../dist/config/paths.js";
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-benchmark-extension-"));
 process.env.BENCHMARK_HUB_DATA_DIR = tmp;
@@ -104,11 +105,11 @@ describe("tool registration", () => {
     assert.equal(guard({ toolName: "bash", input: { command: "rm -rf /" } }), undefined);
   });
 
-  it("defaults the hub root to ~/.understudy/benchmarks with env override", () => {
+  it("defaults the hub root to <global config dir>/benchmarks with env override", () => {
     assert.equal(benchmarkHubRoots(), tmp);
     const saved = process.env.BENCHMARK_HUB_DATA_DIR;
     delete process.env.BENCHMARK_HUB_DATA_DIR;
-    assert.equal(benchmarkHubRoots(), path.join(os.homedir(), ".understudy", "benchmarks"));
+    assert.equal(benchmarkHubRoots(), path.join(globalConfigDir(), "benchmarks"));
     process.env.BENCHMARK_HUB_DATA_DIR = saved;
   });
 });

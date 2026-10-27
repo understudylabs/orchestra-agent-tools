@@ -9,7 +9,6 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -45,6 +44,7 @@ import {
   prepareProofCorrectionEvidence,
   prepareProofCorrectionGepaHandoff,
 } from "../desktop/proof-corrections.js";
+import { globalConfigDir } from "../config/paths.js";
 
 interface RuntimeEvent {
   run_id?: string;
@@ -1052,7 +1052,7 @@ export function registerDesktopCommand(program: Command): void {
       };
       const metricsContent = `${JSON.stringify(metrics, null, 2)}\n`;
       const metricsSha256 = sha256(metricsContent);
-      const outputRoot = join(homedir(), ".understudy", "exports", "supervision");
+      const outputRoot = join(globalConfigDir(), "exports", "supervision");
       const outputPath = opts.output
         ? resolve(opts.output)
         : join(outputRoot, `${pairsSha256}.correction-pairs.jsonl`);
@@ -1131,8 +1131,7 @@ export function registerDesktopCommand(program: Command): void {
       const gepa = prepareProofCorrectionGepaHandoff(prepared);
       const safeProofId = prepared.manifest.source.proof_id.replaceAll(/[^a-zA-Z0-9._-]/g, "-");
       const outputRoot = join(
-        homedir(),
-        ".understudy",
+        globalConfigDir(),
         "exports",
         "supervision",
         "proofs",
@@ -1358,7 +1357,7 @@ export function registerDesktopCommand(program: Command): void {
       const suiteSha = String(result.manifest.suite_sha256).slice(0, 12);
       const output = opts.output
         ? resolve(opts.output)
-        : join(homedir(), ".understudy", "evals", "supervision-tiebreaker", `${createdAt}-${suiteSha}`);
+        : join(globalConfigDir(), "evals", "supervision-tiebreaker", `${createdAt}-${suiteSha}`);
       const manifestPath = join(output, "manifest.json");
       const evidencePath = join(output, "evidence.jsonl");
       const summaryPath = join(output, "summary.json");

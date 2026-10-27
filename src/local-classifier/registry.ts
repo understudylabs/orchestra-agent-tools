@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { globalConfigDir } from "../config/paths.js";
+import { globalConfigDir, samePath } from "../config/paths.js";
 import {
   createClassifierModelIdentity,
   type CanonicalModelIdentity,
@@ -161,7 +161,7 @@ function validateManifest(path: string): { manifest: RunManifest; runId: string;
       manifest.data_boundary?.dataset_uploaded !== false || manifest.data_boundary.telemetry_sent !== false ||
       !isNonEmptyString(manifest.run_id) || !RUN_ID_PATTERN.test(manifest.run_id) ||
       !["completed", "failed", "cancelled"].includes(String(manifest.status)) ||
-      resolve(String(manifest.manifest_path)) !== canonicalPath) {
+      !samePath(String(manifest.manifest_path), canonicalPath)) {
     throw new Error("The local classifier run manifest failed its local evidence contract.");
   }
   if (!isNonEmptyString(manifest.generated_at) || Number.isNaN(Date.parse(manifest.generated_at))) {
@@ -208,7 +208,7 @@ function readRepeatValidation(manifestPath: string, runId: string): LocalClassif
           !isRecord(value.data_boundary) || value.data_boundary.dataset_uploaded !== false ||
           value.data_boundary.telemetry_sent !== false || !isRecord(value.verdict) ||
           !["reproduced", "drift_detected"].includes(String(value.verdict.status)) ||
-          resolve(String(value.artifact_path)) !== resolve(path)) {
+          !samePath(String(value.artifact_path), path)) {
         throw new Error(`Repeat-evaluation evidence for ${runId} is malformed.`);
       }
       return {
@@ -235,7 +235,7 @@ function summary(path: string): LocalClassifierRunSummary {
   if (manifest.model !== null && isRecord(manifest.model) &&
       isNonEmptyString(manifest.model.requested_id) && isNonEmptyString(manifest.model.resolved_id) &&
       isNonEmptyString(manifest.model.path) && isSafeNonNegativeInteger(manifest.model.size_bytes) &&
-      resolve(manifest.model.path) === join(dirname(resolve(path)), "model") &&
+      samePath(manifest.model.path, join(dirname(resolve(path)), "model")) &&
       Array.isArray(manifest.model.labels) && manifest.model.labels.length >= 2 &&
       manifest.model.labels.every(isNonEmptyString) &&
       new Set(manifest.model.labels).size === manifest.model.labels.length) {

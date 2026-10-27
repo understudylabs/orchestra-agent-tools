@@ -14,7 +14,6 @@
 // All stdout is MCP protocol; diagnostics go to stderr only.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -67,7 +66,7 @@ export function configureBenchmarksMcpRoots(extraRoots: string[]): void {
   if (extraRoots.length === 0) return;
   const defaults = process.env.BENCHMARK_HUB_DATA_DIR
     ? process.env.BENCHMARK_HUB_DATA_DIR.split(":").filter(Boolean)
-    : [join(homedir(), ".understudy", "benchmarks")];
+    : [join(globalConfigDir(), "benchmarks")];
   process.env.BENCHMARK_HUB_DATA_DIR = [...defaults, ...extraRoots.map((r) => resolve(r))].join(":");
 }
 
@@ -276,7 +275,7 @@ function obligations(accumulation: OracleReplay | null): { label: string; kind: 
 function toolListBenchmarks(): unknown {
   const entries = loadHub();
   return {
-    roots: process.env.BENCHMARK_HUB_DATA_DIR ?? join(homedir(), ".understudy", "benchmarks"),
+    roots: process.env.BENCHMARK_HUB_DATA_DIR ?? join(globalConfigDir(), "benchmarks"),
     benchmarks: entries.map((entry) => {
       if (entry.kind === "invalid") {
         return { slug: entry.slug, dir: entry.dir, stage: "invalid", errors: entry.errors };
@@ -719,13 +718,13 @@ function toolProfileWorkload(args: Obj): unknown {
 const SLUG_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
 function hubRoots(): string[] {
-  return (process.env.BENCHMARK_HUB_DATA_DIR ?? join(homedir(), ".understudy", "benchmarks"))
+  return (process.env.BENCHMARK_HUB_DATA_DIR ?? join(globalConfigDir(), "benchmarks"))
     .split(":")
     .filter(Boolean);
 }
 
 function hubPrimaryRoot(): string {
-  return hubRoots()[0] ?? join(homedir(), ".understudy", "benchmarks");
+  return hubRoots()[0] ?? join(globalConfigDir(), "benchmarks");
 }
 
 /**
@@ -1435,6 +1434,6 @@ export async function runBenchmarksMcpServer(extraRoots: string[]): Promise<void
   await server.connect(transport);
   console.error(
     `orchestra benchmarks mcp: serving ${BENCHMARKS_TOOLS.length} tools over stdio ` +
-      `(roots: ${process.env.BENCHMARK_HUB_DATA_DIR ?? join(homedir(), ".understudy", "benchmarks")})`,
+      `(roots: ${process.env.BENCHMARK_HUB_DATA_DIR ?? join(globalConfigDir(), "benchmarks")})`,
   );
 }

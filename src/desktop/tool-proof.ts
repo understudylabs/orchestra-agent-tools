@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { packagePath } from "../internal/package-root.js";
+import { globalConfigDir } from "../config/paths.js";
 
 export interface ToolProofCandidate {
   label: string;
@@ -105,8 +105,7 @@ type RunnerModule = {
 };
 
 export const DEFAULT_TOOL_PROOF_ROOT = join(
-  homedir(),
-  ".understudy",
+  globalConfigDir(),
   "proofs",
   "tool-correctness",
 );

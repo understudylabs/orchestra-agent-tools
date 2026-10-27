@@ -1,5 +1,4 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -16,6 +15,7 @@ import {
   isDesktopSingleFileBundle,
   isStandaloneExecutable,
 } from "../../internal/package-root.js";
+import { globalConfigDir } from "../../config/paths.js";
 
 const INTERNAL_CONVERSATION_SIDECAR_ARG = "__understudy_conversation_sidecar__";
 
@@ -48,7 +48,7 @@ export type ConversationRuntimeStatus = {
 export function conversationRuntimeHome(): string {
   return resolve(
     process.env.UNDERSTUDY_CONVERSATION_RUNTIME_HOME ??
-      join(homedir(), ".understudy", "runtime", "conversation"),
+      join(globalConfigDir(), "runtime", "conversation"),
   );
 }
 

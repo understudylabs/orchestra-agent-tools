@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
+import { samePath } from "../config/paths.js";
 import { assertCustomerScope, resolveAuth } from "../internal/http.js";
 
 export const FRONTIER_CLASSIFICATION_SCHEMA = "understudy.capture_import.frontier_classification.v1";
@@ -221,7 +222,7 @@ function verifyRun(pathInput: string): VerifiedRun {
       !isNonEmptyString(run.run_id)) {
     throw new Error("Frontier comparison requires a completed local classification run.");
   }
-  if (run.manifest_path !== manifestPath) {
+  if (typeof run.manifest_path !== "string" || !samePath(run.manifest_path, manifestPath)) {
     throw new Error("The selected run manifest does not match its immutable recorded path.");
   }
   const dataset = run.dataset;

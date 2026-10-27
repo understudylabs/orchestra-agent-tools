@@ -8,10 +8,10 @@ import {
   readdirSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { packagePath } from "../../internal/package-root.js";
+import { globalConfigDir } from "../../config/paths.js";
 
 export const MLX_VLM_COMMIT = "bc3461b13a636d7cb8213b0008d885a9965f1e69";
 export const MLX_VLM_SOURCE = `git+https://github.com/Blaizzy/mlx-vlm.git@${MLX_VLM_COMMIT}`;
@@ -51,7 +51,7 @@ export type MlxVlmRuntimeDoctor = {
 export function mlxVlmRuntimeHome(): string {
   return resolve(
     process.env.UNDERSTUDY_MLX_VLM_HOME ??
-      join(homedir(), ".understudy", "runtime", "mlx-vlm"),
+      join(globalConfigDir(), "runtime", "mlx-vlm"),
   );
 }
 

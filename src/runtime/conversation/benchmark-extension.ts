@@ -33,7 +33,6 @@
 // colon-separated BENCHMARK_HUB_DATA_DIR env var when set, otherwise
 // ~/.understudy/benchmarks.
 
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defineTool } from "@earendil-works/pi-coding-agent";
@@ -45,6 +44,7 @@ import { getEntry } from "../../benchmark-hub-core.js";
 import { deriveRigorReport } from "../../rigor-report.js";
 import { COST_PER_MTOKEN } from "../../trace-author.js";
 import { raiseTrustHint, readTrustPosture, trustAtLeast, type TrustPosture } from "../../config/trust.js";
+import { globalConfigDir } from "../../config/paths.js";
 
 /**
  * Explicit allowlist of MCP-shared operator tools exposed in the embedded
@@ -81,7 +81,7 @@ export const PI_BENCHMARK_TOOL_NAMES: readonly string[] = [
 ];
 
 export function benchmarkHubRoots(): string {
-  return process.env.BENCHMARK_HUB_DATA_DIR ?? join(homedir(), ".understudy", "benchmarks");
+  return process.env.BENCHMARK_HUB_DATA_DIR ?? join(globalConfigDir(), "benchmarks");
 }
 
 /* ---------------- spend-adjacent gating (command-guard pattern) ---------------- */

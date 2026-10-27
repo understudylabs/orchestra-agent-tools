@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
@@ -40,6 +39,7 @@ import {
   piBenchmarkLabExtension,
 } from "./benchmark-extension.js";
 import { packagePath } from "../../internal/package-root.js";
+import { globalConfigDir } from "../../config/paths.js";
 
 /**
  * The explicit, deliberately small preinstall allowlist of packaged skills.
@@ -58,7 +58,7 @@ export function piPreinstalledSkillPaths(): string[] {
 function runtimeHome(): string {
   return resolve(
     process.env.UNDERSTUDY_CONVERSATION_RUNTIME_HOME ??
-      join(homedir(), ".understudy", "runtime", "conversation"),
+      join(globalConfigDir(), "runtime", "conversation"),
   );
 }
 

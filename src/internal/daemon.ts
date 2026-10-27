@@ -8,8 +8,8 @@
 // behind.
 
 import { lstatSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { globalConfigDir } from "../config/paths.js";
 
 const DEFAULT_PROBE_TIMEOUT_MS = 800;
 
@@ -34,7 +34,7 @@ export interface DaemonStatus {
 }
 
 export function agentCardPath(): string {
-  return join(homedir(), ".understudy", "agent-card.json");
+  return join(globalConfigDir(), "agent-card.json");
 }
 
 /** Parse the agent card; null when missing, a symlink, or unreadable JSON. */
