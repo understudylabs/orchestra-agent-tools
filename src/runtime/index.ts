@@ -29,7 +29,7 @@ export function requireUnderstudyEnv(): UnderstudyEnv {
     throw new Error(
       [
         "No Understudy config found.",
-        "Run `understudy login` in your project root to create .understudy/config.json.",
+        "Run `orchestra login` in your project root to create .understudy/config.json.",
       ].join(" "),
     );
   }
@@ -39,7 +39,7 @@ export function requireUnderstudyEnv(): UnderstudyEnv {
     throw new Error(
       [
         "No Understudy credentials found.",
-        "Run `understudy login` to create ~/.understudy/credentials.json.",
+        "Run `orchestra login` to create ~/.understudy/credentials.json.",
       ].join(" "),
     );
   }
@@ -49,7 +49,7 @@ export function requireUnderstudyEnv(): UnderstudyEnv {
     throw new Error(
       [
         `No credentials for org_id=${config.org_id} in ~/.understudy/credentials.json.`,
-        "Run `understudy login` to sign in to this org.",
+        "Run `orchestra login` to sign in to this org.",
       ].join(" "),
     );
   }

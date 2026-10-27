@@ -99,7 +99,7 @@ describe("explore mcp", () => {
       const status = JSON.parse(responses.get(2).result.content[0].text);
       assert.equal(status.clickhouse_reachable, false);
       assert.equal(status.has_scan, false);
-      assert.match(status.hint, /understudy explore scan/);
+      assert.match(status.hint, /orchestra explore scan/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

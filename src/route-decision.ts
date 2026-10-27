@@ -194,7 +194,7 @@ export function planRouteDecision(workloadCardPath: string, output?: string): { 
       artificial_analysis_snapshots: [],
     },
     candidate_routes: buildCandidateRoutes(card),
-    recommended_next_command: "understudy optimize-workload check --repo .",
+    recommended_next_command: "orchestra optimize-workload check --repo .",
     approval_required_before: ["expanding data, destination, spend, retention, or production impact"],
   };
   const outputPath = resolve(output ?? join(dirname(resolvedPath), "..", "route-decision", "route-decision-packet.json"));

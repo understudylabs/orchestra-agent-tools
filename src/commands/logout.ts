@@ -25,7 +25,7 @@ interface LogoutOpts {
 export function registerLogoutCommand(program: Command): void {
   program
     .command("logout")
-    .description("Clear local Understudy credentials.")
+    .description("Clear local Orchestra credentials.")
     .option("--org <id>", "Log out of just this org. Default: clear all orgs.")
     .action(function (this: Command, opts: LogoutOpts) {
       runLogout(opts, isJsonMode(this));

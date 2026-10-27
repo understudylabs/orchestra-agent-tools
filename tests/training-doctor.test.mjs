@@ -400,7 +400,7 @@ describe("understudy training doctor", () => {
     assert.equal(report.first_failure, "server_capabilities");
     assert.match(
       report.checks.find((check) => check.id === "server_capabilities").next,
-      /understudy login/,
+      /orchestra login/,
     );
   });
 

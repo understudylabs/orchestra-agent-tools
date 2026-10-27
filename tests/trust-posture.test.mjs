@@ -97,7 +97,7 @@ describe("posture resolution matrix", () => {
   });
 
   it("raiseTrustHint is the ONE action a blocked gate offers", () => {
-    assert.equal(raiseTrustHint("bounded_experiments"), "understudy trust set bounded_experiments");
+    assert.equal(raiseTrustHint("bounded_experiments"), "orchestra trust set bounded_experiments");
   });
 });
 

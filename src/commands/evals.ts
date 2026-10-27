@@ -162,7 +162,7 @@ export function registerEvalsCommand(program: Command): void {
   const cohort = evals.command("cohort").description("Create or materialize immutable cohorts.");
   addWorkloadOptions(cohort.command("create")
     .description("Freeze an exact cohort from a saved redacted catalog.")
-    .requiredOption("--from-catalog <path>", "Catalog JSON written by `understudy evals catalog --out`.")
+    .requiredOption("--from-catalog <path>", "Catalog JSON written by `orchestra evals catalog --out`.")
     .requiredOption("--name <name>", "Cohort name.")
     .option("--description <text>", "Why these captures were selected."))
     .action(async function (this: Command, opts: CohortCreateOpts) {
@@ -238,7 +238,7 @@ async function runPublish(cmd: Command, opts: PublishOpts): Promise<void> {
     return;
   }
   if (opts.expectReleaseId === undefined) {
-    throw new Error("Run `understudy evals publish --preview` first, review its exact contents, then rerun with `--expect-release-id <expected_release_id>`.");
+    throw new Error("Run `orchestra evals publish --preview` first, review its exact contents, then rerun with `--expect-release-id <expected_release_id>`.");
   }
   const release = await publishEvalRelease(project, { expectedReleaseId: opts.expectReleaseId });
   if (isJsonMode(cmd)) {
@@ -253,7 +253,7 @@ async function runPublish(cmd: Command, opts: PublishOpts): Promise<void> {
 function addWorkloadOptions(command: Command): Command {
   return command
     .requiredOption("--workload <name-or-id>", "Workload name or id.")
-    .option("--project-id <id>", "Project id from `understudy projects list --json`.")
+    .option("--project-id <id>", "Project id from `orchestra projects list --json`.")
     .option("--project <slug>", "Project slug to resolve to an id.")
     .option("--org <id>", "Org id (default: local config or only credential org).");
 }

@@ -169,7 +169,7 @@ export function queueRunSpendNotice(args: Obj, posture: TrustPosture): string {
     `${incumbents.length > 0 ? ` (incl. ${incumbents.length} incumbent)` : ""} x ` +
     `${taskCount ?? "?"} task(s) x ${rollouts} rollout(s)` +
     `${totalRollouts === null ? "" : ` = ${totalRollouts} rollout(s)`}; ${est}. ` +
-    `Recorded, reversible: cancel via run_status/cancel; lower autonomy any time with \`understudy trust set local_sandbox\`.`
+    `Recorded, reversible: cancel via run_status/cancel; lower autonomy any time with \`orchestra trust set local_sandbox\`.`
   );
 }
 
@@ -312,7 +312,7 @@ export function benchmarkToolDefinitions() {
     name: PI_BENCHMARK_RIGOR_TOOL,
     label: "Benchmark lab: read_rigor_report",
     description:
-      "Derive the ABC rigor report for one PROMOTED benchmark (same shared derivation as `understudy benchmarks rigor` and the checked-in rigor-report.md): per-item PASS/FLAG/UNKNOWN with evidence. Read-only.",
+      "Derive the ABC rigor report for one PROMOTED benchmark (same shared derivation as `orchestra benchmarks rigor` and the checked-in rigor-report.md): per-item PASS/FLAG/UNKNOWN with evidence. Read-only.",
     parameters: Type.Unsafe(({
       type: "object",
       properties: { slug: { type: "string", description: "Slug from list_benchmarks (promoted stage)." } },

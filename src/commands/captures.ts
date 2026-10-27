@@ -153,7 +153,7 @@ export function registerCapturesCommand(program: Command): void {
 
 function addCaptureOptions(command: Command): Command {
   return command
-    .option("--project-id <id>", "Project id from `understudy projects list --json`.")
+    .option("--project-id <id>", "Project id from `orchestra projects list --json`.")
     .option("--project <slug>", "Project slug to resolve to an id.")
     .option("--workload <name-or-id>", "Optional workload name or id.")
     .option("--org <id>", "Org id to use (default: local config or only org in credentials).");
@@ -226,7 +226,7 @@ async function runTimeSearch(cmd: Command, opts: ListOpts): Promise<void> {
   for (const capture of result.captures) {
     process.stdout.write(`${capture.request_id.padEnd(width)}  ${capture.captured_at}\n`);
   }
-  process.stdout.write("Inspect candidates with understudy captures get <request-id> using the same project and workload.\n");
+  process.stdout.write("Inspect candidates with orchestra captures get <request-id> using the same project and workload.\n");
 }
 
 async function runGet(cmd: Command, requestId: string, opts: CaptureOpts): Promise<void> {

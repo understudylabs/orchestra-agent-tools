@@ -430,7 +430,7 @@ describe("submit_feedback", () => {
     assert.equal(out.feedback.schema_version, "understudy.task_feedback.v1");
     assert.equal(out.feedback.task_id, "t-clean");
     assert.equal(out.feedback.status, "open");
-    assert.ok(out.handoff.includes(`understudy traces regenerate-env --benchmark ${policyDir}`));
+    assert.ok(out.handoff.includes(`orchestra traces regenerate-env --benchmark ${policyDir}`));
     assert.ok(out.handoff.includes("gold contract over-specified"));
     const lines = fs.readFileSync(path.join(policyDir, "feedback.jsonl"), "utf8").trim().split("\n");
     assert.equal(lines.length, 1);

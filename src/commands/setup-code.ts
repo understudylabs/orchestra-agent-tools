@@ -19,7 +19,7 @@ const recipeByClient: Record<string, string> = {
 export function registerSetupCodeCommand(program: Command): void {
   program
     .command("setup-code")
-    .description("Route coding agents to the Understudy setup skill instead of patching code directly.")
+    .description("Route coding agents to the Orchestra setup skill instead of patching code directly.")
     .option("--client <name>", "Recipe hint: anthropic, openai, mastra, universal, or gepa.", "universal")
     .option("--file <path>", "Optional source file hint for the coding agent.")
     .action(async function (this: Command, opts: SetupCodeOpts) {
@@ -36,7 +36,7 @@ function routeSetupCode(opts: SetupCodeOpts, json: boolean): void {
     skill: "skills/onboard/setup-code.md",
     recipe,
     file_hint: opts.file ?? null,
-    next_command: "understudy setup",
+    next_command: "orchestra setup",
     message:
       "Use the onboarding skill and referenced recipe to patch the application. The CLI no longer rewrites source code directly.",
   };
@@ -54,7 +54,7 @@ function routeSetupCode(opts: SetupCodeOpts, json: boolean): void {
       `Recipe: ${payload.recipe}`,
       opts.file ? `File hint: ${opts.file}` : null,
       "",
-      "Run `understudy setup` to install the onboarding skill, then ask your coding agent to convert this repo to Understudy.",
+      "Run `orchestra setup` to install the onboarding skill, then ask your coding agent to convert this repo to Understudy.",
       "The CLI does not rewrite source code directly.",
     ]
       .filter((line): line is string => line !== null)

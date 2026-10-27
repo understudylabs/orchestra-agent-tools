@@ -72,8 +72,8 @@ export function registerWorkloadsCommand(program: Command): void {
     });
 
   addProjectOptions(workloads.command("route <workload>")
-    .description("Set or clear an Understudy model traffic route for a workload.")
-    .option("--model-id <id>", "Public Understudy model id from `understudy models list`.")
+    .description("Set or clear an Orchestra model traffic route for a workload.")
+    .option("--model-id <id>", "Public Understudy model id from `orchestra models list`.")
     .option("--traffic-pct <0-100>", "Percent of traffic to send to the selected Understudy model.", "10")
     .option("--clear", "Clear the Understudy model route and return to passthrough/frontier."))
     .action(async function (this: Command, workload: string, opts: RouteOpts) {
@@ -83,7 +83,7 @@ export function registerWorkloadsCommand(program: Command): void {
 
 function addProjectOptions(command: Command): Command {
   return command
-    .option("--project-id <id>", "Project id from `understudy projects list --json`.")
+    .option("--project-id <id>", "Project id from `orchestra projects list --json`.")
     .option("--project <slug>", "Project slug to resolve to an id.")
     .option("--org <id>", "Org id to use (default: local config or only org in credentials).");
 }
@@ -139,7 +139,7 @@ async function runCreate(cmd: Command, name: string | undefined, opts: CreateOpt
   }
   process.stdout.write(`${kleur.green("✓")} Created workload ${kleur.bold(res.data.name)} (${res.data.id})\n`);
   process.stdout.write(`capture: ${res.data.capture_enabled ? "on" : "off"}\n`);
-  process.stdout.write(`next: understudy gateway probe --provider anthropic --project ${project.projectSlug ?? project.projectId} --workload ${res.data.name}\n`);
+  process.stdout.write(`next: orchestra gateway probe --provider anthropic --project ${project.projectSlug ?? project.projectId} --workload ${res.data.name}\n`);
 }
 
 async function runShow(cmd: Command, workloadValue: string, opts: WorkloadOpts): Promise<void> {
@@ -227,7 +227,7 @@ function validateWorkloadName(name: string): void {
 
 function printWorkloadTable(workloads: Workload[]): void {
   if (workloads.length === 0) {
-    process.stdout.write(`${kleur.gray("No workloads in this project.")} Run ${kleur.cyan("understudy workloads create <name>")} to create one.\n`);
+    process.stdout.write(`${kleur.gray("No workloads in this project.")} Run ${kleur.cyan("orchestra workloads create <name>")} to create one.\n`);
     return;
   }
   const rows = workloads.map((w) => ({

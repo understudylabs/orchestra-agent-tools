@@ -499,7 +499,7 @@ export function compileDatasetFoundry(sourceInput: string, outputInput: string, 
     models: [] as string[],
     trivial_arms: ["null_agent", "majority_class"],
     rollouts_per_task: 1,
-    note: "queue with `understudy runs …` or the hub; add candidate model arms alongside the floors",
+    note: "queue with `orchestra runs …` or the hub; add candidate model arms alongside the floors",
   };
 
   const docsDir = options.docsDir ? resolve(options.docsDir) : null;
@@ -616,7 +616,7 @@ export function renderCurationReport(result: Obj): string {
   lines.push("");
   lines.push("## Next steps");
   lines.push("");
-  lines.push("1. `understudy benchmarks rigor <dir>` after the first run — floors + per-class accuracy land in rigor-report.md.");
+  lines.push("1. `orchestra benchmarks rigor <dir>` after the first run — floors + per-class accuracy land in rigor-report.md.");
   lines.push("2. Queue the recommended run (null_agent + majority_class floors alongside your candidate models).");
   lines.push("3. Training? Record the frozen split hash above in experiments.jsonl before any provider spend.");
   lines.push("");

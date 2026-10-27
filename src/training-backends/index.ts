@@ -159,7 +159,7 @@ function backendContract(
       blocked_reasons: [
         ...(!compatible ? [`Recipe ${plan.recipe_id} has no MLX executor.`] : []),
         ...(compatible && !executorImplemented ? [
-          `Recipe ${plan.recipe_id} is not implemented by understudy training run-local-sft`
+          `Recipe ${plan.recipe_id} is not implemented by orchestra training run-local-sft`
             + ` (implemented: ${Object.keys(localSftRecipeRegistry).join(", ")}).`,
         ] : []),
         ...(executorImplemented && !runtimeReady ? ["MLX local SFT requires Apple Silicon."] : []),
@@ -172,7 +172,7 @@ function backendContract(
       },
       execution: {
         transport: "local_process",
-        command: "understudy training run-local-sft",
+        command: "orchestra training run-local-sft",
         plan_argument: plan.plan_path,
         network_policy: "offline",
         evaluator: recipe.evaluator,
@@ -240,7 +240,7 @@ function backendContract(
     blocked_reasons: [
       ...(!compatible ? [`Recipe ${plan.recipe_id} has no Tinker executor.`] : []),
       ...(compatible && !tinkerImplemented ? [
-        `Recipe ${plan.recipe_id} is not implemented by understudy training run-tinker-sft`
+        `Recipe ${plan.recipe_id} is not implemented by orchestra training run-tinker-sft`
           + ` (implemented: ${Object.keys(tinkerSftRecipeRegistry).join(", ")}).`,
       ] : []),
       ...(tinkerImplemented && plan.maximum_spend_usd === 0 ? [
@@ -265,7 +265,7 @@ function backendContract(
     },
     execution: {
       transport: "tinker_python_sdk",
-      command: "understudy training run-tinker-sft",
+      command: "orchestra training run-tinker-sft",
       service_preflight: "ServiceClient.get_server_capabilities_async",
       training_client: "ServiceClient.create_lora_training_client_async",
       dataset_conversion: "conversation_to_datum",

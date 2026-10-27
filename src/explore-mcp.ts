@@ -397,7 +397,7 @@ async function toolOpen(args: Record<string, unknown>): Promise<unknown> {
   if (!rawId) throw new Error("id is required");
   if (/^(turn|event):/.test(rawId)) {
     throw new Error(
-      `id form '${rawId.split(":")[0]}:' is not yet supported by understudy explore mcp v1 — ` +
+      `id form '${rawId.split(":")[0]}:' is not yet supported by orchestra explore mcp v1 — ` +
         "use a session id (bare or 'session:<id>'), then page events with the cursor parameter.",
     );
   }
@@ -539,7 +539,7 @@ async function toolFileAttention(args: Record<string, unknown>): Promise<unknown
 function toolExploreTasks(): unknown {
   const db = openScanDbRO();
   if (!db) {
-    return { has_scan: false, hint: "No scan store yet — suggest running `understudy explore scan` (then `understudy explore cluster`)." };
+    return { has_scan: false, hint: "No scan store yet — suggest running `orchestra explore scan` (then `orchestra explore cluster`)." };
   }
   try {
     const scanned = (db.prepare("SELECT COUNT(*) c FROM session_scan").get() as { c: number }).c;
@@ -547,7 +547,7 @@ function toolExploreTasks(): unknown {
       (db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE name IN ('clusters','cluster_map')").get() as { c: number }).c === 2;
     if (!hasClusters) {
       const top = db.prepare("SELECT label, COUNT(*) sessions FROM session_scan GROUP BY label ORDER BY sessions DESC LIMIT 20").all();
-      return { has_scan: true, sessions_scanned: scanned, clusters: null, top_labels: top, hint: "Run `understudy explore cluster` to build the cluster catalog." };
+      return { has_scan: true, sessions_scanned: scanned, clusters: null, top_labels: top, hint: "Run `orchestra explore cluster` to build the cluster catalog." };
     }
     const clusters = db
       .prepare(`
@@ -594,7 +594,7 @@ async function toolExploreStatus(): Promise<unknown> {
     hint:
       (scanned ?? 0) > 0
         ? undefined
-        : "No scan data — suggest the user run `understudy explore scan` to enable label/summary/cluster enrichment.",
+        : "No scan data — suggest the user run `orchestra explore scan` to enable label/summary/cluster enrichment.",
   };
 }
 
@@ -686,14 +686,14 @@ const TOOLS = [
     description:
       "Understudy-native: the cluster catalog of what the user actually works on — clusters with session " +
       "counts, sample labels, and how many sessions mention evals/benchmarks. Built from scan.sqlite; " +
-      "if empty, suggest `understudy explore scan`.",
+      "if empty, suggest `orchestra explore scan`.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "explore_status",
     description:
       "Understudy-native: data availability — ClickHouse reachability, scan/cluster/commit/language store " +
-      "counts. If has_scan is false, suggest the user run `understudy explore scan`.",
+      "counts. If has_scan is false, suggest the user run `orchestra explore scan`.",
     inputSchema: { type: "object", properties: {} },
   },
 ] as const;
@@ -732,7 +732,7 @@ export async function runExploreMcpServer(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`understudy explore mcp: serving ${TOOLS.length} tools over stdio (clickhouse ${clickhouseUrl()})`);
+  console.error(`orchestra explore mcp: serving ${TOOLS.length} tools over stdio (clickhouse ${clickhouseUrl()})`);
 }
 
 // --- registration takeover ----------------------------------------------------------

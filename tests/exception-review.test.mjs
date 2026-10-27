@@ -336,7 +336,7 @@ describe("task feedback contract (understudy.task_feedback.v1)", () => {
     assert.equal(read.feedback[0].task_id, "t1");
 
     // The handoff is a concrete agent prompt: dir, task, the user's words, the CLI verb.
-    assert.ok(result.handoff.includes(`understudy traces regenerate-env --benchmark ${dir}`));
+    assert.ok(result.handoff.includes(`orchestra traces regenerate-env --benchmark ${dir}`));
     assert.ok(result.handoff.includes("wrong required tool"));
     assert.ok(result.handoff.includes("t1"));
     assert.equal(result.handoff, buildTaskFeedbackHandoff(dir, "t1", "wrong required tool"));

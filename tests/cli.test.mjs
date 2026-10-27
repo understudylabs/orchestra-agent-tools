@@ -1438,14 +1438,14 @@ describe("understudy CLI", () => {
     const result = run(["skills", "--search", "gateway"]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /use-understudy-gateway/);
-    assert.match(result.stdout, /next: understudy skills --inspect use-understudy-gateway/);
+    assert.match(result.stdout, /next: orchestra skills --inspect use-understudy-gateway/);
   });
 
   it("searches pedagogical and verifier training surfaces", () => {
     const pedagogical = run(["skills", "--search", "pedagogical"]);
     assert.equal(pedagogical.status, 0, pedagogical.stderr);
     assert.match(pedagogical.stdout, /local-distillation-lab \(skill\)/);
-    assert.match(pedagogical.stdout, /next: understudy skills --inspect local-distillation-lab/);
+    assert.match(pedagogical.stdout, /next: orchestra skills --inspect local-distillation-lab/);
 
     const verifiers = run(["skills", "--search", "verifiers"]);
     assert.equal(verifiers.status, 0, verifiers.stderr);
@@ -1706,7 +1706,7 @@ describe("understudy CLI", () => {
       assert.equal(payload.candidate_routes[0].kind, "understudy");
       assert.equal(payload.candidate_routes[0].model, "auto");
       assert.equal(payload.candidate_routes[0].approval_required, false);
-      assert.match(payload.recommended_next_command, /understudy optimize-workload check/);
+      assert.match(payload.recommended_next_command, /orchestra optimize-workload check/);
       const saved = JSON.parse(readFileSync(join(repo, ".understudy", "route-decision", "route-decision-packet.json"), "utf8"));
       assert.equal(saved.schema_version, "understudy.route_decision_packet.v1");
     }));
@@ -1756,7 +1756,7 @@ describe("understudy CLI", () => {
   it("routes GEPA setup guidance to skills search", () => {
     const result = run(["optimize-workload"]);
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /understudy skills --search gepa/);
+    assert.match(result.stdout, /orchestra skills --search gepa/);
   });
 
   it("keeps the understand compatibility alias", () => {
@@ -4733,6 +4733,36 @@ class ChainOfThought(Predict):
     }
   });
 
+  it("leaves a third-party ORCHESTRA_API_KEY alone in run", async () => {
+    // getorchestra.io's SDK reads ORCHESTRA_API_KEY; `orchestra run` must
+    // neither use it as our key nor overwrite it in the child.
+    const home = mkdtempSync(join(tmpdir(), "orchestra-run-foreign-key-home-"));
+    const repo = mkdtempSync(join(tmpdir(), "orchestra-run-foreign-key-repo-"));
+    try {
+      const result = await runWithEnvAsync(
+        [
+          "run",
+          "node",
+          "-e",
+          "console.log(JSON.stringify({o:process.env.ORCHESTRA_API_KEY,u:process.env.UNDERSTUDY_API_KEY}))",
+        ],
+        {
+          HOME: home,
+          USERPROFILE: home,
+          ORCHESTRA_API_KEY: "third_party_key",
+          UNDERSTUDY_API_KEY: "sk_ours",
+          UNDERSTUDY_GATEWAY_URL: "https://gateway.example.test",
+        },
+        repo,
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout.trim()), { o: "third_party_key", u: "sk_ours" });
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it("scans capture/import sources with metadata only and writes a redaction manifest", () =>
     withCaptureFixtureRepo((repo) => {
       const result = run(["capture-import", "scan", "--repo", repo, "--json"]);
@@ -5458,7 +5488,7 @@ describe("two-phase email login", () => {
       const sentPayload = JSON.parse(sent.stdout);
       assert.equal(sentPayload.pending, true);
       assert.equal(sentPayload.code_sent_to, "agent@example.com");
-      assert.match(sentPayload.complete_with, /understudy login --code/);
+      assert.match(sentPayload.complete_with, /orchestra login --code/);
       const pendingPath = join(home, ".understudy", "login-pending.json");
       const pending = JSON.parse(readFileSync(pendingPath, "utf8"));
       assert.equal(pending.claim_token, "ct_test_token");
@@ -5497,7 +5527,7 @@ describe("two-phase email login", () => {
       );
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /One-time code sent to/);
-      assert.match(result.stdout, /understudy login --code/);
+      assert.match(result.stdout, /orchestra login --code/);
     } finally {
       server.close();
       rmSync(home, { recursive: true, force: true });

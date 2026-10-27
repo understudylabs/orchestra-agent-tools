@@ -46,7 +46,7 @@ export function registerDoctorCommand(
 
 async function runHostedDoctor(cmd: Command, opts: DoctorOpts): Promise<void> {
   const checks: Check[] = [];
-  let nextCommand = "understudy login --email you@company.com";
+  let nextCommand = "orchestra login --email you@company.com";
   let auth: ReturnType<typeof resolveAuth> | null = null;
 
   try {
@@ -90,7 +90,7 @@ async function runHostedDoctor(cmd: Command, opts: DoctorOpts): Promise<void> {
 
   const resolvedForNext = projectResolved as Awaited<ReturnType<typeof resolveProject>> | null;
   const projectLabel = resolvedForNext?.projectSlug ?? resolvedForNext?.projectId ?? "rehearsal";
-  nextCommand = `understudy gateway probe --provider anthropic --project ${projectLabel}`;
+  nextCommand = `orchestra gateway probe --provider anthropic --project ${projectLabel}`;
 
   if (opts.probe && checks.every((entry) => entry.ok)) {
     await check("gateway probe", checks, async () => {

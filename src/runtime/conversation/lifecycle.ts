@@ -205,7 +205,7 @@ export function installConversationRuntime(): ConversationRuntimeStatus {
     conformance_schema: CONFORMANCE_SCHEMA,
     pid: null,
     base_url: null,
-    detail: "bundled runtime installed; run `understudy runtime start`",
+    detail: "bundled runtime installed; run `orchestra runtime start`",
     state_dir: location.root,
     token_path: location.token,
     tool_token_path: location.toolToken,
@@ -345,6 +345,6 @@ export async function doctorConversationRuntime(): Promise<{
     ok: checks.every((check) => check.ok),
     checks,
     status,
-    repair_command: "understudy runtime repair",
+    repair_command: "orchestra runtime repair",
   };
 }

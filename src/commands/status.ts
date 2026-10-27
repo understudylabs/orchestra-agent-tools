@@ -18,7 +18,7 @@ import { telemetryEnabled, trackStatusChecked } from "../internal/telemetry.js";
 export function registerStatusCommand(program: Command): void {
   program
     .command("status")
-    .description("Print the active Understudy org, project, key suffix, and gateway URL.")
+    .description("Print the active Orchestra org, project, key suffix, and gateway URL.")
     .action(async function (this: Command) {
       await runAction(this, async () => {
         process.exitCode = await runStatus(isJsonMode(this));
@@ -78,12 +78,12 @@ export async function runStatus(json = false): Promise<0 | 1> {
     await trackStatusChecked({ configured: false, signedIn: false });
     if (json) {
       process.stdout.write(
-        `${JSON.stringify({ ok: true, configured: false, signed_in: false, hint: "Run `understudy login`." })}\n`,
+        `${JSON.stringify({ ok: true, configured: false, signed_in: false, hint: "Run `orchestra login`." })}\n`,
       );
       return 0;
     }
     process.stdout.write(
-      `${kleur.yellow("not signed in")} — run ${kleur.bold("understudy login")} to sign in or register.\n`,
+      `${kleur.yellow("not signed in")} — run ${kleur.bold("orchestra login")} to sign in or register.\n`,
     );
     return 0;
   }

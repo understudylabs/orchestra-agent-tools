@@ -53,7 +53,7 @@ export function registerExperimentsCommands(program: Command): void {
           return;
         }
         if (rows.length === 0) {
-          process.stdout.write("No experiments yet. Run `understudy experiments new`.\n");
+          process.stdout.write("No experiments yet. Run `orchestra experiments new`.\n");
           return;
         }
         for (const row of rows) {
@@ -130,7 +130,7 @@ export function registerExperimentsCommands(program: Command): void {
       runLocal(this, () => {
         const target = id ?? readActiveId(options.repo);
         if (!target) {
-          throw new Error("No active experiment. Pass an id or run `understudy experiments new`.");
+          throw new Error("No active experiment. Pass an id or run `orchestra experiments new`.");
         }
         const experiment = readExperiment(options.repo, target);
         if (isJsonMode(this)) {

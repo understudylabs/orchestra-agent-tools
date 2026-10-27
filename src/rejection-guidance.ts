@@ -131,7 +131,7 @@ export function buildRejectionGuidance(schemas: Obj, observedCallsByTool: Map<st
   }
   return {
     schema_version: REJECTION_GUIDANCE_SCHEMA,
-    note: "Rejection-guidance templates the generated world.py serves on validation rejections. DATA, not code: edit or regenerate freely; test variants via `understudy traces regenerate-env --guidance <file>`. Examples use observed INPUT values only (never contract gold); the build-time leakage audit scans this file.",
+    note: "Rejection-guidance templates the generated world.py serves on validation rejections. DATA, not code: edit or regenerate freely; test variants via `orchestra traces regenerate-env --guidance <file>`. Examples use observed INPUT values only (never contract gold); the build-time leakage audit scans this file.",
     tools,
   };
 }

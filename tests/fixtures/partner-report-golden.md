@@ -1,6 +1,6 @@
 # Benchmark & savings report — [partner] [partner] automation for [redacted-email]
 
-Generated 2026-07-22T00:00:00.000Z from local benchmark artifacts only (no new runs, no network). Every number in this report is derived from persisted eval rows; the derivation is reproducible with `understudy benchmarks report`.
+Generated 2026-07-22T00:00:00.000Z from local benchmark artifacts only (no new runs, no network). Every number in this report is derived from persisted eval rows; the derivation is reproducible with `orchestra benchmarks report`.
 
 ## Workload
 

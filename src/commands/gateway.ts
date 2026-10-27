@@ -26,7 +26,7 @@ interface ProbeOpts {
 export function registerGatewayCommand(program: Command): void {
   const gateway = program
     .command("gateway")
-    .description("Run narrow Understudy gateway health and probe checks.");
+    .description("Run narrow Orchestra gateway health and probe checks.");
 
   gateway
     .command("health")

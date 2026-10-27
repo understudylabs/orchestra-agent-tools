@@ -70,7 +70,7 @@ export function registerHostedTraceExportCommand(traces: Command): void {
     .option("--trace-ids-file <path>", "Batch export: one explicit trace id per line.")
     .option("--date <YYYY-MM-DD>", "Workload mode: one complete UTC calendar day.")
     .option("--last <duration>", "Workload mode: rolling window (currently exactly 1d).")
-    .option("--project-id <id>", "Project id from `understudy projects list --json`.")
+    .option("--project-id <id>", "Project id from `orchestra projects list --json`.")
     .option("--project <slug>", "Project slug to resolve to an id.")
     .option("--workload <name-or-id>", "Optional workload name or id.")
     .option("--org <id>", "Org id to use (default: local config or only org in credentials).")

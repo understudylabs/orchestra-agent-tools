@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { Command } from "commander";
 import kleur from "kleur";
 
-import { DEFAULT_GATEWAY_URL } from "../config/defaults.js";
+import { CLI_NAME, DEFAULT_GATEWAY_URL } from "../config/defaults.js";
 import { readCredentials } from "../config/credentials.js";
 import { readProjectConfig } from "../config/index.js";
 import { isJsonMode, runAction } from "../internal/output.js";
@@ -21,7 +21,7 @@ interface ResolvedRunEnv {
 }
 
 /**
- * `understudy run -- <command>` — run an arbitrary child command with the
+ * `orchestra run -- <command>` — run an arbitrary child command with the
  * authenticated Understudy key injected into that process only.
  *
  * This is the agent-first bridge: skills can execute local inference
@@ -31,9 +31,9 @@ interface ResolvedRunEnv {
 export function registerRunCommand(program: Command): void {
   program
     .command("run")
-    .description("Run a command with the authenticated Understudy API key injected.")
+    .description("Run a command with the authenticated Orchestra API key injected.")
     .allowUnknownOption(true)
-    .argument("<command...>", "Command to run after --, for example: understudy run -- npm run gepa")
+    .argument("<command...>", "Command to run after --, for example: orchestra run -- npm run gepa")
     .action(async function (this: Command, command: string[]) {
       await runAction(this, () => runWithUnderstudyEnv(command, isJsonMode(this)));
     });
@@ -46,7 +46,7 @@ async function runWithUnderstudyEnv(
   const resolved = resolveRunEnv();
   const [bin, ...args] = command;
   if (!bin) {
-    throw new Error("Usage: understudy run -- <command>");
+    throw new Error("Usage: orchestra run -- <command>");
   }
 
   const startedAt = Date.now();
@@ -77,7 +77,7 @@ async function runWithUnderstudyEnv(
     );
   } else {
     process.stderr.write(
-      `${kleur.gray("understudy")} injecting UNDERSTUDY_API_KEY into child process\n`,
+      `${kleur.gray(CLI_NAME)} injecting UNDERSTUDY_API_KEY into child process\n`,
     );
   }
 
@@ -142,7 +142,7 @@ function resolveRunEnv(): ResolvedRunEnv {
   const config = readProjectConfig();
   const credentials = readCredentials();
   if (!credentials) {
-    throw new Error("Not signed in. Run `understudy login` once, then re-run this command.");
+    throw new Error("Not signed in. Run `orchestra login` once, then re-run this command.");
   }
 
   const orgCredentials = config ? credentials.orgs[config.org_id] : undefined;
@@ -153,7 +153,7 @@ function resolveRunEnv(): ResolvedRunEnv {
     DEFAULT_GATEWAY_URL;
 
   if (!apiKey) {
-    throw new Error("Not signed in. Run `understudy login` once, then re-run this command.");
+    throw new Error("Not signed in. Run `orchestra login` once, then re-run this command.");
   }
 
   return {

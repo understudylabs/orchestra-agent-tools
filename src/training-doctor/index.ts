@@ -233,7 +233,7 @@ export async function runTrainingDoctor(
         label: "workload-card.json",
         status: "fail",
         detail: `missing at ${cardPath}`,
-        next: "Run `understudy capture-import compile --source <path>` (or point --workload at the artifact root it prints).",
+        next: "Run `orchestra capture-import compile --source <path>` (or point --workload at the artifact root it prints).",
       });
     } else {
       try {
@@ -253,7 +253,7 @@ export async function runTrainingDoctor(
           label: "workload-card.json",
           status: "fail",
           detail: `invalid: ${(error as Error).message}`,
-          next: "Re-run `understudy capture-import compile` to regenerate the workload card.",
+          next: "Re-run `orchestra capture-import compile` to regenerate the workload card.",
         });
       }
     }
@@ -269,7 +269,7 @@ export async function runTrainingDoctor(
           label: "table inspection artifact",
           status: "fail",
           detail: `missing csv-inspection.json in ${root}`,
-          next: "Run `understudy capture-import inspect-csv --source <table> --artifact-root <root>` on the CSV/XLSX source.",
+          next: "Run `orchestra capture-import inspect-csv --source <table> --artifact-root <root>` on the CSV/XLSX source.",
         });
       } else {
         try {
@@ -289,7 +289,7 @@ export async function runTrainingDoctor(
             label: "table inspection artifact",
             status: "fail",
             detail: `invalid: ${(error as Error).message}`,
-            next: "Re-run `understudy capture-import inspect-csv` against the current source table.",
+            next: "Re-run `orchestra capture-import inspect-csv` against the current source table.",
           });
         }
       }
@@ -306,7 +306,7 @@ export async function runTrainingDoctor(
           label: "dataset manifest and splits",
           status: "fail",
           detail: `no dataset-manifest.json found under ${root}`,
-          next: "Run `understudy capture-import prepare-classification` to build the frozen splits.",
+          next: "Run `orchestra capture-import prepare-classification` to build the frozen splits.",
         });
       } else {
         const manifestPath = manifests[0]!;
@@ -347,7 +347,7 @@ export async function runTrainingDoctor(
             label: "dataset manifest and splits",
             status: "fail",
             detail: `${manifestPath}: ${(error as Error).message}`,
-            next: "Re-run `understudy capture-import prepare-classification`; the split artifacts changed after preparation.",
+            next: "Re-run `orchestra capture-import prepare-classification`; the split artifacts changed after preparation.",
           });
         }
       }
@@ -414,7 +414,7 @@ export async function runTrainingDoctor(
         label: "environment proposal",
         status: "fail",
         detail: `missing at ${proposalPath}`,
-        next: `Run \`understudy training goal-card --plan ${planPath}\` to build and validate the environment proposal.`,
+        next: `Run \`orchestra training goal-card --plan ${planPath}\` to build and validate the environment proposal.`,
       });
     } else {
       try {
@@ -432,7 +432,7 @@ export async function runTrainingDoctor(
             label: "environment proposal",
             status: "fail",
             detail: `needs verifier; blocking gates: ${validation.blockers.join(", ")}`,
-            next: "Resolve the blocking gates (or rebuild the proposal with `understudy training goal-card`).",
+            next: "Resolve the blocking gates (or rebuild the proposal with `orchestra training goal-card`).",
           });
         }
       } catch (error) {
@@ -441,7 +441,7 @@ export async function runTrainingDoctor(
           label: "environment proposal",
           status: "fail",
           detail: `${proposalPath}: ${(error as Error).message}`,
-          next: `Rebuild it with \`understudy training goal-card --plan ${planPath}\`.`,
+          next: `Rebuild it with \`orchestra training goal-card --plan ${planPath}\`.`,
         });
       }
     }
@@ -533,7 +533,7 @@ export async function runTrainingDoctor(
       label: "training service capabilities",
       status: "fail",
       detail: "no Understudy credentials found",
-      next: "Run `understudy login` to create ~/.understudy/credentials.json.",
+      next: "Run `orchestra login` to create ~/.understudy/credentials.json.",
     });
     skip(state, "run_status", "live run status", "blocked by earlier failure");
     return finish(state, mode);
@@ -572,7 +572,7 @@ export async function runTrainingDoctor(
       label: "training service capabilities",
       status: "fail",
       detail: (error as Error).message,
-      next: "Check network access and credentials, then retry (`understudy login` refreshes the key).",
+      next: "Check network access and credentials, then retry (`orchestra login` refreshes the key).",
     });
     skip(state, "run_status", "live run status", "blocked by earlier failure");
     return finish(state, mode);

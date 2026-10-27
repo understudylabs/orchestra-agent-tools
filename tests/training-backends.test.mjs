@@ -117,7 +117,7 @@ describe("portable training backend compiler", () => {
     assert.equal(tinker.adapter_implemented, true);
     assert.equal(tinker.execution.service_preflight, "ServiceClient.get_server_capabilities_async");
     assert.equal(tinker.execution.loss_mask, "last_assistant_message");
-    assert.equal(tinker.execution.command, "understudy training run-tinker-sft");
+    assert.equal(tinker.execution.command, "orchestra training run-tinker-sft");
     assert.equal(tinker.cleanup.checkpoint_ttl_seconds, 3600);
   });
 

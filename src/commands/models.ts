@@ -51,11 +51,11 @@ interface PullOpts {
 export function registerModelsCommand(program: Command): void {
   const models = program
     .command("models")
-    .description("List routeable models and manage local Understudy model snapshots.");
+    .description("List routeable models and manage local Orchestra model snapshots.");
 
   models
     .command("list")
-    .description("List routeable public Understudy model ids.")
+    .description("List routeable public Orchestra model ids.")
     .option("--org <id>", "Org id to use (default: only org in credentials).")
     .action(async function (this: Command, opts: OrgOpt) {
       await runAction(this, () => runList(this, opts));
@@ -63,7 +63,7 @@ export function registerModelsCommand(program: Command): void {
 
   models
     .command("snapshots")
-    .description("List downloadable local Understudy model snapshots.")
+    .description("List downloadable local Orchestra model snapshots.")
     .option("--json", "Output JSON.")
     .action(async function (this: Command, opts: { json?: boolean }) {
       await runSnapshotList(this, opts);
@@ -84,7 +84,7 @@ export function registerModelsCommand(program: Command): void {
 
   const runtime = models
     .command("runtime")
-    .description("Manage the pinned local MLX/VLM engine used by Understudy Desktop.");
+    .description("Manage the pinned local MLX/VLM engine used by Orchestra Desktop.");
 
   runtime
     .command("version")
@@ -256,7 +256,7 @@ async function runPull(cmd: Command, model: string | undefined, opts: PullOpts):
     throw new Error("--session-url can only be used with one model id.");
   }
   if (!opts.all && !model) {
-    throw new Error("Usage: understudy models pull <model-id> or understudy models pull --all");
+    throw new Error("Usage: orchestra models pull <model-id> or orchestra models pull --all");
   }
   const catalog = await fetchSnapshotCatalog();
   if (!opts.json && !isJsonMode(cmd)) {

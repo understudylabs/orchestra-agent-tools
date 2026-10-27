@@ -210,7 +210,7 @@ function inspectSkill(name: string): void {
 function searchSkills(query: string, json: boolean): void {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (terms.length === 0) {
-    throw new Error("Usage: understudy skills --search <query>");
+    throw new Error("Usage: orchestra skills --search <query>");
   }
   const results = searchSkillDocs(terms).slice(0, 8);
   if (json) {
@@ -219,7 +219,7 @@ function searchSkills(query: string, json: boolean): void {
   }
   if (results.length === 0) {
     console.log(`No skill matches for: ${query}`);
-    console.log("Try: understudy skills --list");
+    console.log("Try: orchestra skills --list");
     return;
   }
   console.log(`Skill search: ${query}`);
@@ -228,7 +228,7 @@ function searchSkills(query: string, json: boolean): void {
     console.log(`  path: ${result.path}`);
     console.log(`  matched: ${result.matches.join(", ")}`);
     if (result.kind === "skill") {
-      console.log(`  next: understudy skills --inspect ${result.name}`);
+      console.log(`  next: orchestra skills --inspect ${result.name}`);
     }
   }
 }
@@ -886,8 +886,8 @@ function registerValueCommands(program: Command): void {
 export function buildProgram(): Command {
   const program = new Command();
   program
-    .name("understudy")
-    .description("Public Understudy agent tools and skill-library CLI")
+    .name("orchestra")
+    .description("Public Orchestra agent tools and skill-library CLI (also installed as `understudy`)")
     .version(readCliVersion())
     .option("--json", "Emit machine-readable JSON when supported");
 

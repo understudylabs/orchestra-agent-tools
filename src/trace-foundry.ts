@@ -1985,7 +1985,7 @@ export function writeVerifiersEnvironment(
   const goldDocumentation = oracleAuthority === "captured_incumbent"
     ? "- `gold.json` — SCORER-SIDE ONLY legacy diagnostic. It contains incumbent post-state observations, is never read by world.py, and is not independent correctness evidence.\n"
     : "- No `gold.json` is emitted. Hosted provable-lineage mode treats incumbent output only as historical evidence; owner/invariant/terminal-state evidence must author the oracle later.\n";
-  writeFileSync(join(root, "README.md"), `# Generated verifiers environment\n\nLayout (fixtures-state-split):\n\n- \`understudy_trace_env/servers/fixtures.json\` — CANDIDATE-READABLE. Pre-state only:\n  tool results the incumbent observed BEFORE its first mutating call.\n  Each fixture is tagged with its \`task_id\`; world.py serves a rollout only its\n  own task's fixtures (untagged fixtures from pre-split environments are served\n  to every task).\n- \`understudy_trace_env/servers/guidance.json\` — CANDIDATE-READABLE. Rejection\n  guidance templates (\`understudy.rejection_guidance.v1\`): the messages\n  world.py serves when validation rejects a call. DATA, not code — edit or\n  regenerate freely; test variants via\n  \`understudy traces regenerate-env --guidance <file>\` (see\n  docs/rejection-guidance.md). Audited for gold leakage like schemas.json.\n${goldDocumentation}- \`understudy_trace_env/tasks.json\` — prompts + outcome contracts (contracts are\n  consumed by the scoring path in taskset.py, not surfaced as model input).\n- \`offline-validation.json\` — oracle/sentinel validation rows.\n`, { mode: 0o600 });
+  writeFileSync(join(root, "README.md"), `# Generated verifiers environment\n\nLayout (fixtures-state-split):\n\n- \`understudy_trace_env/servers/fixtures.json\` — CANDIDATE-READABLE. Pre-state only:\n  tool results the incumbent observed BEFORE its first mutating call.\n  Each fixture is tagged with its \`task_id\`; world.py serves a rollout only its\n  own task's fixtures (untagged fixtures from pre-split environments are served\n  to every task).\n- \`understudy_trace_env/servers/guidance.json\` — CANDIDATE-READABLE. Rejection\n  guidance templates (\`understudy.rejection_guidance.v1\`): the messages\n  world.py serves when validation rejects a call. DATA, not code — edit or\n  regenerate freely; test variants via\n  \`orchestra traces regenerate-env --guidance <file>\` (see\n  docs/rejection-guidance.md). Audited for gold leakage like schemas.json.\n${goldDocumentation}- \`understudy_trace_env/tasks.json\` — prompts + outcome contracts (contracts are\n  consumed by the scoring path in taskset.py, not surfaced as model input).\n- \`offline-validation.json\` — oracle/sentinel validation rows.\n`, { mode: 0o600 });
   const packageFiles = [join(root, "pyproject.toml"), join(pkg, "__init__.py"), join(pkg, "environment.py"), join(pkg, "taskset.py"), join(pkg, "servers", "world.py"), join(pkg, "servers", "fixtures.json"), join(pkg, "servers", "guidance.json"), join(pkg, "tasks.json")];
   // Gold-leakage audit over the exact artifacts just written (report-only).
   const leakageAudit = auditGoldLeakage(tasks, taskRows, fixtures, validationSchemas, undefined, rejectionGuidance as unknown as Obj);
@@ -2059,7 +2059,7 @@ export function promoteTraceBenchmark(
   for (const row of readReviews(join(output, "reviews.jsonl")).reviews) {
     decisions.set(row.task_id, { decision: row.decision, note: row.note ?? null, reviewed_at: row.created_at ?? null, source: "reviews.jsonl" });
   }
-  if (decisions.size === 0) throw new Error("Refusing to promote an unreviewed benchmark: no decisions found in reviews.jsonl or review-decisions.jsonl. Review the tasks in the Benchmark Hub (or run `understudy traces import-reviews`) first.");
+  if (decisions.size === 0) throw new Error("Refusing to promote an unreviewed benchmark: no decisions found in reviews.jsonl or review-decisions.jsonl. Review the tasks in the Benchmark Hub (or run `orchestra traces import-reviews`) first.");
   const accepted = tasks.filter((task) => ACCEPTING_DECISIONS.includes(decisions.get(task.task_id)?.decision));
   const excluded = tasks.filter((task) => !ACCEPTING_DECISIONS.includes(decisions.get(task.task_id)?.decision)).map((task) => ({ task_id: task.task_id, decision: decisions.get(task.task_id)?.decision ?? "unreviewed" }));
   if (accepted.length === 0) throw new Error("No task was accepted by review; nothing to promote.");
@@ -2384,7 +2384,7 @@ export function compileTraceFoundry(sourceInput: string, outputInput: string, ma
     passes += 1;
   } while (queuedRows.length > 0 && passes < 10_000);
   if (queuedRows.length > 0) {
-    throw new Error(`${rows.length} of ${rows.length + queuedRows.length} captures compiled before the batch loop stopped; resume with: understudy traces build-benchmark --source ${source} --output ${output}`);
+    throw new Error(`${rows.length} of ${rows.length + queuedRows.length} captures compiled before the batch loop stopped; resume with: orchestra traces build-benchmark --source ${source} --output ${output}`);
   }
   const staleFiltered = hostedFiles
     ? sourceAccounting.filter((entry) => entry.exclusion_reasons.includes("stale")).length

@@ -67,13 +67,13 @@ export async function resolveProject(opts: ProjectResolutionOptions): Promise<Re
 
   const slug = opts.project ?? config?.project_slug;
   if (!slug) {
-    throw new Error("No project selected. Run `understudy projects list` or pass --project-id.");
+    throw new Error("No project selected. Run `orchestra projects list` or pass --project-id.");
   }
 
   const projects = await listProjects(auth);
   const project = projects.find((candidate) => candidate.slug === slug);
   if (!project) {
-    throw new Error(`No project with slug "${slug}" in org ${auth.orgId}. Run \`understudy projects list\` to see what's available.`);
+    throw new Error(`No project with slug "${slug}" in org ${auth.orgId}. Run \`orchestra projects list\` to see what's available.`);
   }
 
   return {

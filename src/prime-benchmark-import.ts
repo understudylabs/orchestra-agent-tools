@@ -275,7 +275,7 @@ export function importPrimeBenchmark(configPath: string): {
   writeFileSync(join(outputDir, "rows-prime.jsonl"), `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`, { mode: 0o600 });
   writeFileSync(
     join(outputDir, "NOTES.md"),
-    `# ${config.name}\n\nGenerated from Prime Verifiers ${config.verifier_version} traces with \`understudy benchmarks import-prime\`.\n\nRaw prompts, completions, and trace bodies are intentionally excluded. Cost uses the reviewed per-model rate table embedded in the import config.\n`,
+    `# ${config.name}\n\nGenerated from Prime Verifiers ${config.verifier_version} traces with \`orchestra benchmarks import-prime\`.\n\nRaw prompts, completions, and trace bodies are intentionally excluded. Cost uses the reviewed per-model rate table embedded in the import config.\n`,
     { mode: 0o600 },
   );
 

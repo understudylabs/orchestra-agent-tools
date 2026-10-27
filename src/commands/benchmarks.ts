@@ -373,7 +373,7 @@ export function registerBenchmarksCommand(program: Command): void {
       "GEPA-style prompt evolution over run arms: propose suffixes with an authoring model (fed per-class " +
         "rejection counts + failed obligations from the run journals), queue prompt_overrides runs on train, " +
         "select the champion on dev, then verify champion-vs-bare ONCE on the sealed holdout. Queue-only: " +
-        "`understudy runs execute --watch` must be running in another terminal",
+        "`orchestra runs execute --watch` must be running in another terminal",
     )
     .requiredOption("--model <id>", "The base model whose system prompt is being evolved (every arm runs this model)")
     .option("--author-model <id>", "Gateway model that authors suffix proposals (default: resolveDefaultModel)")
@@ -449,7 +449,7 @@ export function registerBenchmarksCommand(program: Command): void {
       "Diff the benchmark's current manifest against a previous one into the minimal rerun/regrade/reuse work " +
         "plan (env change => MAJOR => rerun, verifier => MINOR => regrade, meta => PATCH => reuse), append one " +
         "understudy.benchmark_version.v1 line to <dir>/versions.jsonl (append-only), and with --queue write " +
-        "run_request files for the rerun set. Queue-only, never executes: `understudy runs execute --watch` " +
+        "run_request files for the rerun set. Queue-only, never executes: `orchestra runs execute --watch` " +
         "picks requests up, same trust posture as the hub Run panel",
     )
     .option(
@@ -577,7 +577,7 @@ export function registerBenchmarksCommand(program: Command): void {
         "already inspected another way",
     )
     .option("--accept-all-pending", "Append an accept review for every task that has no review yet", false)
-    .option("--note <text>", "Review note recorded on each appended line", "bulk accept via `understudy benchmarks review --accept-all-pending`")
+    .option("--note <text>", "Review note recorded on each appended line", "bulk accept via `orchestra benchmarks review --accept-all-pending`")
     .action(async (dir: string, options: { acceptAllPending: boolean; note: string }) => {
       if (!options.acceptAllPending) throw new Error("nothing to do: pass --accept-all-pending (per-task reviews live in the hub UI / benchmarks mcp)");
       const path = await import("node:path");
