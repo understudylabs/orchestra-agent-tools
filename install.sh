@@ -55,7 +55,7 @@ while [ "$#" -gt 0 ]; do
       cat <<'EOF'
 Usage: install.sh [--yes] [--non-interactive] [--resume] [--from-step N] [--only-step N] [--keep-login] [--lower-my-ant-bill] [--agents auto|all|claude-code|cursor|codex|opencode|hermes|devin|none] [--no-claude] [--no-launch-agent]
 
-Installs the Understudy CLI + detected coding-agent skill/plugin surfaces, then
+Installs the Orchestra CLI + detected coding-agent skill/plugin surfaces, then
 hands the user back to the selected coding agent when possible. It does not
 download model weights, start MLX, launch the ladder server, or make frontier
 calls. Those are guided by the Understudy onboarding skill after the user is in
@@ -176,7 +176,7 @@ say() {
   if [ "$FANCY" = "1" ]; then
     printf '  %s│%s %s\n' "$D" "$R" "$*"
   else
-    printf '\033[1munderstudy\033[0m %s\n' "$*"
+    printf '\033[1morchestra\033[0m %s\n' "$*"
   fi
   log "$*"
 }
@@ -186,7 +186,7 @@ say_unlogged() {
   if [ "$FANCY" = "1" ]; then
     printf '  %s│%s %s\n' "$D" "$R" "$*"
   else
-    printf '\033[1munderstudy\033[0m %s\n' "$*"
+    printf '\033[1morchestra\033[0m %s\n' "$*"
   fi
 }
 # Mask credentials embedded in URLs (https://user:token@host/...) before a
@@ -198,7 +198,7 @@ ok() {
   if [ "$FANCY" = "1" ]; then
     printf '  %s✓%s %s\n' "$OKC" "$R" "$*"
   else
-    printf '\033[1munderstudy\033[0m %s\n' "$*"
+    printf '\033[1morchestra\033[0m %s\n' "$*"
   fi
   log "$*"
 }
@@ -206,7 +206,7 @@ warn() {
   if [ "$FANCY" = "1" ]; then
     printf '  %s!%s %s\n' "$WARNC" "$R" "$*"
   else
-    printf '\033[1munderstudy\033[0m %s\n' "$*"
+    printf '\033[1morchestra\033[0m %s\n' "$*"
   fi
   log "$*"
 }
@@ -214,7 +214,7 @@ fail_line() {
   if [ "$FANCY" = "1" ]; then
     printf '  %s✗%s %s\n' "$ERRC" "$R" "$*"
   else
-    printf '\033[1munderstudy\033[0m %s\n' "$*"
+    printf '\033[1morchestra\033[0m %s\n' "$*"
   fi
   log "$*"
 }
@@ -232,7 +232,7 @@ section() {
     while [ "$n" -gt 0 ]; do pad="${pad}─"; n=$((n - 1)); done
     printf '\n  %s──%s %s%s%s %s%s%s\n' "$AC" "$R" "$B" "$title" "$R" "$AC" "$pad" "$R"
   else
-    printf '\n\033[1munderstudy\033[0m %s\n' "$*"
+    printf '\n\033[1morchestra\033[0m %s\n' "$*"
   fi
   log "$*"
 }
@@ -461,7 +461,7 @@ select_agent_platforms() {
 
   default="$(default_agent_platform)"
   section "Choose Coding Agent"
-  say "Where should Understudy install its agent plugin?"
+  say "Where should Orchestra install its agent plugin?"
   say "  ${G2}1.${R} $(detected_agent_label "claude-code" "Claude Code")"
   say "  ${G3}2.${R} $(detected_agent_label "cursor" "Cursor")"
   say "  ${G4}3.${R} $(detected_agent_label "codex" "Codex")"
@@ -650,7 +650,7 @@ EOF
     printf '\n'
     fail_line "${B}NO CODING-AGENT PLUGIN WAS INSTALLED.${R}"
     warn "The adapter selection was '$AGENT_PLATFORMS', but every candidate was skipped or failed (reasons above)."
-    warn "The understudy CLI is installed, but the Understudy skills are NOT available in any coding agent until an adapter is installed."
+    warn "The understudy CLI is installed, but the Orchestra skills are NOT available in any coding agent until an adapter is installed."
     manual_adapter_instructions
     say "Install log: $LOG_FILE"
   elif [ "$installed" -eq 0 ] && [ "$selection" != "none" ]; then
@@ -719,7 +719,7 @@ remove_previous_global_package() {
   package_path="$global_root/@understudylabs/understudy-agent-tools"
 
   if [ -e "$package_path" ] || [ -L "$package_path" ]; then
-    say "Removing previous global Understudy install at $package_path"
+    say "Removing previous global Orchestra install at $package_path"
     npm uninstall -g @understudylabs/understudy-agent-tools >/dev/null 2>&1 || true
     if [ -e "$package_path" ] || [ -L "$package_path" ]; then
       rm -rf "$package_path"
@@ -729,13 +729,13 @@ remove_previous_global_package() {
   for bin_path in "$global_prefix/bin/understudy" "$HOME/.local/bin/understudy"; do
     [ -e "$bin_path" ] || [ -L "$bin_path" ] || continue
     if [ -L "$bin_path" ] && readlink "$bin_path" 2>/dev/null | grep -q 'understudy-agent-tools'; then
-      say "Removing stale Understudy command at $bin_path"
+      say "Removing stale Orchestra command at $bin_path"
       rm -f "$bin_path"
     elif [ -f "$bin_path" ] && [ "$bin_path" != "$global_prefix/bin/understudy" ]; then
       # Not created by npm or this installer: a user's own wrapper stays.
       warn "Leaving existing $bin_path in place; if its directory precedes $global_prefix/bin in PATH it will shadow the newly installed understudy command."
     elif [ -f "$bin_path" ] && grep -q 'understudy-agent-tools' "$bin_path" 2>/dev/null; then
-      say "Removing stale Understudy command at $bin_path"
+      say "Removing stale Orchestra command at $bin_path"
       rm -f "$bin_path"
     fi
   done
@@ -758,20 +758,20 @@ install_understudy_package() {
   record_install_source
 
   if [ -n "$INSTALL_PACKAGE" ]; then
-    warn "Installing Understudy package from a non-default source: $(redact_url "$INSTALL_PACKAGE")"
-    run_logged "Install Understudy package" npm install -g "$INSTALL_PACKAGE"
+    warn "Installing Orchestra package from a non-default source: $(redact_url "$INSTALL_PACKAGE")"
+    run_logged "Install Orchestra package" npm install -g "$INSTALL_PACKAGE"
     return 0
   fi
 
   need git || {
-    say "git is required to install Understudy from the public repo."
+    say "git is required to install Orchestra from the public repo."
     exit 1
   }
 
   if [ "$INSTALL_SOURCE_OVERRIDDEN" = "1" ]; then
-    warn "Installing Understudy package from a non-default source: $(redact_url "$INSTALL_REPO_URL")#$INSTALL_REF"
+    warn "Installing Orchestra package from a non-default source: $(redact_url "$INSTALL_REPO_URL")#$INSTALL_REF"
   else
-    say "Installing Understudy package from $INSTALL_REPO_URL#$INSTALL_REF"
+    say "Installing Orchestra package from $INSTALL_REPO_URL#$INSTALL_REF"
   fi
   # The scratch checkout is deleted before and after the install; never do
   # that to a path this installer did not create itself.
@@ -798,13 +798,13 @@ install_understudy_package() {
   fi
   rm -rf "$INSTALL_SOURCE_DIR"
   private_mkdir "$(dirname "$INSTALL_SOURCE_DIR")"
-  run_logged "Download Understudy ($INSTALL_REF)" env GIT_ALLOW_PROTOCOL="${GIT_ALLOW_PROTOCOL:-https:ssh:file}" git clone --depth 1 --filter=blob:none --sparse --branch "$INSTALL_REF" "$INSTALL_REPO_URL" "$INSTALL_SOURCE_DIR"
+  run_logged "Download Orchestra ($INSTALL_REF)" env GIT_ALLOW_PROTOCOL="${GIT_ALLOW_PROTOCOL:-https:ssh:file}" git clone --depth 1 --filter=blob:none --sparse --branch "$INSTALL_REF" "$INSTALL_REPO_URL" "$INSTALL_SOURCE_DIR"
   : >"$INSTALL_SOURCE_DIR/.understudy-installer-checkout"
   run_logged "Select install files" git -C "$INSTALL_SOURCE_DIR" sparse-checkout set \
     .agents .claude-plugin .codex-plugin .cursor-plugin .devin .hermes .opencode \
     docs experiments/desktop-tool-proof runtime-assets schemas scripts skills src
   package_commit="$(git -C "$INSTALL_SOURCE_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
-  say "Understudy package commit: $package_commit"
+  say "Orchestra package commit: $package_commit"
   if [ -n "$INSTALL_COMMIT" ]; then
     if [[ "$INSTALL_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]] && [ "$package_commit" = "$(printf '%s' "$INSTALL_COMMIT" | tr 'A-F' 'a-f')" ]; then
       ok "Checkout matches UNDERSTUDY_INSTALL_COMMIT."
@@ -833,7 +833,7 @@ install_understudy_package() {
   run_logged "Bundle pinned runtime dependencies" npm pkg set --prefix "$INSTALL_SOURCE_DIR" --json bundleDependencies="$runtime_deps"
   # Pack from the checkout: npm's directory-input path can omit bundled
   # node_modules even when bundleDependencies is set.
-  (cd "$INSTALL_SOURCE_DIR" && run_logged "Pack Understudy" npm pack . --ignore-scripts --pack-destination "$STATE_DIR")
+  (cd "$INSTALL_SOURCE_DIR" && run_logged "Pack Orchestra" npm pack . --ignore-scripts --pack-destination "$STATE_DIR")
   # Only now that a replacement tarball exists is the previous CLI removed.
   remove_previous_global_package
   run_logged "Install the understudy command" npm install -g --ignore-scripts "$package_tarball"
@@ -876,15 +876,15 @@ prepare_agent_first_signin() {
   section "Prepare the agent-first sign-in."
   if [ -f "$CREDENTIALS_FILE" ]; then
     existing_email="$(credentials_email)"
-    remember_known_email "$existing_email" "existing Understudy credentials"
+    remember_known_email "$existing_email" "existing Orchestra credentials"
     if [ "$KEEP_LOGIN" = "1" ]; then
-      say "Keeping the existing Understudy sign-in (--keep-login)."
+      say "Keeping the existing Orchestra sign-in (--keep-login)."
       return 0
     fi
     # A --resume retry after the reset already happened in this install must
     # not sign the user out again (the agent may have signed in since).
     if [ "$RESUME" = "1" ] && [ -f "$STATE_DIR/login-reset.done" ]; then
-      say "Keeping the current Understudy sign-in; it was already reset earlier in this install (--resume)."
+      say "Keeping the current Orchestra sign-in; it was already reset earlier in this install (--resume)."
       return 0
     fi
     local backup
@@ -899,7 +899,7 @@ prepare_agent_first_signin() {
     if [ -n "$KNOWN_EMAIL" ]; then
       say_unlogged "Signed out $KNOWN_EMAIL so the agent can run the sign-up from scratch."
     elif [ -n "$existing_email" ]; then
-      ok "Signed out the existing Understudy sign-in so the agent can run the sign-up from scratch."
+      ok "Signed out the existing Orchestra sign-in so the agent can run the sign-up from scratch."
     else
       ok "Signed out so the agent can run the sign-up from scratch."
     fi
@@ -1007,14 +1007,14 @@ install_claude_plugin() {
     return 0
   fi
 
-  say "Installing the Understudy Claude Code plugin from $repo."
+  say "Installing the Orchestra Claude Code plugin from $repo."
   if claude plugin list --json 2>/dev/null | grep -q 'understudy@understudy-skills'; then
-    ok "Understudy plugin already appears installed."
+    ok "Orchestra plugin already appears installed."
     record_adapter "claude-code" "installed" "already installed"
   else
     run_logged "Register the plugin marketplace" claude plugin marketplace add "$repo"
-    run_logged "Install the Understudy plugin" claude plugin install understudy@understudy-skills
-    ok "Understudy plugin installed."
+    run_logged "Install the Orchestra plugin" claude plugin install understudy@understudy-skills
+    ok "Orchestra plugin installed."
     record_adapter "claude-code" "installed" "plugin installed"
   fi
   say "In Claude Code, type /reload-plugins once to activate the skills."
@@ -1036,10 +1036,10 @@ install_cursor_plugin() {
   fi
 
   dest="$HOME/.cursor/plugins/local/understudy"
-  say "Installing the Understudy Cursor plugin from $repo."
+  say "Installing the Orchestra Cursor plugin from $repo."
   mkdir -p "$(dirname "$dest")"
   if [ -L "$dest" ] && [ "$(readlink "$dest" 2>/dev/null || true)" = "$repo" ]; then
-    ok "Understudy Cursor plugin already points at $repo."
+    ok "Orchestra Cursor plugin already points at $repo."
     record_adapter "cursor" "installed" "already installed"
   elif [ -L "$dest" ]; then
     local current
@@ -1048,24 +1048,24 @@ install_cursor_plugin() {
       *understudy-agent-tools)
         rm -f "$dest"
         ln -s "$repo" "$dest"
-        ok "Understudy Cursor plugin refreshed at $dest."
+        ok "Orchestra Cursor plugin refreshed at $dest."
         record_adapter "cursor" "installed" "link refreshed"
         ;;
       *)
         warn "Cursor plugin path already exists at $dest; leaving it unchanged."
         say "Manual recovery: move that path aside, then rerun this installer."
-        adapter_prereq_missing "cursor" "an existing non-Understudy path occupies $dest"
+        adapter_prereq_missing "cursor" "an existing non-Orchestra path occupies $dest"
         return 0
         ;;
     esac
   elif [ -e "$dest" ]; then
     warn "Cursor plugin path already exists at $dest; leaving it unchanged."
     say "Manual recovery: move that path aside, then rerun this installer."
-    adapter_prereq_missing "cursor" "an existing non-Understudy path occupies $dest"
+    adapter_prereq_missing "cursor" "an existing non-Orchestra path occupies $dest"
     return 0
   else
     ln -s "$repo" "$dest"
-    ok "Understudy Cursor plugin linked at $dest."
+    ok "Orchestra Cursor plugin linked at $dest."
     record_adapter "cursor" "installed" "plugin linked"
   fi
   say "In Cursor, restart the app or run Developer: Reload Window."
@@ -1107,15 +1107,15 @@ install_codex_plugin() {
     return 0
   fi
 
-  say "Registering the Understudy Codex marketplace from $repo."
+  say "Registering the Orchestra Codex marketplace from $repo."
   if codex plugin marketplace add "$repo" >>"$LOG_FILE" 2>&1; then
-    ok "Understudy Codex marketplace registered."
+    ok "Orchestra Codex marketplace registered."
     record_adapter "codex" "installed" "marketplace registered"
   else
     say "Codex marketplace add failed; trying marketplace refresh."
     log "RUN codex plugin marketplace upgrade understudy-skills"
     if codex plugin marketplace upgrade understudy-skills >>"$LOG_FILE" 2>&1; then
-      ok "Understudy Codex marketplace refreshed."
+      ok "Orchestra Codex marketplace refreshed."
       record_adapter "codex" "installed" "marketplace refreshed"
     else
       warn "Codex marketplace registration failed; continuing with the rest of the install."
@@ -1173,7 +1173,7 @@ install_opencode_adapter() {
   linked=0
   skipped=0
 
-  say "Installing the Understudy OpenCode skills from $repo."
+  say "Installing the Orchestra OpenCode skills from $repo."
   for skill in "$repo"/skills/*; do
     [ -f "$skill/SKILL.md" ] || continue
     skill_name="$(basename "$skill")"
@@ -1190,7 +1190,7 @@ install_opencode_adapter() {
     link_opencode_path "$command_src" "$command_dest" "command" || true
   fi
 
-  ok "Understudy OpenCode skills linked: $linked; skipped existing conflicts: $skipped."
+  ok "Orchestra OpenCode skills linked: $linked; skipped existing conflicts: $skipped."
   if [ "$linked" -gt 0 ]; then
     record_adapter "opencode" "installed" "linked $linked skills"
   else
@@ -1277,7 +1277,7 @@ install_hermes_adapter() {
   register_dir="$(hermes_register_dir "$skills_dir")"
   config="$(hermes_config_path)"
 
-  say "Registering the Understudy skills with Hermes via $register_dir."
+  say "Registering the Orchestra skills with Hermes via $register_dir."
 
   if [ ! -f "$config" ]; then
     # Fresh Hermes: write a minimal user config. Hermes merges defaults at load
@@ -1288,7 +1288,7 @@ install_hermes_adapter() {
       printf '  external_dirs:\n'
       printf '    - %s\n' "$register_dir"
     } >"$config"
-    ok "Created $config and registered Understudy skills in skills.external_dirs."
+    ok "Created $config and registered Orchestra skills in skills.external_dirs."
     record_adapter "hermes" "installed" "registered in new config"
   elif py="$(hermes_yaml_python)"; then
     # Idempotent: the YAML merge is authoritative. It exits 3 when the path is
@@ -1324,11 +1324,11 @@ with open(cfg_path, "w", encoding="utf-8") as f:
 PY
     case "$status" in
       0)
-        ok "Registered Understudy skills in $config (skills.external_dirs)."
+        ok "Registered Orchestra skills in $config (skills.external_dirs)."
         record_adapter "hermes" "installed" "registered"
         ;;
       3)
-        ok "Understudy skills already registered in $config (skills.external_dirs)."
+        ok "Orchestra skills already registered in $config (skills.external_dirs)."
         record_adapter "hermes" "installed" "already registered"
         ;;
       *)
@@ -1339,7 +1339,7 @@ PY
     esac
   elif grep -qF "$register_dir" "$config" 2>/dev/null; then
     # Without a YAML-capable Python a substring match is the best signal left.
-    ok "Understudy skills already registered in $config (skills.external_dirs)."
+    ok "Orchestra skills already registered in $config (skills.external_dirs)."
     record_adapter "hermes" "installed" "already registered"
   else
     warn "No YAML-capable Python found to edit $config safely; leaving it unchanged."
@@ -1365,12 +1365,12 @@ install_devin_adapter() {
     return 0
   fi
 
-  say "Installing the Understudy Devin adapter from $repo."
+  say "Installing the Orchestra Devin adapter from $repo."
   # Devin is cloud-based: the CLI is the install surface (already handled in
   # step 1). The adapter just confirms the skills tree is accessible and the
   # .devin/adapter.json sentinel is present.
   if [ -f "$repo/.devin/adapter.json" ]; then
-    ok "Understudy Devin adapter sentinel found at $repo/.devin/adapter.json."
+    ok "Orchestra Devin adapter sentinel found at $repo/.devin/adapter.json."
     record_adapter "devin" "installed" "skills tree accessible; sentinel present"
   else
     warn "Could not find .devin/adapter.json; the Devin version sentinel is missing."
@@ -1414,7 +1414,7 @@ launch_claude_code() {
     if adapter_installed "claude-code"; then
       say "Claude Code CLI not found; open Claude Code manually and run /reload-plugins then /understudy:onboard."
     else
-      say "Claude Code CLI not found and the Understudy plugin is not installed; install Claude Code, rerun this installer (or the manual plugin commands above), then run /reload-plugins and /understudy:onboard."
+      say "Claude Code CLI not found and the Orchestra plugin is not installed; install Claude Code, rerun this installer (or the manual plugin commands above), then run /reload-plugins and /understudy:onboard."
     fi
     mark_step_done 3
     return 0
@@ -1428,7 +1428,7 @@ launch_claude_code() {
 
   section "Step 3/3 · Open Claude Code"
   say "Claude Code will open in: $(pwd)"
-  say "The Understudy plugin will be loaded for this launch with --plugin-dir."
+  say "The Orchestra plugin will be loaded for this launch with --plugin-dir."
   say "Claude Code permission mode: $CLAUDE_PERMISSION_MODE."
   say "Claude Code will receive the first prompt automatically:"
   say_unlogged "  ${D}$INITIAL_CLAUDE_PROMPT${R}"
@@ -1507,7 +1507,7 @@ launch_hermes() {
   fi
 
   section "Step 3/3 · Open Hermes"
-  say "The Understudy skills are registered in Hermes via skills.external_dirs."
+  say "The Orchestra skills are registered in Hermes via skills.external_dirs."
   say "Start a fresh Hermes session in: $(pwd)"
   say "  hermes"
   say "In an already-open session, run /reload-skills to pick them up without restarting."
@@ -1529,7 +1529,7 @@ launch_devin() {
   fi
 
   section "Step 3/3 · Devin"
-  say "The Understudy CLI and skills are installed."
+  say "The Orchestra CLI and skills are installed."
   say "Devin is a cloud-based agent — it reads AGENTS.md and accesses the skills/ tree directly."
   say "Ask Devin: Use the Understudy onboarding skill for this project."
   say "For persistent installs, add the npm install to the Devin environment blueprint."
@@ -1568,7 +1568,7 @@ banner
 if [ "$FANCY" = "1" ]; then
   section "Welcome"
 else
-  section "Welcome. We are going to install Understudy for your coding agent."
+  section "Welcome. We are going to install Orchestra for your coding agent."
 fi
 say "This installer bootstraps the CLI and selected coding-agent skills, then drops you back into your coding agent when possible."
 if [ -n "$INSTALL_PACKAGE" ]; then
@@ -1583,9 +1583,9 @@ say ""
 select_agent_platforms
 report_agent_selection
 say "${B}Install plan${R}"
-say "  ${G2}1.${R} Install the Understudy CLI."
+say "  ${G2}1.${R} Install the Orchestra CLI."
 if [ "$KEEP_LOGIN" = "1" ]; then
-  say "  ${G3}·${R}  Keep the existing Understudy sign-in (--keep-login)."
+  say "  ${G3}·${R}  Keep the existing Orchestra sign-in (--keep-login)."
 else
   say "  ${G3}·${R}  Reset any existing sign-in so the agent-first sign-up starts fresh (backup kept; --keep-login skips)."
 fi
@@ -1601,7 +1601,7 @@ say "This installer writes only under $LAB, $HOME/.understudy, the global npm pr
 if [ -n "${UNDERSTUDY_INSTALL_SOURCE_DIR:-}" ]; then
   say "Scratch checkout (UNDERSTUDY_INSTALL_SOURCE_DIR): $INSTALL_SOURCE_DIR is deleted before and after the install."
 fi
-confirm "Continue with this Understudy installation?" || exit 1
+confirm "Continue with this Orchestra installation?" || exit 1
 
 PKG_DIR="$(npm root -g)/@understudylabs/understudy-agent-tools"
 
@@ -1652,7 +1652,7 @@ elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
     say "The installer is done. Every selected coding-agent adapter was disabled by a flag (e.g. --no-claude), so only the understudy CLI was installed."
     say "Rerun this installer without the disable flag (or with --agents <adapter>) when you want the skills inside a coding agent."
   else
-    fail_line "The installer finished, but no coding-agent plugin was installed — the Understudy skills are NOT ready in any coding agent."
+    fail_line "The installer finished, but no coding-agent plugin was installed — the Orchestra skills are NOT ready in any coding agent."
     say "Use the manual install commands above (or rerun this installer with --agents <adapter>), then run the platform's reload step before onboarding."
   fi
 else

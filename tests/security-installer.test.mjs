@@ -276,7 +276,7 @@ ${block}`, "test", fixture, root], { encoding: "utf8" });
     });
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /Registered Understudy skills in .*config\.yaml/);
+    assert.match(result.stdout, /Registered Orchestra skills in .*config\.yaml/);
     assert.match(readFileSync(config, "utf8"), /external_dirs/);
     assert.equal(readFileSync(`${config}.understudy.bak`, "utf8"), original);
   });
