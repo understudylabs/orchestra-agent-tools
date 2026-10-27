@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -76,6 +76,23 @@ function runFixture({ runId = "desktop-run-1", status = "completed", generatedAt
 }
 
 describe("local classifier run registry", () => {
+  it("still finds runs recorded before ~/.understudy moved behind a symlink", { skip: process.platform === "win32" }, () => {
+    // Manifests store absolute paths. After the home migration they point
+    // through ~/.understudy (now a symlink) while the registry scans the
+    // real ~/.orchestra, so the paths must compare with symlinks resolved.
+    const data = runFixture({ runId: "pre-migration-run" });
+    const moved = `${data.root}-moved`;
+    renameSync(data.root, moved);
+    symlinkSync(moved, data.root, "dir");
+    roots.push(moved);
+
+    const runs = listLocalClassifierRuns({ captureRoot: join(moved, "capture-imports") });
+    assert.deepEqual(runs.map((run) => run.run_id), ["pre-migration-run"]);
+    assert.ok(runs[0].model, "model path still validates through the symlink");
+    const movedManifest = join(moved, data.manifestPath.slice(data.root.length));
+    assert.equal(getLocalClassifierRun(movedManifest).run_id, "pre-migration-run");
+  });
+
   it("discovers completed local runs without copying label values into the summary", () => {
     const data = runFixture();
     const repeatPath = join(data.runRoot, "evaluations", "repeat-1", "evaluation.json");

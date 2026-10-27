@@ -1,5 +1,17 @@
 import { homedir } from "node:os";
-import { existsSync, lstatSync, mkdirSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  rmdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 /**
@@ -130,55 +142,63 @@ export function globalConfigDir(): string {
   return isOrchestraHome(current) ? current : legacy;
 }
 
-export type GlobalHomeMigration =
+export type GlobalHomeMigrationStatus =
   | "already-migrated"
   | "migrated"
   | "created"
   | "kept-legacy"
   | "unsupported-platform"
-  | "disabled";
+  | "disabled"
+  | "split";
+
+export interface GlobalHomeMigration {
+  status: GlobalHomeMigrationStatus;
+  /** Entries left in a real ~/.understudy because ~/.orchestra already has them. */
+  conflicts: string[];
+}
 
 /**
  * One-time move of `~/.understudy` to `~/.orchestra`, leaving a relative
- * `~/.understudy -> .orchestra` symlink behind. Called once at CLI
- * startup; never throws, and leaves `~/.understudy` in place whenever the
- * move cannot be completed safely:
+ * `~/.understudy -> .orchestra` symlink behind. Opt-in: runs only with
+ * `UNDERSTUDY_HOME_MIGRATION=1`, which the installer sets, so a test, a
+ * library import, or a plain `npm i -g` upgrade never moves anything.
+ * Never throws, and leaves `~/.understudy` in place whenever the move
+ * cannot be completed safely:
  *
  * - a `~/.orchestra` without our marker belongs to another tool;
  * - a user-managed `~/.understudy` symlink is left as is;
  * - if the symlink cannot be created, the rename is rolled back.
  *
  * The marker is written into `~/.understudy` before the rename, so a
- * concurrent CLI process sees a finished migration, never a half one.
- *
- * `UNDERSTUDY_HOME_MIGRATION=0` opts out. Under `node --test`
- * (`NODE_TEST_CONTEXT`, inherited by every CLI a test spawns) it is off
- * unless `UNDERSTUDY_HOME_MIGRATION=1`, so a test run can never move the
- * developer's real home directory.
+ * concurrent process sees a finished migration, never a half one. If a
+ * real `~/.understudy` reappears beside a migrated home (a crash between
+ * rename and symlink, or an older process recreating it), its entries are
+ * moved across without overwriting anything; entries that already exist in
+ * `~/.orchestra` are left where they are and reported as conflicts.
  */
 export function migrateGlobalHome(env: NodeJS.ProcessEnv = process.env): GlobalHomeMigration {
-  const optIn = env.UNDERSTUDY_HOME_MIGRATION;
-  if (optIn === "0" || (env.NODE_TEST_CONTEXT && optIn !== "1")) return "disabled";
-  if (process.platform === "win32") return "unsupported-platform";
+  if (env.UNDERSTUDY_HOME_MIGRATION !== "1") return result("disabled");
+  if (process.platform === "win32") return result("unsupported-platform");
   const home = homedir();
   const current = join(home, GLOBAL_CONFIG_DIR);
   const legacy = join(home, LEGACY_GLOBAL_CONFIG_DIR);
   try {
-    if (isOrchestraHome(current)) {
-      ensureLegacyLink(legacy, current);
-      return "already-migrated";
-    }
-    if (lstatOrNull(current)) return "kept-legacy";
+    if (isOrchestraHome(current)) return linkOrReconcile(legacy, current, "already-migrated");
+    if (lstatOrNull(current)) return result("kept-legacy");
     const legacyStat = lstatOrNull(legacy);
     if (legacyStat?.isDirectory()) return moveLegacyHome(legacy, current);
-    if (legacyStat) return "kept-legacy";
+    if (legacyStat) return result("kept-legacy");
     mkdirSync(current, { mode: 0o700 });
     writeHomeMarker(current, null);
     ensureLegacyLink(legacy, current);
-    return "created";
+    return result("created");
   } catch {
-    return isOrchestraHome(current) ? "already-migrated" : "kept-legacy";
+    return result(isOrchestraHome(current) ? "already-migrated" : "kept-legacy");
   }
+}
+
+function result(status: GlobalHomeMigrationStatus, conflicts: string[] = []): GlobalHomeMigration {
+  return { status, conflicts };
 }
 
 function moveLegacyHome(legacy: string, current: string): GlobalHomeMigration {
@@ -186,21 +206,59 @@ function moveLegacyHome(legacy: string, current: string): GlobalHomeMigration {
   try {
     renameSync(legacy, current);
   } catch {
-    // Another CLI process may have finished the move first.
-    if (isOrchestraHome(current)) {
-      ensureLegacyLink(legacy, current);
-      return "already-migrated";
-    }
-    return "kept-legacy";
+    // Another process may have finished the move first.
+    if (isOrchestraHome(current)) return linkOrReconcile(legacy, current, "already-migrated");
+    return result("kept-legacy");
   }
-  if (ensureLegacyLink(legacy, current)) return "migrated";
+  if (ensureLegacyLink(legacy, current)) return result("migrated");
   // Without the symlink, readers of ~/.understudy would lose everything:
   // put the directory back rather than half-migrate.
   try {
     renameSync(current, legacy);
-    return "kept-legacy";
+    return result("kept-legacy");
   } catch {
-    return "migrated";
+    // Something recreated ~/.understudy in the meantime.
+    return linkOrReconcile(legacy, current, "migrated");
+  }
+}
+
+/**
+ * Make `~/.understudy` the symlink to a migrated home. A real directory
+ * found there is merged into `~/.orchestra` first (see migrateGlobalHome).
+ */
+function linkOrReconcile(legacy: string, current: string, status: GlobalHomeMigrationStatus): GlobalHomeMigration {
+  const legacyStat = lstatOrNull(legacy);
+  if (legacyStat?.isDirectory()) {
+    const conflicts: string[] = [];
+    mergeInto(legacy, current, conflicts, true);
+    if (conflicts.length > 0) return result("split", conflicts);
+    rmdirSync(legacy);
+  }
+  ensureLegacyLink(legacy, current);
+  return result(status);
+}
+
+/** Move entries from `src` into `dst`, recursing into directories both have; never overwrite. */
+function mergeInto(src: string, dst: string, conflicts: string[], top: boolean): void {
+  for (const name of readdirSync(src)) {
+    const from = join(src, name);
+    if (top && name === GLOBAL_HOME_MARKER) {
+      // Left by an interrupted move; the migrated home has its own.
+      rmSync(from, { force: true });
+      continue;
+    }
+    const to = join(dst, name);
+    const toStat = lstatOrNull(to);
+    if (!toStat) {
+      renameSync(from, to);
+      continue;
+    }
+    if (lstatSync(from).isDirectory() && toStat.isDirectory()) {
+      mergeInto(from, to, conflicts, false);
+      if (readdirSync(from).length === 0) rmdirSync(from);
+      continue;
+    }
+    conflicts.push(from);
   }
 }
 

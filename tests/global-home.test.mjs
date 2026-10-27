@@ -32,7 +32,7 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), "orchestra-home-"));
     process.env.HOME = home;
-    // Migration is off under node --test unless explicitly opted in.
+    // Migration is opt-in; the installer sets this.
     process.env.UNDERSTUDY_HOME_MIGRATION = "1";
     assert.equal(homedir(), home);
     current = join(home, ".orchestra");
@@ -46,25 +46,27 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it("stays off under node --test and when opted out", () => {
+  it("does nothing unless UNDERSTUDY_HOME_MIGRATION=1", () => {
     mkdirSync(legacy);
-    assert.equal(migrateGlobalHome({ NODE_TEST_CONTEXT: "child-v8" }), "disabled");
-    assert.equal(migrateGlobalHome({ UNDERSTUDY_HOME_MIGRATION: "0" }), "disabled");
+    assert.equal(migrateGlobalHome({}).status, "disabled");
+    assert.equal(migrateGlobalHome({ UNDERSTUDY_HOME_MIGRATION: "0" }).status, "disabled");
+    assert.equal(migrateGlobalHome({ UNDERSTUDY_HOME_MIGRATION: "true" }).status, "disabled");
     assert.ok(!existsSync(current));
     assert.ok(lstatSync(legacy).isDirectory() && !lstatSync(legacy).isSymbolicLink());
   });
 
-  it("a CLI spawned by a test leaves the home alone", () => {
+  it("a plain CLI run leaves the home alone, even outside node --test", () => {
     mkdirSync(legacy);
     const env = { ...process.env, HOME: home, UNDERSTUDY_TELEMETRY: "0" };
     delete env.UNDERSTUDY_HOME_MIGRATION;
+    delete env.NODE_TEST_CONTEXT;
     const result = spawnSync(process.execPath, ["dist/bin.js", "--version"], { env, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(!existsSync(current));
   });
 
   it("creates ~/.orchestra and the legacy symlink on a fresh machine", () => {
-    assert.equal(migrateGlobalHome(), "created");
+    assert.equal(migrateGlobalHome().status, "created");
     assert.ok(statSync(current).isDirectory());
     assert.equal(statSync(current).mode & 0o777, 0o700);
     assert.ok(existsSync(join(current, GLOBAL_HOME_MARKER)));
@@ -78,7 +80,7 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
     writeFileSync(join(legacy, "credentials.json"), '{"api_key":"sk_test"}\n', { mode: 0o600 });
     writeFileSync(join(legacy, "models", "gemma", "weights.bin"), "w");
 
-    assert.equal(migrateGlobalHome(), "migrated");
+    assert.equal(migrateGlobalHome().status, "migrated");
     assert.equal(globalConfigDir(), current);
     assert.equal(readFileSync(join(current, "credentials.json"), "utf8"), '{"api_key":"sk_test"}\n');
     assert.equal(statSync(join(current, "credentials.json")).mode & 0o777, 0o600);
@@ -90,9 +92,9 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
   });
 
   it("is idempotent and restores a deleted legacy link", () => {
-    assert.equal(migrateGlobalHome(), "created");
+    assert.equal(migrateGlobalHome().status, "created");
     rmSync(legacy);
-    assert.equal(migrateGlobalHome(), "already-migrated");
+    assert.equal(migrateGlobalHome().status, "already-migrated");
     assert.ok(lstatSync(legacy).isSymbolicLink());
   });
 
@@ -102,7 +104,7 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
     mkdirSync(legacy);
     writeFileSync(join(legacy, "credentials.json"), "{}\n");
 
-    assert.equal(migrateGlobalHome(), "kept-legacy");
+    assert.equal(migrateGlobalHome().status, "kept-legacy");
     assert.equal(globalConfigDir(), legacy);
     assert.ok(lstatSync(legacy).isDirectory() && !lstatSync(legacy).isSymbolicLink());
     assert.ok(!existsSync(join(current, GLOBAL_HOME_MARKER)));
@@ -114,21 +116,46 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
     mkdirSync(elsewhere, { recursive: true });
     symlinkSync(elsewhere, legacy, "dir");
 
-    assert.equal(migrateGlobalHome(), "kept-legacy");
+    assert.equal(migrateGlobalHome().status, "kept-legacy");
     assert.equal(readlinkSync(legacy), elsewhere);
     assert.ok(!existsSync(current));
     assert.equal(globalConfigDir(), legacy);
   });
 
-  it("does not touch a real ~/.understudy that appeared beside a migrated home", () => {
-    assert.equal(migrateGlobalHome(), "created");
-    rmSync(legacy);
-    mkdirSync(legacy);
-    writeFileSync(join(legacy, "stray.json"), "{}\n");
+  it("merges a real ~/.understudy that reappeared beside a migrated home", () => {
+    // State after a crash between rename and symlink, then the installer
+    // recreating ~/.understudy/agent-tools/... as a real directory.
+    mkdirSync(join(current, "agent-tools", "logs"), { recursive: true });
+    writeFileSync(join(current, GLOBAL_HOME_MARKER), "{}\n");
+    writeFileSync(join(current, "credentials.json"), "{}\n");
+    mkdirSync(join(legacy, "agent-tools", "install-state"), { recursive: true });
+    writeFileSync(join(legacy, "agent-tools", "install-state", "step-1.done"), "x");
+    writeFileSync(join(legacy, "profile.json"), '{"tier":"new"}\n');
+    writeFileSync(join(legacy, GLOBAL_HOME_MARKER), "{}\n");
 
-    assert.equal(migrateGlobalHome(), "already-migrated");
-    assert.equal(readFileSync(join(legacy, "stray.json"), "utf8"), "{}\n");
-    assert.equal(globalConfigDir(), current);
+    assert.equal(migrateGlobalHome().status, "already-migrated");
+    assert.ok(lstatSync(legacy).isSymbolicLink());
+    assert.equal(readFileSync(join(current, "agent-tools", "install-state", "step-1.done"), "utf8"), "x");
+    assert.equal(readFileSync(join(current, "profile.json"), "utf8"), '{"tier":"new"}\n');
+    assert.ok(existsSync(join(current, "agent-tools", "logs")));
+    assert.equal(readFileSync(join(current, "credentials.json"), "utf8"), "{}\n");
+  });
+
+  it("never overwrites: entries in both homes stay put and are reported", () => {
+    mkdirSync(current, { recursive: true });
+    writeFileSync(join(current, GLOBAL_HOME_MARKER), "{}\n");
+    writeFileSync(join(current, "credentials.json"), '{"api_key":"sk_new"}\n');
+    mkdirSync(legacy);
+    writeFileSync(join(legacy, "credentials.json"), '{"api_key":"sk_old"}\n');
+    writeFileSync(join(legacy, "profile.json"), "{}\n");
+
+    const outcome = migrateGlobalHome();
+    assert.equal(outcome.status, "split");
+    assert.deepEqual(outcome.conflicts, [join(legacy, "credentials.json")]);
+    assert.equal(readFileSync(join(current, "credentials.json"), "utf8"), '{"api_key":"sk_new"}\n');
+    assert.equal(readFileSync(join(legacy, "credentials.json"), "utf8"), '{"api_key":"sk_old"}\n');
+    assert.ok(existsSync(join(current, "profile.json")));
+    assert.ok(lstatSync(legacy).isDirectory() && !lstatSync(legacy).isSymbolicLink());
   });
 
   it("globalConfigDir() only reads: it never moves anything", () => {
@@ -138,7 +165,7 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
     assert.ok(!lstatSync(legacy).isSymbolicLink());
   });
 
-  it("the CLI migrates on first run and still finds existing credentials", () => {
+  it("the CLI migrates when the installer opts in and still finds existing credentials", () => {
     mkdirSync(legacy, { mode: 0o700 });
     writeFileSync(
       join(legacy, "credentials.json"),
@@ -146,7 +173,7 @@ describe("global home: ~/.understudy -> ~/.orchestra", { skip: !posix }, () => {
       { mode: 0o600 },
     );
     const result = spawnSync(process.execPath, ["dist/bin.js", "--json", "status"], {
-      env: { ...process.env, HOME: home, UNDERSTUDY_TELEMETRY: "0" },
+      env: { ...process.env, HOME: home, UNDERSTUDY_TELEMETRY: "0", UNDERSTUDY_HOME_MIGRATION: "1" },
       encoding: "utf8",
     });
     assert.equal(result.status, 0, result.stderr);
