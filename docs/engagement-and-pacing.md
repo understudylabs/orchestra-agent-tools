@@ -1,6 +1,6 @@
 # Engagement & Pacing
 
-How an Understudy agent should *feel* to work with. The optimization loop has
+How an Orchestra agent should *feel* to work with. The optimization loop has
 genuinely slow steps — model downloads, baselines, sweeps — and a good agent
 keeps the user oriented and engaged across that wall-clock instead of going dark.
 Every skill in this repo should follow these rules; onboarding and the
@@ -49,10 +49,12 @@ or a sub-agent), and it goes there **before** the interactive part, so it runs
 *during* the conversation, not after it.
 
 The ordering rule: **if a step needs a long-running background task, start that
-task before you do a batch of interactive steps.** Onboarding is the canonical
-example — start the small-model download, *then* profile the machine and
-interview the user while the bytes arrive. By the time the interview is done, the
-model is cached.
+task before you do a batch of interactive steps.** A model pull is the canonical
+example: when the user asks for a local model, start the download, *then* profile
+the machine and interview them while the bytes arrive, so the model is cached by
+the time the interview is done. (First-run onboarding downloads nothing unless the
+user opted into the local model lab; the installer then starts it in the
+background.)
 
 - Use background tasks / monitors for downloads, baselines, sweeps, installs.
 - Prefer non-blocking fan-out over a barrier that waits on the slowest worker —
@@ -81,7 +83,7 @@ land:
   turn.
 
 Bring the profiling forward too: detect hardware and installed tooling early
-(during the first download), not after.
+(during the first background task), not after.
 
 ## 4. Plan up front, then show progress
 

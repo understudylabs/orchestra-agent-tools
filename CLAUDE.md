@@ -10,11 +10,11 @@ It covers the two ways an agent is used here and what to do in each.
 There are two kinds of visitor to this repo. Figure out which one you have
 before doing anything else:
 
-- **A user who wants to *use* Understudy** — improve an LLM app, cut cost, run a
+- **A user who wants to *use* Orchestra** — improve an LLM app, cut cost, run a
   local model, pick a route. **Install the plugin first** (the
   [`install-plugin`](skills/install-plugin/SKILL.md) skill), then run the
   [`onboard`](skills/onboard/SKILL.md) skill. The plugin's skills are what let
-  you explain what Understudy is, why it matters, and actually solve their
+  you explain what Orchestra is, why it matters, and actually solve their
   problem. Don't try to wing it from the source tree.
 - **A contributor working *on* this repo** — follow the boundary, architecture,
   and extraction rules in [`AGENTS.md`](AGENTS.md).
