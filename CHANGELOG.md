@@ -20,6 +20,10 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 - The installer no longer stops with "too many arguments" when npm still serves
   a CLI without `orchestra init`. It now checks that the CLI lists an `init`
   command before handing off, and falls back to its own steps otherwise.
+- Starting Claude Code from the installer no longer crashes with
+  `EINVAL: invalid argument, kqueue` on macOS. The installer now hands
+  `orchestra init`, `orchestra login`, Claude Code and Codex the terminal's real
+  device instead of the `/dev/tty` alias, which Bun programs cannot watch.
 
 ## [0.8.0] — 2026-10-28
 

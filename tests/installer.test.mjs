@@ -1693,7 +1693,7 @@ describe("install.sh", () => {
     // Older CLIs answer `init --help` with exit 0, so the guard reads the command list.
     assert.doesNotMatch(handoff, /if "\$ORCHESTRA_BIN" init --help/);
     assert.match(handoff, /"\$ORCHESTRA_BIN" --help 2>\/dev\/null \| grep -qE '\^\[\[:space:\]\]\+init/);
-    assert.match(handoff, /exec "\$ORCHESTRA_BIN" init .*<\/dev\/tty >\/dev\/tty/);
+    assert.match(handoff, /exec "\$ORCHESTRA_BIN" init .*<"\$terminal" >"\$terminal"/);
     // Without an init command the installer carries on with its own steps.
     assert.match(handoff, /START_STEP=2\nfi\s*$/);
     assert.match(script, /^HUMAN_RUN=0$/m);
