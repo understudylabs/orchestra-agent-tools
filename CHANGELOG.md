@@ -21,8 +21,9 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 - **Starting in ChatGPT · Codex opens a new Codex chat in your project with the
   prompt filled in.** `orchestra start` uses the `codex://new` link the ChatGPT
-  app supports, so you only press Enter; if the link can't open, it falls back
-  to opening the app with paste steps.
+  app supports, so you only press Enter. The prompt is still shown and copied,
+  with a step to paste it if the chat opens without it; if the link can't open
+  at all, it falls back to opening the app with paste steps.
 - **The prompt sits in a box.** For desktop apps and "Another app", the prompt
   is shown in a bordered block under the clipboard note, so it stands apart
   from the steps and is easy to copy by hand.
