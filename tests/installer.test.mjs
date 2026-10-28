@@ -1690,7 +1690,9 @@ describe("install.sh", () => {
     const handoff = script.slice(script.indexOf("# A person at a terminal gets the guided setup"), script.indexOf("\nbanner\nif [ \"$FANCY\""));
     // Only full, interactive runs: never --yes, --non-interactive, CI or partial steps.
     assert.match(handoff, /if \[ "\$HUMAN_RUN" = "1" \] && \[ -z "\$ONLY_STEP" \] && \[ "\$START_STEP" = "1" \] && \[ "\$RESUME" = "0" \]/);
-    assert.match(handoff, /init --help >\/dev\/null 2>&1; then/);
+    // Older CLIs answer `init --help` with exit 0, so the guard reads the command list.
+    assert.doesNotMatch(handoff, /if "\$ORCHESTRA_BIN" init --help/);
+    assert.match(handoff, /"\$ORCHESTRA_BIN" --help 2>\/dev\/null \| grep -qE '\^\[\[:space:\]\]\+init/);
     assert.match(handoff, /exec "\$ORCHESTRA_BIN" init .*<\/dev\/tty >\/dev\/tty/);
     // Without an init command the installer carries on with its own steps.
     assert.match(handoff, /START_STEP=2\nfi\s*$/);

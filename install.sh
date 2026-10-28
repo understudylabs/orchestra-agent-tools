@@ -2152,7 +2152,9 @@ if [ "$HUMAN_RUN" = "1" ] && [ -z "$ONLY_STEP" ] && [ "$START_STEP" = "1" ] && [
   mark_step_done 1
   [ "$KEEP_LOGIN" = "1" ] || prepare_agent_first_signin
   ORCHESTRA_BIN="$(command -v orchestra || printf '%s/bin/orchestra' "$(npm prefix -g)")"
-  if "$ORCHESTRA_BIN" init --help >/dev/null 2>&1; then
+  # `init --help` is no test: commander answers it with the top-level help and
+  # exit 0 on CLIs that have no init command. Look for init in the command list.
+  if "$ORCHESTRA_BIN" --help 2>/dev/null | grep -qE '^[[:space:]]+init([[:space:]]|$)'; then
     INIT_ARGS=()
     [ "$LOCAL_MODELS" = "1" ] && INIT_ARGS+=(--local-models)
     [ "$SKIP_LOGIN" = "1" ] && INIT_ARGS+=(--skip-login)
