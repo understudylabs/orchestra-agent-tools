@@ -30,23 +30,23 @@ CLI alias, and rerunning the installer replaces the old `understudy` plugin).
 curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
-You need Node.js 20+ (for npm). The installer asks one question:
+You need Node.js 22+ (for npm). The installer installs the CLI, then hands
+over to `orchestra init`, a short guided setup:
 
-1. **Orchestra account + plugin for your coding agents** (recommended). It
-   installs the CLI, signs you in to your Orchestra account right in the
-   terminal (we email a one-time code; an existing sign-in is kept), and
-   installs the plugin into every coding agent it detects: Claude Code,
-   Cursor, Codex, Devin. OpenCode and Hermes Agent are deprecated and only
-   installed when named with `--agents`.
-2. **Option 1 + local model lab** (Apple Silicon only). Also starts the
-   managed MLX runtime install and the Orchestra 2B model download (about 3.6 GB,
-   our MLX build of Gemma 4 E2B) in
-   the background. The MLX runtime needs [uv](https://docs.astral.sh/uv/); if
-   it is missing the installer asks before running `brew install uv`.
-3. **CLI only.**
+1. **What to set up:** Orchestra account + coding-agent plugin (recommended),
+   the same plus the local model lab (Apple Silicon: the Orchestra 2B model,
+   about 3.6 GB, downloads in the background; its MLX runtime needs
+   [uv](https://docs.astral.sh/uv/), installed with Homebrew only if you say
+   yes), choose agents, or just the CLI.
+2. **A checklist** that ticks off the CLI, your sign-in (we email a one-time
+   code you type right there; an existing sign-in is kept) and the plugin for
+   every coding agent it finds: Claude Code, Codex, Cursor, Devin.
+3. **Where do you want to start?** Claude Code (or the Codex CLI) opens here
+   with Orchestra ready. For the Claude desktop app, ChatGPT (Codex) or Cursor,
+   the prompt is copied and the app is opened; paste it into a new chat. Run
+   `orchestra start` to get back to this screen any time.
 
-`a` (or `--advanced`) lets you choose which coding agents get the plugin. At
-the end it offers to open Claude Code here, in your own permission mode.
+Anything that needs your attention is listed once, at the end.
 
 The CLI comes from the published npm package `@orchestraai/agent-tools`. If
 npm has no release yet (or with `--from-source`), the installer builds it from

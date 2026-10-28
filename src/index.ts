@@ -56,6 +56,7 @@ import { registerTrustCommand } from "./commands/trust.js";
 import { registerTrainingCommand } from "./commands/training.js";
 import { registerSetupCodeCommand } from "./commands/setup-code.js";
 import { registerSetupCommand } from "./commands/setup.js";
+import { registerOnboardingCommands } from "./commands/onboarding.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerInstrumentCommand } from "./commands/instrument.js";
 import { registerOptimizeWorkloadCommand } from "./commands/optimize-workload.js";
@@ -938,6 +939,7 @@ export function buildProgram(): Command {
   registerGatewayCommand(program);
   registerRoutesCommand(program);
   registerSetupCommand(program);
+  registerOnboardingCommands(program);
   registerSetupCodeCommand(program);
   registerRunCommand(program);
   registerRunsCommand(program);

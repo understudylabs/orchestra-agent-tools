@@ -293,6 +293,10 @@ ATTENTION_COUNT=0
 attention() {
   local message="$1" fix="${2:-}"
   log "ATTENTION $message${fix:+ | $fix}"
+  if [ -n "${STATE_DIR:-}" ]; then
+    private_mkdir "$STATE_DIR"
+    printf '%s\t%s\n' "$message" "$fix" >>"$STATE_DIR/attention.txt"
+  fi
   if [ "${QUIET_RUN:-0}" = "1" ]; then
     ATTENTION_COUNT=$((ATTENTION_COUNT + 1))
     ATTENTION_TEXT="${ATTENTION_TEXT}${message}
@@ -814,6 +818,9 @@ summarize_agent_adapters() {
   local name status reason installed=0 unmet=0 selection
   selection="$(normalize_agent_platform "$AGENT_PLATFORMS")"
   ADAPTERS_ATTEMPTED=1
+  # Machine-readable copy for `orchestra init`, which runs this step for a person.
+  private_mkdir "$STATE_DIR"
+  printf '%s' "$ADAPTER_RESULTS" >"$STATE_DIR/adapter-results.txt"
   QUIET_DETAIL=0
   if [ "$QUIET_RUN" = "1" ]; then
     summarize_agent_adapters_quiet
@@ -2127,6 +2134,39 @@ case "$OUTPUT_MODE" in
   verbose) ;;
   *) [ "$FANCY" = "1" ] && [ "$HUMAN_RUN" = "1" ] && QUIET_RUN=1 ;;
 esac
+
+# A person at a terminal gets the guided setup from the CLI itself
+# (`orchestra init`: menus, a checklist, sign-in, and the start screen). The
+# installer only installs the CLI first. Scripts, CI, --yes and partial runs
+# keep the installer's own steps below.
+if [ "$HUMAN_RUN" = "1" ] && [ -z "$ONLY_STEP" ] && [ "$START_STEP" = "1" ] && [ "$RESUME" = "0" ] && [ "${UNDERSTUDY_INSTALL_GUIDED:-1}" = "1" ]; then
+  banner
+  printf '\n'
+  QUIET_DETAIL=1
+  install_understudy_package
+  QUIET_DETAIL=0
+  PKG_DIR="$(npm root -g)/$PACKAGE_NAME"
+  if need orchestra; then
+    UNDERSTUDY_HOME_MIGRATION=1 orchestra --version >/dev/null 2>>"$LOG_FILE" || true
+  fi
+  mark_step_done 1
+  [ "$KEEP_LOGIN" = "1" ] || prepare_agent_first_signin
+  ORCHESTRA_BIN="$(command -v orchestra || printf '%s/bin/orchestra' "$(npm prefix -g)")"
+  if "$ORCHESTRA_BIN" init --help >/dev/null 2>&1; then
+    INIT_ARGS=()
+    [ "$LOCAL_MODELS" = "1" ] && INIT_ARGS+=(--local-models)
+    [ "$SKIP_LOGIN" = "1" ] && INIT_ARGS+=(--skip-login)
+    [ "$ADVANCED" = "1" ] && INIT_ARGS+=(--advanced)
+    [ "$AGENT_PLATFORMS_EXPLICIT" = "1" ] && INIT_ARGS+=(--agents "$AGENT_PLATFORMS")
+    lower_my_ant_bill_enabled && INIT_ARGS+=(--lower-anthropic-bill)
+    [ "$LAUNCH_CLAUDE" = "1" ] || INIT_ARGS+=(--no-start)
+    log "EXEC orchestra init ${INIT_ARGS[*]:-}"
+    export UNDERSTUDY_LAB="$LAB" ORCHESTRA_INIT_FROM_INSTALLER=1
+    exec "$ORCHESTRA_BIN" init ${INIT_ARGS[@]+"${INIT_ARGS[@]}"} </dev/tty >/dev/tty 2>&1
+  fi
+  warn "This CLI has no guided setup; continuing with the installer's own steps."
+  START_STEP=2
+fi
 
 banner
 if [ "$FANCY" = "1" ]; then

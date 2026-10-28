@@ -1684,4 +1684,16 @@ describe("install.sh", () => {
     assert.match(out.slice(block), /1 OpenCode skills already exist/);
     assert.match(out.slice(block), /mkdir -p .*skills\.bak/);
   });
+
+  it("hands a person at a terminal to orchestra init, and only them", () => {
+    const script = readFileSync("install.sh", "utf8");
+    const handoff = script.slice(script.indexOf("# A person at a terminal gets the guided setup"), script.indexOf("\nbanner\nif [ \"$FANCY\""));
+    // Only full, interactive runs: never --yes, --non-interactive, CI or partial steps.
+    assert.match(handoff, /if \[ "\$HUMAN_RUN" = "1" \] && \[ -z "\$ONLY_STEP" \] && \[ "\$START_STEP" = "1" \] && \[ "\$RESUME" = "0" \]/);
+    assert.match(handoff, /init --help >\/dev\/null 2>&1; then/);
+    assert.match(handoff, /exec "\$ORCHESTRA_BIN" init .*<\/dev\/tty >\/dev\/tty/);
+    // Without an init command the installer carries on with its own steps.
+    assert.match(handoff, /START_STEP=2\nfi\s*$/);
+    assert.match(script, /^HUMAN_RUN=0$/m);
+  });
 });

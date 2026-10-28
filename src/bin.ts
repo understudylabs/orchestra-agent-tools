@@ -16,6 +16,16 @@ if (home.status === "migrated") {
   );
 }
 
+// `orchestra explore` imports node:sqlite, which Node 22 still flags as
+// experimental with a warning on import. Every command loads it, so that one
+// warning would land in the middle of interactive screens; others still print.
+const emitWarning = process.emitWarning.bind(process) as (...args: unknown[]) => void;
+process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
+  const text = typeof warning === "string" ? warning : warning.message;
+  if (text.startsWith("SQLite is an experimental feature")) return;
+  emitWarning(warning, ...rest);
+}) as typeof process.emitWarning;
+
 if (process.argv[2] === INTERNAL_CONVERSATION_SIDECAR_ARG) {
   const { runConversationSidecarMain } = await import("./runtime/conversation/sidecar.js");
   await runConversationSidecarMain();
