@@ -1200,10 +1200,29 @@ prepare_agent_first_signin() {
   fi
 }
 
+# The terminal device to hand to interactive programs. `/dev/tty` is only an
+# alias for it, and macOS kqueue cannot watch that alias (EINVAL), so a Bun
+# program such as Claude Code given `</dev/tty >/dev/tty` crashes on start.
+# Use the real device (/dev/ttys003, /dev/pts/1) and fall back to the alias.
+terminal_device() {
+  local name
+  name="$(ps -o tty= -p $$ 2>/dev/null | tr -d '[:space:]')"
+  case "$name" in
+    ""|"?"|"??") ;;
+    *)
+      if [ -c "/dev/$name" ] && [ -r "/dev/$name" ] && [ -w "/dev/$name" ]; then
+        printf '/dev/%s\n' "$name"
+        return 0
+      fi
+      ;;
+  esac
+  printf '/dev/tty\n'
+}
+
 # Without a terminal (CI, --yes, agent shells) there is nobody to type the
 # code, so the sign-in is left for `orchestra login` later.
 sign_in_in_terminal() {
-  local answer email
+  local answer email terminal
   [ -z "$ONLY_STEP" ] || return 0
   [ -f "$CREDENTIALS_FILE" ] && return 0
   if [ "$SKIP_LOGIN" = "1" ]; then
@@ -1235,7 +1254,8 @@ sign_in_in_terminal() {
     return 0
   fi
   log "RUN orchestra login --email <redacted>"
-  if orchestra login --email "$email" </dev/tty >/dev/tty 2>&1; then
+  terminal="$(terminal_device)"
+  if orchestra login --email "$email" <"$terminal" >"$terminal" 2>&1; then
     ok "Signed in to Orchestra."
   else
     warn "The sign-in did not finish; the install continues. Run \`orchestra login\` to try again."
@@ -1330,7 +1350,7 @@ copy_paste_prompt_to_clipboard() {
 # (copied to the clipboard), the one thing each installed agent needs first,
 # and an offer to start a terminal agent here with that prompt.
 start_onboarding() {
-  local copied="" first="" choices="" n=0 answer pick=""
+  local copied="" first="" choices="" n=0 answer pick="" terminal
   [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ] || return 0
   if need pbcopy && printf '%s' "$INITIAL_CLAUDE_PROMPT" | pbcopy 2>/dev/null; then
     copied=" (copied to your clipboard)"
@@ -1382,7 +1402,8 @@ start_onboarding() {
       say "Opening Codex here. If it can't find the Orchestra skill yet, enable orchestra in /plugins and send the prompt again."
       log "LAUNCH codex <initial-prompt>"
       AGENT_LAUNCHED=1
-      codex "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || say "Codex exited with status $?."
+      terminal="$(terminal_device)"
+      codex "$INITIAL_CLAUDE_PROMPT" <"$terminal" >"$terminal" 2>&1 || say "Codex exited with status $?."
       mark_step_done 3
       ;;
     *)
@@ -2015,7 +2036,8 @@ launch_claude_code() {
     mark_step_done 3
     return 0
   fi
-  local permission_args=()
+  local permission_args=() terminal
+  terminal="$(terminal_device)"
   if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
     permission_args=(--permission-mode "$CLAUDE_PERMISSION_MODE")
     say "Claude Code permission mode: $CLAUDE_PERMISSION_MODE (UNDERSTUDY_CLAUDE_PERMISSION_MODE)."
@@ -2028,7 +2050,7 @@ launch_claude_code() {
   # shellcheck disable=SC2086
   CLAUDE_LAUNCHED=1
   AGENT_LAUNCHED=1
-  claude ${permission_args[@]+"${permission_args[@]}"} --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
+  claude ${permission_args[@]+"${permission_args[@]}"} --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" <"$terminal" >"$terminal" 2>&1 || {
     local status="$?"
     say "Claude Code exited with status $status."
     return "$status"
@@ -2164,7 +2186,8 @@ if [ "$HUMAN_RUN" = "1" ] && [ -z "$ONLY_STEP" ] && [ "$START_STEP" = "1" ] && [
     [ "$LAUNCH_CLAUDE" = "1" ] || INIT_ARGS+=(--no-start)
     log "EXEC orchestra init ${INIT_ARGS[*]:-}"
     export UNDERSTUDY_LAB="$LAB" ORCHESTRA_INIT_FROM_INSTALLER=1
-    exec "$ORCHESTRA_BIN" init ${INIT_ARGS[@]+"${INIT_ARGS[@]}"} </dev/tty >/dev/tty 2>&1
+    terminal="$(terminal_device)"
+    exec "$ORCHESTRA_BIN" init ${INIT_ARGS[@]+"${INIT_ARGS[@]}"} <"$terminal" >"$terminal" 2>&1
   fi
   warn "This CLI has no guided setup; continuing with the installer's own steps."
   START_STEP=2
