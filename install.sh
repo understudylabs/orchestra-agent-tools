@@ -858,6 +858,22 @@ install_from_npm_registry() {
     log "npm $PACKAGE_NAME@$version is deprecated: $deprecated"
     return 1
   fi
+  # npm can point latest at a pre-release stand-in (0.0.0-stage while a
+  # staged publish awaits approval) that ships no CLI. Only a release that
+  # declares the orchestra command may replace a working install; a
+  # pre-release is used only when UNDERSTUDY_INSTALL_VERSION names it.
+  case "$version" in
+    *-*)
+      if [ "$INSTALL_VERSION" != "$version" ]; then
+        log "npm $PACKAGE_NAME@$INSTALL_VERSION resolves to pre-release $version"
+        return 1
+      fi
+      ;;
+  esac
+  if ! npm view "$PACKAGE_NAME@$version" bin --json 2>>"$LOG_FILE" | grep -q '"orchestra"'; then
+    log "npm $PACKAGE_NAME@$version does not declare the orchestra command"
+    return 1
+  fi
   say "Installing $PACKAGE_NAME@$version from npm."
   remove_previous_global_package
   if ! run_logged "Install the orchestra command" npm install -g --ignore-scripts "$PACKAGE_NAME@$version"; then

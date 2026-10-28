@@ -1424,7 +1424,11 @@ describe("install.sh", () => {
   it("installs the published npm release by default, without cloning", () => {
     mkdirSync(join(root, "home"), { recursive: true });
     const stubs = flowStubs({
-      npmView: { "@orchestraai/agent-tools@latest version": "0.7.0", "@orchestraai/agent-tools@0.7.0 deprecated": "" },
+      npmView: {
+        "@orchestraai/agent-tools@latest version": "0.7.0",
+        "@orchestraai/agent-tools@0.7.0 deprecated": "",
+        "@orchestraai/agent-tools@0.7.0 bin --json": '{"orchestra":"dist/bin.js","understudy":"dist/bin.js"}',
+      },
     });
     const result = runFlow(["--non-interactive", "--only-step", "1"], stubs);
 
@@ -1436,8 +1440,30 @@ describe("install.sh", () => {
     assert.equal(readFileSync(join(root, "lab", "install-state", "package-version"), "utf8"), "0.7.0\n");
   });
 
-  it("builds from source when npm has no release or only the deprecated placeholder", () => {
-    for (const npmView of [{}, { "@orchestraai/agent-tools@latest version": "0.0.1", "@orchestraai/agent-tools@0.0.1 deprecated": "Not installable from npm." }]) {
+  it("builds from source when npm has no usable release", () => {
+    for (const npmView of [
+      {},
+      // The deprecated name-reservation placeholder.
+      { "@orchestraai/agent-tools@latest version": "0.0.1", "@orchestraai/agent-tools@0.0.1 deprecated": "Not installable from npm." },
+      // npm's staged-publishing stand-in: latest is a pre-release with no CLI.
+      {
+        "@orchestraai/agent-tools@latest version": "0.0.0-stage",
+        "@orchestraai/agent-tools@0.0.0-stage deprecated": "",
+        "@orchestraai/agent-tools@0.0.0-stage bin --json": "",
+      },
+      // A pre-release that does ship the CLI is still not taken by default.
+      {
+        "@orchestraai/agent-tools@latest version": "0.8.0-beta.1",
+        "@orchestraai/agent-tools@0.8.0-beta.1 deprecated": "",
+        "@orchestraai/agent-tools@0.8.0-beta.1 bin --json": '{"orchestra":"dist/bin.js"}',
+      },
+      // A stable version that still ships no orchestra command.
+      {
+        "@orchestraai/agent-tools@latest version": "0.7.1",
+        "@orchestraai/agent-tools@0.7.1 deprecated": "",
+        "@orchestraai/agent-tools@0.7.1 bin --json": "",
+      },
+    ]) {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(join(root, "home"), { recursive: true });
       const stubs = flowStubs({ npmView });
