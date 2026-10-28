@@ -15,6 +15,19 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Added
+
+- **`orchestra init` and `orchestra start`.** For a person at a terminal the
+  installer now installs the CLI and hands over to `orchestra init`: an
+  arrow-key menu, a checklist that ticks off the CLI, the sign-in and the
+  plugin in place, problems collected into one "Needs attention" list, and a
+  "Where do you want to start?" picker. Claude Code (and the Codex CLI) open
+  in your project with the onboarding prompt as the first message; for the
+  Claude desktop app, ChatGPT (where the Codex app now lives) and Cursor the
+  prompt is copied and the app is opened. Started from your home folder, it
+  asks for the project first. `orchestra start` shows that picker any time.
+  Scripts, CI, `--yes` and partial runs keep the installer's own steps.
+
 ### Changed
 
 - **Shorter installer output.** In an interactive terminal the installer now
