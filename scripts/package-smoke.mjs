@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import {
   configuredPrivateTermPolicy,
   privateTermsEnvironmentVariable,
@@ -58,6 +59,20 @@ function npmPackFiles() {
   return payload[0].files;
 }
 
+// npm rejects a provenance publish unless repository.url names the GitHub
+// repo that built it, so a missing or stale value only shows up at release.
+const expectedRepository = "https://github.com/understudylabs/orchestra-agent-tools";
+
+function packageMetadataErrors() {
+  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const url = typeof manifest.repository === "string" ? manifest.repository : manifest.repository?.url ?? "";
+  const normalized = url.replace(/^git\+/, "").replace(/\.git$/, "");
+  if (normalized !== expectedRepository) {
+    return [`package.json: repository.url must be ${expectedRepository} (with optional git+ and .git) for npm provenance; got ${JSON.stringify(url)}`];
+  }
+  return [];
+}
+
 function main() {
   const release = process.argv.slice(2).includes("--release");
   const privateTermPolicy = configuredPrivateTermPolicy();
@@ -68,6 +83,7 @@ function main() {
   }
 
   const errors = [];
+  errors.push(...packageMetadataErrors());
   const packageFiles = npmPackFiles();
   const packagePaths = new Set(packageFiles.map((entry) => entry.path));
   for (const required of requiredPackageMembers) {

@@ -443,8 +443,11 @@ describe("GEPA controller", () => {
   });
 
   it("hard-stops a hung receipt authority verifier", async () => {
+    // The evaluation must finish before the wallclock so its spend is
+    // recorded; only the verifier hangs. 5 ms was too tight for CI runners,
+    // where the deadline could pass before evaluate ran and spend stayed 0.
     const result = await runGepaHillclimb({
-      input: gepaInput({ fuse: { ...fuse, max_concurrency: 1, max_metric_calls: 1, max_episodes: 1, max_reflections: 1, max_spend_usd: 2, max_wallclock_ms: 5 } }),
+      input: gepaInput({ fuse: { ...fuse, max_concurrency: 1, max_metric_calls: 1, max_episodes: 1, max_reflections: 1, max_spend_usd: 2, max_wallclock_ms: 500 } }),
       verifyEvaluationReceipt: () => new Promise(() => {}),
       propose: async () => ({ status: "ok", candidate, cost_usd: 0, latency_ms: 1 }),
       evaluate: async (context) => ({ status: "ok", rows: gepaRows(1, 1, context), cost_usd: 0.3, latency_ms: 1 }),
