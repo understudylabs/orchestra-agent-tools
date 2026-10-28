@@ -1,7 +1,7 @@
 {
   "name": "orchestra",
   "description": "Improve LLM apps and agents from real traces: capture evidence, build evals, optimize prompts/routes, compare models, run local models, and hand off to Orchestra.",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "author": {
     "name": "Orchestra"
   },

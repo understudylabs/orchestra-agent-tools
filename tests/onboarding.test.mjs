@@ -127,8 +127,11 @@ describe("runStart", () => {
     const text = stripAnsi(calls.printed.join("\n"));
     assert.match(text, /Opened a new ChatGPT · Codex chat in .*my app with the prompt filled in/);
     assert.match(text, /Press Enter in the new chat/);
+    // The box stays, with a step for when the link opens nothing useful.
+    assert.match(text, /╭─ Prompt · copied to your clipboard/);
+    assert.match(text, /No chat or no prompt\? Paste the prompt above/);
     // The link puts the chat in Codex and in the project already.
-    assert.doesNotMatch(text, /Switch to Codex|paste the prompt/);
+    assert.doesNotMatch(text, /Switch to Codex|paste the prompt into a new thread/);
     assert.deepEqual(calls.ran, []);
   });
 

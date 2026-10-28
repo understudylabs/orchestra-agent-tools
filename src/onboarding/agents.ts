@@ -106,7 +106,11 @@ export function startTargets(probe: AgentProbe): StartTarget[] {
       link: {
         url: (project, prompt) =>
           `codex://new?path=${encodeURIComponent(project)}&prompt=${encodeURIComponent(prompt)}`,
-        steps: ["Enable orchestra under Plugins if you haven't yet", "Press Enter in the new chat to send the prompt"],
+        steps: [
+          "Enable orchestra under Plugins if you haven't yet",
+          "Press Enter in the new chat to send the prompt",
+          "No chat or no prompt? Paste the prompt above into a new Codex thread",
+        ],
       },
     });
   }
