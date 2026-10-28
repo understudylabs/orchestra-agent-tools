@@ -126,8 +126,10 @@ Releases: bump `package.json`, `package-lock.json` and the eight plugin/adapter
 manifests together and date the CHANGELOG in a PR. Merging it is the release:
 `.github/workflows/release.yml` sees a version npm does not have, publishes
 through npm trusted publishing, tags the merge commit `vX.Y.Z` and creates the
-GitHub release from the CHANGELOG. Do not push the tag by hand. npm stages the release until a maintainer approves it with a
-passkey; agents cannot approve it, and never handle tokens or sign-in codes.
+GitHub release from the CHANGELOG. Do not push the tag by hand. The trusted
+publisher may publish directly, so the merge is the last check before users get
+it; npm can take several minutes to show a new version. Agents never handle
+tokens, passkeys or sign-in codes.
 
 ## Boundary
 
