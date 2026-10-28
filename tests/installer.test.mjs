@@ -1565,4 +1565,85 @@ describe("install.sh", () => {
     assert.match(script, /if local_models_supported; then\n\s+say "  \$\{G3\}2\.\$\{R\} Option 1 \+ local model lab/);
     assert.match(script, /Advanced: choose which coding agents get the plugin/);
   });
+
+  function runStepTwo(args, extraEnv = {}) {
+    const home = join(root, "home");
+    return spawnSync(
+      "bash",
+      ["-s", "--", "--non-interactive", "--only-step", "2", "--no-launch-agent", ...args, "--lab", join(root, "lab")],
+      {
+        cwd: process.cwd(),
+        input: readFileSync("install.sh", "utf8"),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CI: "1",
+          UNDERSTUDY_INSTALL_FROM_CWD: "1",
+          HOME: home,
+          HERMES_HOME: join(home, ".hermes"),
+          UNDERSTUDY_INSTALL_LOG_DIR: join(root, "logs"),
+          ...extraEnv,
+        },
+      },
+    );
+  }
+
+  it("summarizes OpenCode skill conflicts in one warning and replaces dead links", () => {
+    const skillRoot = join(root, "home", ".config", "opencode", "skills");
+    mkdirSync(skillRoot, { recursive: true });
+    for (const name of ["onboard", "ladder", "watch-logs"]) {
+      mkdirSync(join(skillRoot, name));
+      writeFileSync(join(skillRoot, name, "SKILL.md"), "# an older copy\n");
+    }
+    symlinkSync(join(root, "gone", "skills", "instrument"), join(skillRoot, "instrument"));
+
+    const result = runStepTwo(["--agents", "opencode"]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.doesNotMatch(result.stdout, /OpenCode skill already exists at/);
+    assert.match(result.stdout, /3 OpenCode skills already exist in .* as folders or links this installer did not create/);
+    assert.match(result.stdout, /mkdir -p .*skills\.bak.* while read -r s; do mv /);
+    const conflicts = readFileSync(join(root, "lab", "install-state", "opencode-skill-conflicts.txt"), "utf8");
+    assert.deepEqual(conflicts.trim().split("\n").sort(), ["ladder", "onboard", "watch-logs"]);
+    // The user's folders are untouched; the dead link now points at the current skill.
+    assert.equal(readFileSync(join(skillRoot, "onboard", "SKILL.md"), "utf8"), "# an older copy\n");
+    assert.equal(readlinkSync(join(skillRoot, "instrument")), join(process.cwd(), "skills", "instrument"));
+  });
+
+  it("repoints a Hermes stable skills link whose target no longer exists", () => {
+    const stableLink = join(root, "home", ".understudy", "skills");
+    mkdirSync(dirname(stableLink), { recursive: true });
+    symlinkSync(join(root, "old-worktree", "skills"), stableLink);
+
+    const result = runStepTwo(["--agents", "hermes"]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.doesNotMatch(result.stdout + result.stderr, /unexpected symlink/);
+    assert.equal(readlinkSync(stableLink), join(process.cwd(), "skills"));
+    assert.ok(readFileSync(join(root, "home", ".hermes", "config.yaml"), "utf8").includes(stableLink));
+  });
+
+  it("keeps quiet output to results while the log keeps the detail", () => {
+    const result = runStepTwo(["--agents", "cursor"], { UNDERSTUDY_INSTALL_OUTPUT: "quiet" });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.doesNotMatch(result.stdout, /Installing the Orchestra Cursor plugin from/);
+    assert.doesNotMatch(result.stdout, /Orchestra Cursor plugin linked at/);
+    assert.match(result.stdout, /Adapter summary/);
+    assert.match(result.stdout, /cursor: plugin linked/);
+    assert.match(result.stdout, /Full install log: /);
+    const logs = readdirSync(join(root, "logs")).map((name) => readFileSync(join(root, "logs", name), "utf8")).join("\n");
+    assert.match(logs, /Installing the Orchestra Cursor plugin from/);
+    assert.match(logs, /Orchestra Cursor plugin linked at/);
+  });
+
+  it("prints a paste-ready prompt for coding agent apps", () => {
+    const result = runStepTwo(["--agents", "cursor"]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Paste into your coding agent/);
+    assert.match(result.stdout, /Use the Orchestra onboarding skill for this project\./);
+    // Signed out: the prompt asks the agent to send the person to `orchestra login`.
+    assert.match(result.stdout, /ask me to run `orchestra login` in my terminal/);
+  });
 });

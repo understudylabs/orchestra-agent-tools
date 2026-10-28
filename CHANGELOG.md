@@ -15,6 +15,18 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Changed
+
+- **Shorter installer output.** In an interactive terminal the installer now
+  prints one line per step, the coding-agent summary and next steps; the
+  detail goes to the install log (`--verbose` shows everything, and scripts
+  and CI keep the full output). It ends with a paste-ready prompt for coding
+  agent apps, copied to the clipboard when Claude Code is not opened. Existing
+  OpenCode skill folders the installer did not create get one summary warning
+  with a move-aside command instead of a line each, and links to folders that
+  no longer exist (OpenCode skills, Hermes `~/.understudy/skills`) are
+  repointed.
+
 ## [0.7.0] — 2026-10-27
 
 First release as Orchestra, and the first published to npm as
