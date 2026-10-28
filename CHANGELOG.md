@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Fixed
+
+- The installer no longer stops with "too many arguments" when npm still serves
+  a CLI without `orchestra init`. It now checks that the CLI lists an `init`
+  command before handing off, and falls back to its own steps otherwise.
+
 ## [0.8.0] — 2026-10-28
 
 ### Added
