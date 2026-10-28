@@ -1,7 +1,15 @@
 {
   "name": "@orchestraai/agent-tools",
   "version": "0.7.0",
-  "description": "Public Understudy agent tools CLI and skill library.",
+  "description": "Orchestra agent tools: the orchestra CLI and coding-agent skill library.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/understudylabs/orchestra-agent-tools.git"
+  },
+  "homepage": "https://github.com/understudylabs/orchestra-agent-tools#readme",
+  "bugs": {
+    "url": "https://github.com/understudylabs/orchestra-agent-tools/issues"
+  },
   "type": "module",
   "bin": {
     "orchestra": "dist/bin.js",
