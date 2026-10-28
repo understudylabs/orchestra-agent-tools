@@ -15,6 +15,18 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-10-28
+
+### Changed
+
+- **Starting in ChatGPT · Codex opens a new Codex chat in your project with the
+  prompt filled in.** `orchestra start` uses the `codex://new` link the ChatGPT
+  app supports, so you only press Enter; if the link can't open, it falls back
+  to opening the app with paste steps.
+- **The prompt sits in a box.** For desktop apps and "Another app", the prompt
+  is shown in a bordered block under the clipboard note, so it stands apart
+  from the steps and is easy to copy by hand.
+
 ### Fixed
 
 - The installer no longer stops with "too many arguments" when npm still serves
