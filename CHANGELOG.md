@@ -15,6 +15,8 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-28
+
 ### Added
 
 - **`orchestra init` and `orchestra start`.** For a person at a terminal the
@@ -49,6 +51,18 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
   `--agents hermes` still does, with a deprecation notice, and existing
   installs are left alone. `orchestra platforms` reports them as
   `deprecated`. They will be removed in a future release.
+
+### Fixed
+
+- **Installer and npm stand-ins.** The installer only installs an npm release
+  that ships the `orchestra` command, so a staged-publish stand-in
+  (`0.0.0-stage`) or another pre-release can no longer replace a working
+  install; it builds from source instead.
+- **Package provenance.** `package.json` names the GitHub repository, which
+  npm requires to accept a provenance-signed publish; the package smoke check
+  now fails without it.
+- **Experimental-SQLite warning.** CLI commands no longer print Node's
+  "SQLite is an experimental feature" warning.
 
 ## [0.7.0] — 2026-10-27
 
