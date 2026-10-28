@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// First, so an old Node gets one sentence instead of a stack trace.
+import "./node-guard.js";
 import { migrateGlobalHome } from "./config/paths.js";
 
 const INTERNAL_CONVERSATION_SIDECAR_ARG = "__understudy_conversation_sidecar__";

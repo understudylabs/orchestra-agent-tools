@@ -65,6 +65,8 @@ import { registerExperimentsCommands, registerNextCommand } from "./commands/exp
 import { daemonStatus } from "./internal/daemon.js";
 import { readCliVersion, readManifestVersions } from "./internal/version.js";
 import { installedPackageRoot } from "./internal/package-root.js";
+import { MIN_NODE, nodeVersionOk } from "./node-version.js";
+import { systemAgentProbe } from "./onboarding/agents.js";
 
 export {
   PREFERENCE_REJECTION_CLASSES,
@@ -361,6 +363,9 @@ async function printDoctorJson(): Promise<void> {
         repo: "orchestra-agent-tools",
         runtime: "node",
         node: process.version,
+        // Informational, like the daemon: what the installer and onboarding
+        // need, so a support question starts from one command.
+        prerequisites: prerequisites(),
         versions,
         versions_consistent: versionsConsistent,
         missing,
@@ -375,6 +380,25 @@ async function printDoctorJson(): Promise<void> {
   if (missing.length > 0 || !versionsConsistent) {
     process.exitCode = 1;
   }
+}
+
+function prerequisites(): Record<string, unknown> {
+  const probe = systemAgentProbe();
+  const appleSilicon = process.platform === "darwin" && process.arch === "arm64";
+  return {
+    node: { version: process.versions.node, required: MIN_NODE, ok: nodeVersionOk(process.versions.node) },
+    npm: probe.hasCommand("npm"),
+    git: probe.hasCommand("git"),
+    coding_agents: {
+      claude_code: probe.hasCommand("claude"),
+      codex: probe.hasCommand("codex") || probe.hasApp("ChatGPT") || probe.hasApp("Codex"),
+      cursor: probe.hasCommand("cursor") || probe.hasApp("Cursor"),
+    },
+    local_models: appleSilicon
+      ? { supported: true, uv: probe.hasCommand("uv") }
+      : { supported: false, reason: "local models need a Mac with Apple Silicon" },
+    clipboard: ["pbcopy", "wl-copy", "xclip"].some((name) => probe.hasCommand(name)),
+  };
 }
 
 function printJson(payload: unknown): void {

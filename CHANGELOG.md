@@ -15,15 +15,38 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-10-28
+
+### Added
+
+- **The installer checks prerequisites before it changes anything.** It needs
+  macOS or Linux and Node 22.19 or newer with npm; anything missing is listed
+  in one "Before you install" block with the fix for this machine (Homebrew,
+  nvm, fnm, Volta, or nodejs.org), and the installer stops with nothing
+  installed. A person at a terminal with Homebrew is offered `brew install node`
+  (or `brew upgrade node`); `--yes` and scripts never install Node.
+- **`orchestra doctor` lists prerequisites:** Node (version and minimum), npm,
+  git, the coding agents it can find, local-model support and uv, and a
+  clipboard tool. They are informational and do not fail the doctor.
+
+### Fixed
+
+- **On a Node older than 22.19 the CLI says so instead of crashing.** npm only
+  warns about the engines field, so an old Node still got the CLI installed and
+  every command then failed with a stack trace (`node:sqlite` needs Node 22.5).
+  The CLI now checks the version first and names the update command.
+- The installer said "Install Node.js 20+"; Orchestra needs Node 22.19.
+- After the Codex link opens, the steps say what to do if the chat opens
+  without the prompt: paste it from the box (it is on the clipboard too).
+
 ## [0.8.1] — 2026-10-28
 
 ### Changed
 
 - **Starting in ChatGPT · Codex opens a new Codex chat in your project with the
   prompt filled in.** `orchestra start` uses the `codex://new` link the ChatGPT
-  app supports, so you only press Enter. The prompt is still shown and copied,
-  with a step to paste it if the chat opens without it; if the link can't open
-  at all, it falls back to opening the app with paste steps.
+  app supports, so you only press Enter; if the link can't open, it falls back
+  to opening the app with paste steps.
 - **The prompt sits in a box.** For desktop apps and "Another app", the prompt
   is shown in a bordered block under the clipboard note, so it stands apart
   from the steps and is easy to copy by hand.

@@ -2140,10 +2140,119 @@ launch_selected_agent() {
   fi
 }
 
-need npm || {
-  say "npm is required. Install Node.js 20+ first: https://nodejs.org"
-  exit 1
+# ── prerequisites ────────────────────────────────────────────────────
+# Checked before anything is installed, and reported together with the fix
+# for this machine, so a missing prerequisite costs one rerun. Node is never
+# installed silently: a person at a terminal is offered `brew install node`.
+MIN_NODE="22.19.0" # keep in step with engines.node and src/node-version.ts
+
+version_at_least() {
+  local have="$1" need="$2" a b i
+  local IFS=.
+  # shellcheck disable=SC2206
+  a=($have)
+  # shellcheck disable=SC2206
+  b=($need)
+  for i in 0 1 2; do
+    [ "${a[$i]:-0}" -gt "${b[$i]:-0}" ] 2>/dev/null && return 0
+    [ "${a[$i]:-0}" -lt "${b[$i]:-0}" ] 2>/dev/null && return 1
+  done
+  return 0
 }
+
+node_version() {
+  node -p 'process.versions.node' 2>/dev/null
+}
+
+# The command that updates Node the way it was installed.
+node_update_hint() {
+  local path
+  path="$(command -v node 2>/dev/null)"
+  path="$(readlink "$path" 2>/dev/null || printf '%s' "$path")"
+  case "$path" in
+    */.nvm/*) printf 'nvm install 22 && nvm alias default 22' ;;
+    */fnm/*|*/.fnm/*) printf 'fnm install 22 && fnm default 22' ;;
+    */.volta/*) printf 'volta install node@22' ;;
+    /opt/homebrew/*|/usr/local/Cellar/*|/usr/local/opt/*) printf 'brew upgrade node' ;;
+    *) node_install_hint ;;
+  esac
+}
+
+node_install_hint() {
+  if need brew; then
+    printf 'brew install node'
+  else
+    printf 'install Node 22 from https://nodejs.org'
+  fi
+}
+
+PREFLIGHT_PROBLEMS=()
+PREFLIGHT_NODE=""
+
+# Fills PREFLIGHT_PROBLEMS with "problem<TAB>fix" lines; PREFLIGHT_NODE says
+# what is wrong with Node (missing / old), if anything.
+collect_prerequisites() {
+  local os version
+  PREFLIGHT_PROBLEMS=()
+  PREFLIGHT_NODE=""
+  os="$(uname -s 2>/dev/null)"
+  case "$os" in
+    Darwin|Linux) ;;
+    *) PREFLIGHT_PROBLEMS+=("Orchestra runs on macOS and Linux; this is ${os:-an unknown system}."$'\t'"On Windows, run the installer inside WSL: https://learn.microsoft.com/windows/wsl/install") ;;
+  esac
+  if ! need node; then
+    PREFLIGHT_NODE="missing"
+    PREFLIGHT_PROBLEMS+=("Node.js is not installed. Orchestra needs Node $MIN_NODE or newer."$'\t'"$(node_install_hint)")
+  else
+    version="$(node_version)"
+    if ! version_at_least "${version:-0}" "$MIN_NODE"; then
+      PREFLIGHT_NODE="old"
+      PREFLIGHT_PROBLEMS+=("Node ${version:-of unknown version} is too old. Orchestra needs Node $MIN_NODE or newer."$'\t'"$(node_update_hint)")
+    elif ! need npm; then
+      PREFLIGHT_PROBLEMS+=("npm is missing; it normally comes with Node."$'\t'"Reinstall Node: $(node_install_hint)")
+    fi
+  fi
+}
+
+# A person at a terminal with Homebrew can have Node installed or updated
+# for them, after saying yes. --yes and scripts never install Node.
+offer_node_with_homebrew() {
+  local verb
+  [ -n "$PREFLIGHT_NODE" ] || return 1
+  need brew || return 1
+  [ "$YES" = "0" ] || return 1
+  noninteractive_enabled && return 1
+  { : </dev/tty >/dev/tty; } 2>/dev/null || return 1
+  # An old Node from a version manager is updated there, not with brew.
+  case "$PREFLIGHT_NODE:$(node_update_hint)" in
+    missing:*) verb="install" ;;
+    "old:brew upgrade node") verb="upgrade" ;;
+    *) return 1 ;;
+  esac
+  confirm_default_yes "Orchestra needs Node $MIN_NODE or newer. Run brew $verb node now?" || return 1
+  run_logged "brew $verb node" brew "$verb" node || return 1
+  hash -r
+  return 0
+}
+
+check_prerequisites() {
+  local entry
+  collect_prerequisites
+  [ "${#PREFLIGHT_PROBLEMS[@]}" -eq 0 ] && return 0
+  if offer_node_with_homebrew; then
+    collect_prerequisites
+    [ "${#PREFLIGHT_PROBLEMS[@]}" -eq 0 ] && return 0
+  fi
+  section "Before you install"
+  for entry in "${PREFLIGHT_PROBLEMS[@]}"; do
+    fail_line "${entry%%$'\t'*}"
+    say "    Fix: ${entry#*$'\t'}"
+  done
+  say "Nothing was installed. Run the installer again once these are fixed."
+  return 1
+}
+
+check_prerequisites || exit 1
 
 validate_agent_platforms || exit 2
 configure_resume

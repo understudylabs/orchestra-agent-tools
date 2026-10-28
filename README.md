@@ -30,8 +30,11 @@ CLI alias, and rerunning the installer replaces the old `understudy` plugin).
 curl -fsSL https://raw.githubusercontent.com/understudylabs/orchestra-agent-tools/main/install.sh | bash
 ```
 
-You need Node.js 22+ (for npm). The installer installs the CLI, then hands
-over to `orchestra init`, a short guided setup:
+You need macOS or Linux (on Windows, use WSL) and Node.js 22.19 or newer. The
+installer checks both before it changes anything and tells you the fix for your
+machine; with Homebrew it offers to install Node for you. Run `orchestra doctor`
+any time to see what Orchestra can find. The installer then installs the CLI
+and hands over to `orchestra init`, a short guided setup:
 
 1. **What to set up:** Orchestra account + coding-agent plugin (recommended),
    the same plus the local model lab (Apple Silicon: the Orchestra 2B model,

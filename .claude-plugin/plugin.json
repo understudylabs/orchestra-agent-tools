@@ -1,7 +1,7 @@
 {
   "name": "orchestra",
   "description": "Improve LLM apps and agents from real traces — reduce cost/latency, raise quality/reliability, capture traces, build evals, run local optimization (GEPA), compare models/providers, and route through Orchestra.",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "author": {
     "name": "Orchestra"
   },
