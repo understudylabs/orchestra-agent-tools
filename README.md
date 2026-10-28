@@ -11,7 +11,7 @@ measured, cheaper — often local — model, with evidence you can trust.**
 [![Skills](https://img.shields.io/badge/skill%20library-skills%2F-2ea44f)](skills/README.md)
 [![Backed by Y Combinator](https://img.shields.io/badge/backed%20by-Y%20Combinator-F0652F)](https://www.ycombinator.com)
 
-Works with **Claude Code** · **Cursor** · **Codex** · **OpenCode** · **Hermes Agent** · **Devin**
+Works with **Claude Code** · **Cursor** · **Codex** · **Devin** (OpenCode and Hermes Agent: deprecated)
 
 </div>
 
@@ -36,7 +36,8 @@ You need Node.js 20+ (for npm). The installer asks one question:
    installs the CLI, signs you in to your Orchestra account right in the
    terminal (we email a one-time code; an existing sign-in is kept), and
    installs the plugin into every coding agent it detects: Claude Code,
-   Cursor, Codex, OpenCode, Hermes Agent, Devin.
+   Cursor, Codex, Devin. OpenCode and Hermes Agent are deprecated and only
+   installed when named with `--agents`.
 2. **Option 1 + local model lab** (Apple Silicon only). Also starts the
    managed MLX runtime install and the Orchestra 2B model download (about 3.6 GB,
    our MLX build of Gemma 4 E2B) in
@@ -193,8 +194,8 @@ the agent-run install/update/verify flow for every platform.
 | Claude Code | Autodetected when `claude` is on `PATH`; installs the local Claude plugin. | Run `/reload-plugins`, then `/orchestra:onboard`. |
 | Cursor | Autodetected when Cursor is present; links this repo into `~/.cursor/plugins/local/orchestra`. | Restart Cursor or run **Developer: Reload Window**, then ask Cursor Agent to use the Understudy onboarding skill. |
 | Codex | Autodetected when `codex` is on `PATH`; registers the local Codex marketplace from `.agents/plugins/marketplace.json`. | Run `/plugins`, choose `orchestra-skills`, install or enable `orchestra`, then start a new thread if needed. |
-| OpenCode | Autodetected when `opencode` is on `PATH` or OpenCode config/data exists; links the shared skills into `~/.config/opencode/skills`. | Restart OpenCode or open a new TUI session, then run `/orchestra-onboard`. |
-| Hermes Agent | Autodetected when `hermes` is on `PATH` or `~/.hermes` exists; registers a stable `~/.understudy/skills` symlink in `skills.external_dirs`. | Run `/reload-skills` (or start a new `hermes` session), then `/onboard` or ask Hermes to use the Understudy onboarding skill. |
+| OpenCode (deprecated) | Installed only with `--agents opencode`; links the shared skills into `~/.config/opencode/skills`. | Restart OpenCode or open a new TUI session, then run `/orchestra-onboard`. |
+| Hermes Agent (deprecated) | Installed only with `--agents hermes`; registers a stable `~/.understudy/skills` symlink in `skills.external_dirs`. | Run `/reload-skills` (or start a new `hermes` session), then `/onboard` or ask Hermes to use the Orchestra onboarding skill. |
 | Devin | Autodetected when the `DEVIN` or `DEVIN_SESSION_ID` env var is set or `~/.devin` exists; the installer builds the GitHub source and links the CLI globally. | Ask Devin: *Use the Understudy onboarding skill for this project.* |
 
 Every path is local-only: installing an adapter does not authenticate, upload

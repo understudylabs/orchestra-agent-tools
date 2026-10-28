@@ -15,6 +15,28 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Changed
+
+- **Shorter installer output.** In an interactive terminal the installer now
+  prints one line per step and keeps problems for a single "Needs attention"
+  block at the end; the detail goes to the install log (`--verbose` shows
+  everything, and scripts and CI keep the full output). It ends with one
+  "Start onboarding" box: the prompt to paste into any coding agent (copied to
+  the clipboard), what each installed agent needs first, and an offer to start
+  Claude Code or Codex here with that prompt. Existing
+  OpenCode skill folders the installer did not create get one summary warning
+  with a move-aside command instead of a line each, and links to folders that
+  no longer exist (OpenCode skills, Hermes `~/.understudy/skills`) are
+  repointed.
+
+### Deprecated
+
+- **OpenCode and Hermes Agent adapters.** The installer no longer installs
+  them by default or with `--agents all`; `--agents opencode` or
+  `--agents hermes` still does, with a deprecation notice, and existing
+  installs are left alone. `orchestra platforms` reports them as
+  `deprecated`. They will be removed in a future release.
+
 ## [0.7.0] — 2026-10-27
 
 First release as Orchestra, and the first published to npm as

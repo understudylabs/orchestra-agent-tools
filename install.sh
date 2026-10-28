@@ -39,6 +39,13 @@ INSTALL_VERSION="${UNDERSTUDY_INSTALL_VERSION:-latest}"
 ADVANCED=0
 SETUP_CHOSEN=0
 SETUP_MENU_ANSWERED=0
+# quiet (person at a terminal: one line per step, detail in the log) or
+# verbose (everything; the default for --yes, --non-interactive and CI).
+OUTPUT_MODE="${UNDERSTUDY_INSTALL_OUTPUT:-}"
+QUIET_RUN=0
+QUIET_DETAIL=0
+# 1 when a person is at the terminal (no --yes, --non-interactive or CI).
+HUMAN_RUN=0
 NO_CLAUDE=0
 START_STEP=1
 ONLY_STEP=""
@@ -64,6 +71,7 @@ while [ "$#" -gt 0 ]; do
     --local-models) LOCAL_MODELS=1; SETUP_CHOSEN=1 ;;
     --advanced) ADVANCED=1 ;;
     --from-source) INSTALL_FROM_SOURCE=1 ;;
+    --verbose) OUTPUT_MODE=verbose ;;
     --from-step) START_STEP="${2:?missing step number}"; shift ;;
     --only-step) ONLY_STEP="${2:?missing step number}"; shift ;;
     --resume) RESUME=1 ;;
@@ -95,6 +103,7 @@ Options:
                         Orchestra 2B model download (about 3.6 GB) in the background
   --advanced            choose which coding agents get the plugin
   --from-source         build the CLI from the GitHub source instead of npm
+  --verbose             print every step (the default outside an interactive terminal)
   --lower-my-ant-bill   focus onboarding on lowering Anthropic/Claude API spend
   --lower-my-anthropic-bill
                         alias for --lower-my-ant-bill
@@ -128,6 +137,7 @@ Environment overrides:
   UNDERSTUDY_INSTALL_PACKAGE     optional npm package spec override
   UNDERSTUDY_INSTALL_VERSION     npm version or dist-tag to install, default latest
   UNDERSTUDY_INSTALL_FROM_SOURCE set to 1 to build from the GitHub source instead of npm
+  UNDERSTUDY_INSTALL_OUTPUT      quiet or verbose; default quiet in an interactive terminal
   UNDERSTUDY_INSTALL_FROM_CWD    set to 1 to install agent adapters from a checkout in the current directory
   UNDERSTUDY_NONINTERACTIVE      set to 1 to use safe defaults without prompting
   UNDERSTUDY_REQUIRE_CONFIRM     set to 1 to fail when no prompt TTY exists
@@ -195,7 +205,10 @@ else
 fi
 
 log() { printf '%s %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$*" >>"$LOG_FILE"; }
+# While QUIET_DETAIL is 1, say and ok only reach the install log; warnings and
+# failures always print.
 say() {
+  if [ "${QUIET_DETAIL:-0}" = "1" ]; then log "$*"; return 0; fi
   if [ "$FANCY" = "1" ]; then
     printf '  %s│%s %s\n' "$D" "$R" "$*"
   else
@@ -218,6 +231,7 @@ redact_url() {
   printf '%s\n' "$*" | sed -E 's#(://)[^/@[:space:]]+@#\1<redacted>@#g'
 }
 ok() {
+  if [ "${QUIET_DETAIL:-0}" = "1" ]; then log "$*"; return 0; fi
   if [ "$FANCY" = "1" ]; then
     printf '  %s✓%s %s\n' "$OKC" "$R" "$*"
   else
@@ -258,6 +272,47 @@ section() {
     printf '\n\033[1morchestra\033[0m %s\n' "$*"
   fi
   log "$*"
+}
+# Step headers are structure for logs; a person sees one line per step.
+step_section() {
+  if [ "${QUIET_RUN:-0}" = "1" ]; then log "$*"; return 0; fi
+  section "$@"
+}
+ok_unlogged() {
+  if [ "$FANCY" = "1" ]; then
+    printf '  %s✓%s %s\n' "$OKC" "$R" "$*"
+  else
+    printf '\033[1morchestra\033[0m %s\n' "$*"
+  fi
+}
+# Something the person should act on. In quiet runs it is collected and shown
+# once, in a "Needs attention" block at the end, so problems never interleave
+# with progress; otherwise it prints as a warning right away.
+ATTENTION_TEXT=""
+ATTENTION_COUNT=0
+attention() {
+  local message="$1" fix="${2:-}"
+  log "ATTENTION $message${fix:+ | $fix}"
+  if [ "${QUIET_RUN:-0}" = "1" ]; then
+    ATTENTION_COUNT=$((ATTENTION_COUNT + 1))
+    ATTENTION_TEXT="${ATTENTION_TEXT}${message}
+${fix}
+"
+    return 0
+  fi
+  warn "$message"
+  [ -z "$fix" ] || say "$fix"
+}
+print_attention() {
+  local message fix
+  [ "$ATTENTION_COUNT" -gt 0 ] || return 0
+  section "Needs attention"
+  while IFS= read -r message && IFS= read -r fix; do
+    warn "$message"
+    [ -z "$fix" ] || say "  $fix"
+  done <<ATTENTION
+$ATTENTION_TEXT
+ATTENTION
 }
 banner() {
   if [ "$FANCY" != "1" ]; then
@@ -381,6 +436,19 @@ validate_agent_platforms() {
     fail_line "Agent adapter mode '$mode' cannot be combined with other values. Use '$mode' alone, or use a comma list like claude-code,cursor."
     return 1
   fi
+}
+# Like agent_platform_requested, but "all" does not count.
+agent_platform_named() {
+  local wanted token
+  wanted="$(normalize_agent_platform "$1")"
+  set -f
+  # shellcheck disable=SC2046
+  set -- $(printf '%s\n' "$AGENT_PLATFORMS" | tr ',;' '  ')
+  set +f
+  for token in "$@"; do
+    [ "$(normalize_agent_platform "$token")" = "$wanted" ] && return 0
+  done
+  return 1
 }
 agent_platform_requested() {
   local wanted token normalized
@@ -536,10 +604,10 @@ select_agent_platforms() {
   say "  ${G2}1.${R} $(detected_agent_label "claude-code" "Claude Code")"
   say "  ${G3}2.${R} $(detected_agent_label "cursor" "Cursor")"
   say "  ${G4}3.${R} $(detected_agent_label "codex" "Codex")"
-  say "  ${G5}4.${R} $(detected_agent_label "opencode" "OpenCode")"
-  say "  ${G6}5.${R} $(detected_agent_label "hermes" "Hermes Agent")"
+  say "  ${G5}4.${R} $(detected_agent_label "opencode" "OpenCode") ${D}(deprecated)${R}"
+  say "  ${G6}5.${R} $(detected_agent_label "hermes" "Hermes Agent") ${D}(deprecated)${R}"
   say "  ${G6}6.${R} $(detected_agent_label "devin" "Devin")"
-  say "  ${G6}7.${R} All detected coding agents"
+  say "  ${G6}7.${R} All detected coding agents ${D}(except deprecated ones)${R}"
   say "  ${G6}8.${R} CLI only, no coding-agent plugins"
   say "Press Enter for: all detected coding agents."
 
@@ -587,19 +655,19 @@ should_install_codex_adapter() {
   esac
   agent_platform_requested "codex"
 }
+# OpenCode and Hermes are deprecated: neither auto nor all installs them, but
+# naming one in --agents still does.
 should_install_opencode_adapter() {
   case "$(normalize_agent_platform "$AGENT_PLATFORMS")" in
-    none) return 1 ;;
-    auto) detect_opencode; return ;;
+    none|auto) return 1 ;;
   esac
-  agent_platform_requested "opencode"
+  agent_platform_named "opencode"
 }
 should_install_hermes_adapter() {
   case "$(normalize_agent_platform "$AGENT_PLATFORMS")" in
-    none) return 1 ;;
-    auto) detect_hermes; return ;;
+    none|auto) return 1 ;;
   esac
-  agent_platform_requested "hermes"
+  agent_platform_named "hermes"
 }
 should_install_devin_adapter() {
   case "$(normalize_agent_platform "$AGENT_PLATFORMS")" in
@@ -687,10 +755,70 @@ manual_adapter_instructions() {
   say "  Devin:       cloud-based, no local install — ask Devin to use the Orchestra onboarding skill for this project"
   say "Or rerun this installer with an explicit adapter, e.g.: --agents claude-code"
 }
+agent_display_name() {
+  case "$1" in
+    claude-code) printf 'Claude Code' ;;
+    cursor) printf 'Cursor' ;;
+    codex) printf 'Codex' ;;
+    opencode) printf 'OpenCode' ;;
+    hermes) printf 'Hermes' ;;
+    devin) printf 'Devin' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# One line for a person: which agents got the plugin. Failures go to Needs
+# attention; agents that simply aren't on this machine only reach the log.
+summarize_agent_adapters_quiet() {
+  local name status reason names="" installed=0 unmet=0 selection
+  selection="$(normalize_agent_platform "$AGENT_PLATFORMS")"
+  while IFS='|' read -r name status reason; do
+    [ -n "$name" ] || continue
+    log "adapter $name: $status — $reason"
+    case "$status" in
+      installed)
+        installed=$((installed + 1))
+        names="${names:+$names, }$(agent_display_name "$name")"
+        ;;
+      failed)
+        unmet=$((unmet + 1))
+        attention "The $(agent_display_name "$name") plugin did not install: $reason." "Details are in $LOG_FILE."
+        ;;
+      disabled) ;;
+      *)
+        case "$selection" in
+          auto|all) [ "$reason" = "not selected or not detected" ] || unmet=$((unmet + 1)) ;;
+          *)
+            if adapter_explicitly_requested "$name"; then
+              unmet=$((unmet + 1))
+              attention "The $(agent_display_name "$name") plugin was skipped: $reason."
+            fi
+            ;;
+        esac
+        ;;
+    esac
+  done <<ADAPTERS
+$ADAPTER_RESULTS
+ADAPTERS
+  ADAPTERS_INSTALLED_COUNT="$installed"
+  ADAPTERS_UNMET_COUNT="$unmet"
+  if [ "$installed" -gt 0 ]; then
+    ok "Plugin installed: $names"
+  elif [ "$selection" != "none" ]; then
+    fail_line "No coding-agent plugin was installed; the Orchestra skills are not available in any coding agent yet."
+    manual_adapter_instructions
+  fi
+}
+
 summarize_agent_adapters() {
   local name status reason installed=0 unmet=0 selection
   selection="$(normalize_agent_platform "$AGENT_PLATFORMS")"
   ADAPTERS_ATTEMPTED=1
+  QUIET_DETAIL=0
+  if [ "$QUIET_RUN" = "1" ]; then
+    summarize_agent_adapters_quiet
+    return 0
+  fi
   say ""
   say "${B}Adapter summary${R}"
   while IFS='|' read -r name status reason; do
@@ -700,7 +828,12 @@ summarize_agent_adapters() {
       failed) fail_line "$name: failed — $reason"; unmet=$((unmet + 1)) ;;
       disabled) say "$name: skipped — $reason" ;;
       *)
-        say "$name: skipped — $reason"
+        # Agents that simply aren't on this machine are noise for a person.
+        if [ "$QUIET_RUN" = "1" ] && [ "$reason" = "not selected or not detected" ]; then
+          log "$name: skipped — $reason"
+        else
+          say "$name: skipped — $reason"
+        fi
         # A skip counts as an unmet adapter when it was a real candidate:
         # any candidate under auto/all, or an explicitly requested adapter.
         # Skips of adapters the user never asked for don't count, and
@@ -1016,6 +1149,10 @@ prepare_agent_first_signin() {
     existing_email="$(credentials_email)"
     remember_known_email "$existing_email" "existing Orchestra credentials"
     if [ "$KEEP_LOGIN" = "1" ]; then
+      if [ "$QUIET_RUN" = "1" ]; then
+        if [ -n "$KNOWN_EMAIL" ]; then ok_unlogged "Signed in as $KNOWN_EMAIL"; else ok "Signed in to Orchestra"; fi
+        return 0
+      fi
       section "Orchestra account"
       if [ -n "$KNOWN_EMAIL" ]; then
         say_unlogged "Already signed in as $KNOWN_EMAIL; keeping that sign-in."
@@ -1131,7 +1268,7 @@ start_local_model_lab() {
     warn "The orchestra command is not on PATH; skipping the local model lab."
     return 0
   fi
-  section "Local model lab"
+  step_section "Local model lab"
   private_mkdir "$LOG_DIR"
   private_mkdir "$STATE_DIR"
   runtime_log="$LOG_DIR/mlx-runtime-$(date -u +"%Y%m%dT%H%M%SZ").log"
@@ -1154,6 +1291,98 @@ start_local_model_lab() {
   say "Progress: tail -f \"$pull_log\""
   say "It keeps going if you close this terminal; onboarding picks it up when it finishes."
   LOCAL_MODEL_LAB_STARTED=1
+}
+
+# GUI coding agents (Cursor, Codex, the Claude desktop app, ...) cannot be
+# launched with a first message, so give the user the same one-line prompt
+# Claude Code would get, ready to paste.
+CLAUDE_LAUNCHED=0
+AGENT_LAUNCHED=0
+
+show_paste_prompt() {
+  [ "$ADAPTERS_ATTEMPTED" != "1" ] || [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ] || return 0
+  section "Paste into your coding agent"
+  say "In a coding agent app (Cursor, Codex, Claude desktop, OpenCode, ...), open this project in a new chat and paste:"
+  say_unlogged "  ${B}$INITIAL_CLAUDE_PROMPT${R}"
+}
+
+# Only when Claude Code is not opened here and a person is at the terminal:
+# the prompt is the next thing they need.
+copy_paste_prompt_to_clipboard() {
+  [ "$ADAPTERS_ATTEMPTED" != "1" ] || [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ] || return 0
+  [ "$YES" = "0" ] || return 0
+  noninteractive_enabled && return 0
+  { : </dev/tty >/dev/tty; } 2>/dev/null || return 0
+  need pbcopy || return 0
+  if printf '%s' "$INITIAL_CLAUDE_PROMPT" | pbcopy 2>/dev/null; then
+    ok "Copied the prompt to your clipboard."
+  fi
+}
+
+# The ending for a person at a terminal: what to paste into any coding agent
+# (copied to the clipboard), the one thing each installed agent needs first,
+# and an offer to start a terminal agent here with that prompt.
+start_onboarding() {
+  local copied="" first="" choices="" n=0 answer pick=""
+  [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ] || return 0
+  if need pbcopy && printf '%s' "$INITIAL_CLAUDE_PROMPT" | pbcopy 2>/dev/null; then
+    copied=" (copied to your clipboard)"
+  fi
+  section "Start onboarding"
+  say "Paste into your coding agent$copied:"
+  say_unlogged "  ${B}$INITIAL_CLAUDE_PROMPT${R}"
+  adapter_installed "claude-code" && first="${first:+$first · }Claude Code already open → /reload-plugins"
+  adapter_installed "cursor" && first="${first:+$first · }Cursor → Developer: Reload Window"
+  adapter_installed "codex" && first="${first:+$first · }Codex → enable orchestra in /plugins"
+  adapter_installed "opencode" && first="${first:+$first · }OpenCode → new session"
+  adapter_installed "hermes" && first="${first:+$first · }Hermes → /reload-skills"
+  [ -z "$first" ] || say "${D}First: $first${R}"
+
+  if ! should_run_step 3 || [ "$LAUNCH_CLAUDE" != "1" ]; then
+    mark_step_done 3
+    return 0
+  fi
+  if adapter_installed "claude-code" && [ "$NO_CLAUDE" = "0" ] && need claude; then
+    n=$((n + 1)); choices="${choices}${n}:claude "
+  fi
+  if adapter_installed "codex" && need codex; then
+    n=$((n + 1)); choices="${choices}${n}:codex "
+  fi
+  if [ "$n" -eq 0 ]; then
+    mark_step_done 3
+    return 0
+  fi
+  local line="Or start one here:" item
+  for item in $choices; do
+    line="$line   ${item%%:*}. $(agent_display_name "$( [ "${item#*:}" = claude ] && echo claude-code || echo "${item#*:}")")"
+  done
+  say "$line"
+  printf "  %s?%s Start %s[1, or n to finish]%s " "$G4" "$R" "$D" "$R" >/dev/tty 2>/dev/null || { mark_step_done 3; return 0; }
+  read -r answer </dev/tty 2>/dev/null || answer="n"
+  case "$answer" in
+    n|N|no|NO) mark_step_done 3; return 0 ;;
+    "") answer=1 ;;
+  esac
+  for item in $choices; do
+    [ "${item%%:*}" = "$answer" ] && pick="${item#*:}"
+  done
+  case "$pick" in
+    claude)
+      LAUNCH_CONFIRMED=1
+      launch_claude_code
+      ;;
+    codex)
+      say "Opening Codex here. If it can't find the Orchestra skill yet, enable orchestra in /plugins and send the prompt again."
+      log "LAUNCH codex <initial-prompt>"
+      AGENT_LAUNCHED=1
+      codex "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || say "Codex exited with status $?."
+      mark_step_done 3
+      ;;
+    *)
+      say "No agent started. Paste the prompt into your coding agent when you're ready."
+      mark_step_done 3
+      ;;
+  esac
 }
 
 compose_initial_prompt() {
@@ -1449,6 +1678,12 @@ link_opencode_path() {
     if [ "$current" = "$src" ]; then
       return 0
     fi
+    # A link to something that no longer exists holds nothing to protect.
+    if [ ! -e "$dest" ]; then
+      rm -f "$dest"
+      ln -s "$src" "$dest"
+      return 0
+    fi
     case "$current" in
       */@orchestraai/agent-tools/skills/*|*/@orchestraai/agent-tools/.opencode/commands/*|*orchestra-agent-tools/skills/*|*orchestra-agent-tools/.opencode/commands/*|*understudy-agent-tools/skills/*|*understudy-agent-tools/.opencode/commands/*)
         rm -f "$dest"
@@ -1456,11 +1691,11 @@ link_opencode_path() {
         return 0
         ;;
     esac
-    warn "OpenCode $kind already exists at $dest; leaving it unchanged."
+    [ "$kind" = "skill" ] || warn "OpenCode $kind already exists at $dest; leaving it unchanged."
     return 1
   fi
   if [ -e "$dest" ]; then
-    warn "OpenCode $kind already exists at $dest; leaving it unchanged."
+    [ "$kind" = "skill" ] || warn "OpenCode $kind already exists at $dest; leaving it unchanged."
     return 1
   fi
   ln -s "$src" "$dest"
@@ -1473,7 +1708,7 @@ install_opencode_adapter() {
     return 0
   fi
 
-  local repo skill_root command_root skill skill_name linked skipped command_src command_dest
+  local repo skill_root command_root skill skill_name linked skipped skipped_names command_src command_dest conflicts_file
   if ! repo="$(resolve_skill_repo)"; then
     say "Could not find skills/understudy/SKILL.md; skipping OpenCode skill install."
     adapter_prereq_missing "opencode" "skills/understudy/SKILL.md was not found"
@@ -1485,7 +1720,9 @@ install_opencode_adapter() {
   mkdir -p "$skill_root" "$command_root"
   linked=0
   skipped=0
+  skipped_names=""
 
+  attention "OpenCode support is deprecated and will be removed in a future release; Claude Code, Codex and Cursor are the supported coding agents."
   say "Installing the Orchestra OpenCode skills from $repo."
   for skill in "$repo"/skills/*; do
     [ -f "$skill/SKILL.md" ] || continue
@@ -1494,6 +1731,8 @@ install_opencode_adapter() {
       linked=$((linked + 1))
     else
       skipped=$((skipped + 1))
+      skipped_names="${skipped_names}${skill_name}
+"
     fi
   done
 
@@ -1510,6 +1749,18 @@ install_opencode_adapter() {
   fi
 
   ok "Orchestra OpenCode skills linked: $linked; skipped existing conflicts: $skipped."
+  if [ "$skipped" -gt 0 ]; then
+    # Folders or foreign links the installer did not create are never touched;
+    # one summary instead of a warning per skill, with the names in a file.
+    private_mkdir "$STATE_DIR"
+    conflicts_file="$STATE_DIR/opencode-skill-conflicts.txt"
+    printf '%s' "$skipped_names" >"$conflicts_file"
+    local quiet_before="$QUIET_DETAIL"
+    QUIET_DETAIL=0
+    attention "$skipped OpenCode skills already exist in $skill_root as folders or links this installer did not create, so OpenCode keeps using those copies (names in $conflicts_file). To switch them to the current skills, move them aside and rerun with --agents opencode:" \
+      "mkdir -p \"$skill_root.bak\" && while read -r s; do mv \"$skill_root/\$s\" \"$skill_root.bak/\"; done < \"$conflicts_file\""
+    QUIET_DETAIL="$quiet_before"
+  fi
   if [ "$linked" -gt 0 ]; then
     record_adapter "opencode" "installed" "linked $linked skills"
   else
@@ -1560,6 +1811,12 @@ hermes_register_dir() {
     if [ "$current" = "$skills_dir" ]; then
       printf '%s\n' "$stable_link"; return 0
     fi
+    # A link to a folder that no longer exists holds nothing to protect.
+    if [ ! -e "$stable_link" ]; then
+      rm -f "$stable_link"
+      ln -s "$skills_dir" "$stable_link"
+      printf '%s\n' "$stable_link"; return 0
+    fi
     case "$current" in
       */@orchestraai/agent-tools/skills|*orchestra-agent-tools/skills|*understudy-agent-tools/skills)
         rm -f "$stable_link"
@@ -1596,6 +1853,7 @@ install_hermes_adapter() {
   register_dir="$(hermes_register_dir "$skills_dir")"
   config="$(hermes_config_path)"
 
+  attention "Hermes support is deprecated and will be removed in a future release; Claude Code, Codex and Cursor are the supported coding agents."
   say "Registering the Orchestra skills with Hermes via $register_dir."
 
   if [ ! -f "$config" ]; then
@@ -1744,8 +2002,8 @@ launch_claude_code() {
     return 0
   fi
 
-  section "Step 3/3 · Open Claude Code"
-  if ! { [ "$YES" = "1" ] || noninteractive_enabled; } && ! confirm_default_yes "Open Claude Code in $(pwd) now?"; then
+  [ "${LAUNCH_CONFIRMED:-0}" = "1" ] || section "Step 3/3 · Open Claude Code"
+  if [ "${LAUNCH_CONFIRMED:-0}" != "1" ] && ! { [ "$YES" = "1" ] || noninteractive_enabled; } && ! confirm_default_yes "Open Claude Code in $(pwd) now?"; then
     say "Open Claude Code here whenever you're ready, then run /orchestra:onboard."
     mark_step_done 3
     return 0
@@ -1761,6 +2019,8 @@ launch_claude_code() {
   # curl | bash leaves stdin on the pipe, so Claude Code gets the terminal
   # directly. No session transcript is recorded.
   # shellcheck disable=SC2086
+  CLAUDE_LAUNCHED=1
+  AGENT_LAUNCHED=1
   claude ${permission_args[@]+"${permission_args[@]}"} --plugin-dir "$PKG_DIR" ${UNDERSTUDY_CLAUDE_ARGS:-} "$INITIAL_CLAUDE_PROMPT" </dev/tty >/dev/tty 2>&1 || {
     local status="$?"
     say "Claude Code exited with status $status."
@@ -1859,6 +2119,15 @@ need npm || {
 validate_agent_platforms || exit 2
 configure_resume
 
+if [ "$YES" = "0" ] && ! noninteractive_enabled && { : </dev/tty >/dev/tty; } 2>/dev/null; then
+  HUMAN_RUN=1
+fi
+case "$OUTPUT_MODE" in
+  quiet) QUIET_RUN=1 ;;
+  verbose) ;;
+  *) [ "$FANCY" = "1" ] && [ "$HUMAN_RUN" = "1" ] && QUIET_RUN=1 ;;
+esac
+
 banner
 if [ "$FANCY" = "1" ]; then
   section "Welcome"
@@ -1866,6 +2135,7 @@ else
   section "Welcome. We are going to install Orchestra for your coding agent."
 fi
 say "This installer sets up the Orchestra CLI, your Orchestra account, and the plugin for your coding agents."
+QUIET_DETAIL="$QUIET_RUN"
 if [ -n "$INSTALL_PACKAGE" ]; then
   warn "Source: npm package $(redact_url "$INSTALL_PACKAGE") (UNDERSTUDY_INSTALL_PACKAGE override) ${D}(installer commit: $INSTALLER_COMMIT)${R}"
 elif [ "$INSTALL_SOURCE_OVERRIDDEN" = "1" ]; then
@@ -1874,9 +2144,14 @@ else
   say "Source: $INSTALL_REPO_URL#$INSTALL_REF ${D}(installer commit: $INSTALLER_COMMIT)${R}"
 fi
 say "Install log: $LOG_FILE"
-say ""
+QUIET_DETAIL=0
 choose_setup
 select_agent_platforms
+# After a menu choice the plan is already on screen in the person's own
+# words; keep the restatement for the log.
+if [ "$QUIET_RUN" = "1" ] && [ "$SETUP_MENU_ANSWERED" = "1" ]; then
+  QUIET_DETAIL=1
+fi
 report_agent_selection
 say "${B}Install plan${R}"
 say "  ${G2}1.${R} Install the Orchestra CLI."
@@ -1896,10 +2171,11 @@ if lower_my_ant_bill_enabled; then
   say "  ${G6}·${R}  Focus onboarding on the lower Anthropic bill audit path."
 fi
 say ""
+say "This installer writes only under $LAB, $HOME/.understudy, the global npm prefix, and selected coding-agent plugin state."
+QUIET_DETAIL=0
 if [ "$LOCAL_MODELS" != "1" ]; then
   say "No model weights are downloaded and no frontier calls are made. Add the local model lab any time with --local-models."
 fi
-say "This installer writes only under $LAB, $HOME/.understudy, the global npm prefix, and selected coding-agent plugin state."
 if [ -n "${UNDERSTUDY_INSTALL_SOURCE_DIR:-}" ]; then
   say "Scratch checkout (UNDERSTUDY_INSTALL_SOURCE_DIR): $INSTALL_SOURCE_DIR is deleted before and after the install."
 fi
@@ -1912,8 +2188,13 @@ fi
 PKG_DIR="$(npm root -g)/$PACKAGE_NAME"
 
 if should_run_step 1; then
-  section "Step 1/3 · Install the CLI"
+  step_section "Step 1/3 · Install the CLI"
+  QUIET_DETAIL="$QUIET_RUN"
   install_understudy_package
+  QUIET_DETAIL=0
+  if [ "$QUIET_RUN" = "1" ] && need orchestra; then
+    ok "Orchestra CLI $(orchestra --version 2>/dev/null || true)"
+  fi
   PKG_DIR="$(npm root -g)/$PACKAGE_NAME"
   # Move ~/.understudy to ~/.orchestra (leaving a symlink) now, before the
   # coding agent starts; every path this installer writes later goes through
@@ -1930,8 +2211,10 @@ prepare_agent_first_signin
 sign_in_in_terminal
 
 if should_run_step 2; then
-  section "Step 2/3 · Install agent adapters"
+  step_section "Step 2/3 · Install agent adapters"
+  QUIET_DETAIL="$QUIET_RUN"
   install_agent_adapters
+  QUIET_DETAIL=0
   # An incomplete adapter install must not be marked resumable-complete, or a
   # later --resume would start at step 3 and exit 0 with no plugin installed.
   if [ "$(adapter_exit_code)" = "0" ]; then
@@ -1946,60 +2229,75 @@ fi
 start_local_model_lab
 compose_initial_prompt
 
-section "Where this goes next"
-# Only promise per-agent next steps for adapters that actually installed;
-# when the adapter step ran and installed nothing, hand out recovery
-# instructions instead of claiming the skills are ready.
-if [ "$ADAPTERS_ATTEMPTED" != "1" ]; then
-  say "The installer is done. The next experience belongs inside your coding agent:"
-  say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
-  say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Orchestra onboarding skill."
-  say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Orchestra onboarding skill."
-  say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
-  say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Orchestra onboarding skill."
-  say "  Devin: ask Devin to use the Orchestra onboarding skill for this project. For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
-elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
-  if [ "$(normalize_agent_platform "$AGENT_PLATFORMS")" = "none" ]; then
-    say "The installer is done. No coding-agent plugins were requested, so only the orchestra CLI was installed."
-    say "Rerun this installer with --agents claude-code (or another adapter) when you want the skills inside a coding agent."
-  elif [ "${ADAPTERS_UNMET_COUNT:-0}" -eq 0 ]; then
-    say "The installer is done. Every selected coding-agent adapter was disabled by a flag (e.g. --no-claude), so only the orchestra CLI was installed."
-    say "Rerun this installer without the disable flag (or with --agents <adapter>) when you want the skills inside a coding agent."
-  else
-    fail_line "The installer finished, but no coding-agent plugin was installed — the Orchestra skills are NOT ready in any coding agent."
-    say "Use the manual install commands above (or rerun this installer with --agents <adapter>), then run the platform's reload step before onboarding."
-  fi
+print_attention
+# A person at the terminal gets one ending: what to paste, what each agent
+# needs first, and an offer to start a terminal agent. Scripts and CI keep
+# the full per-agent instructions.
+if [ "$HUMAN_RUN" = "1" ] && [ "$ADAPTERS_ATTEMPTED" = "1" ] && [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ]; then
+  start_onboarding
 else
-  say "The installer is done. The next experience belongs inside your coding agent:"
-  if adapter_installed "claude-code"; then
+  section "Where this goes next"
+  # Only promise per-agent next steps for adapters that actually installed;
+  # when the adapter step ran and installed nothing, hand out recovery
+  # instructions instead of claiming the skills are ready.
+  if [ "$ADAPTERS_ATTEMPTED" != "1" ]; then
+    say "The installer is done. The next experience belongs inside your coding agent:"
     say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
-  fi
-  if adapter_installed "cursor"; then
     say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Orchestra onboarding skill."
-  fi
-  if adapter_installed "codex"; then
     say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Orchestra onboarding skill."
-  fi
-  if adapter_installed "opencode"; then
     say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
-  fi
-  if adapter_installed "hermes"; then
     say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Orchestra onboarding skill."
-  fi
-  if adapter_installed "devin"; then
     say "  Devin: ask Devin to use the Orchestra onboarding skill for this project. For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
+  elif [ "$ADAPTERS_INSTALLED_COUNT" -eq 0 ]; then
+    if [ "$(normalize_agent_platform "$AGENT_PLATFORMS")" = "none" ]; then
+      say "The installer is done. No coding-agent plugins were requested, so only the orchestra CLI was installed."
+      say "Rerun this installer with --agents claude-code (or another adapter) when you want the skills inside a coding agent."
+    elif [ "${ADAPTERS_UNMET_COUNT:-0}" -eq 0 ]; then
+      say "The installer is done. Every selected coding-agent adapter was disabled by a flag (e.g. --no-claude), so only the orchestra CLI was installed."
+      say "Rerun this installer without the disable flag (or with --agents <adapter>) when you want the skills inside a coding agent."
+    else
+      fail_line "The installer finished, but no coding-agent plugin was installed — the Orchestra skills are NOT ready in any coding agent."
+      say "Use the manual install commands above (or rerun this installer with --agents <adapter>), then run the platform's reload step before onboarding."
+    fi
+  else
+    say "The installer is done. The next experience belongs inside your coding agent:"
+    if adapter_installed "claude-code"; then
+      say "  Claude Code: run /reload-plugins and then /orchestra:onboard."
+    fi
+    if adapter_installed "cursor"; then
+      say "  Cursor: restart Cursor or run Developer: Reload Window, then ask Cursor Agent to use the Orchestra onboarding skill."
+    fi
+    if adapter_installed "codex"; then
+      say "  Codex: run /plugins, install or enable orchestra, then ask Codex to use the Orchestra onboarding skill."
+    fi
+    if adapter_installed "opencode"; then
+      say "  OpenCode: restart the TUI or open a new session, then run /orchestra-onboard."
+    fi
+    if adapter_installed "hermes"; then
+      say "  Hermes: run /reload-skills in an open session (or start a new hermes session), then run /onboard or ask Hermes to use the Orchestra onboarding skill."
+    fi
+    if adapter_installed "devin"; then
+      say "  Devin: ask Devin to use the Orchestra onboarding skill for this project. For persistent installs, run this installer with --yes --agents devin --no-launch-agent in the Devin environment blueprint."
+    fi
+  fi
+  if lower_my_ant_bill_enabled; then
+    say "Focused path: lower Anthropic bill. Ask the agent to use onboarding with the lower-Anthropic-bill path, then run the lower-anthropic-bill skill."
+  fi
+  if [ "$ADAPTERS_ATTEMPTED" != "1" ] || [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ]; then
+    [ "$QUIET_RUN" = "1" ] || say "Onboarding profiles your setup, asks what you're working on, and points the plugin at your real workload."
+  fi
+  show_paste_prompt
+  if should_run_step 3; then
+    launch_selected_agent
+  else
+    say "Skipping step 3/3: open coding agent."
+  fi
+  if [ "$CLAUDE_LAUNCHED" != "1" ]; then
+    copy_paste_prompt_to_clipboard
   fi
 fi
-if lower_my_ant_bill_enabled; then
-  say "Focused path: lower Anthropic bill. Ask the agent to use onboarding with the lower-Anthropic-bill path, then run the lower-anthropic-bill skill."
-fi
-if [ "$ADAPTERS_ATTEMPTED" != "1" ] || [ "$ADAPTERS_INSTALLED_COUNT" -gt 0 ]; then
-  say "Onboarding profiles your setup, asks what you're working on, and points the plugin at your real workload."
-fi
-if should_run_step 3; then
-  launch_selected_agent
-else
-  say "Skipping step 3/3: open coding agent."
+if [ "$QUIET_RUN" = "1" ]; then
+  say "${D}Full install log: $LOG_FILE${R}"
 fi
 
 INSTALL_EXIT="$(adapter_exit_code)"
