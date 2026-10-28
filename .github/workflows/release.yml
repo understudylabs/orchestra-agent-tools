@@ -1,8 +1,11 @@
 name: Release
 
-# Publishes @orchestraai/agent-tools to npm when a version tag (v0.6.42, ...)
-# is pushed. The installer installs this package by default, so a release is
-# what users get; it falls back to building from source when npm has none.
+# Publishes @orchestraai/agent-tools to npm when a release PR merges: any push
+# to main that changes package.json to a version npm does not have yet. It then
+# tags the merge commit vX.Y.Z and opens a GitHub release from the CHANGELOG.
+# Pushing a vX.Y.Z tag by hand still works. The installer installs this package
+# by default, so a release is what users get; it falls back to building from
+# source when npm has none.
 #
 # Publishing uses npm trusted publishing (OIDC, no long-lived token) with
 # provenance. One-time setup on npmjs.com: under the package's settings, add
@@ -11,18 +14,55 @@ name: Release
 
 on:
   push:
+    branches: [main]
+    paths: [package.json]
     tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
+  # A merge that does not change the version, or a version npm already has, is
+  # not a release: stop here, before the npm environment, without failing.
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Decide whether this is a release
+        id: release
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
+            exit 1
+          fi
+          if npm view "@orchestraai/agent-tools@$version" version >/dev/null 2>&1; then
+            echo "npm already has $version; nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
+    needs: decide
+    if: needs.decide.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: npm
     permissions:
-      contents: read
+      contents: write
       id-token: write
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -39,14 +79,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check the tag matches package.json
-        run: |
-          version="$(node -p 'require("./package.json").version')"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
-            exit 1
-          fi
-
       - name: Check
         run: npm run check
 
@@ -60,3 +92,16 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Tags pushed with the workflow token do not start another run.
+      - name: Tag and create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$VERSION"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+          fi
+          awk -v v="$VERSION" 'index($0, "## [" v "]") == 1 {on=1; next} on && /^## \[/ {exit} on' CHANGELOG.md > release-notes.md
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --notes-file release-notes.md --verify-tag

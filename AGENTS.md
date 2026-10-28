@@ -123,10 +123,13 @@ Installer "is this ours?" checks must accept `@orchestraai/agent-tools`,
 `orchestra-agent-tools` and `understudy-agent-tools` paths.
 
 Releases: bump `package.json`, `package-lock.json` and the eight plugin/adapter
-manifests together and date the CHANGELOG in a PR; after it merges, push a
-`vX.Y.Z` tag and `.github/workflows/release.yml` publishes through npm trusted
-publishing. npm stages the release until a maintainer approves it with a
-passkey; agents cannot approve it, and never handle tokens or sign-in codes.
+manifests together and date the CHANGELOG in a PR. Merging it is the release:
+`.github/workflows/release.yml` sees a version npm does not have, publishes
+through npm trusted publishing, tags the merge commit `vX.Y.Z` and creates the
+GitHub release from the CHANGELOG. Do not push the tag by hand. The trusted
+publisher may publish directly, so the merge is the last check before users get
+it; npm can take several minutes to show a new version. Agents never handle
+tokens, passkeys or sign-in codes.
 
 ## Boundary
 
