@@ -1,6 +1,6 @@
 # Changelog
 
-Notable, user-facing changes to the Understudy skills + CLI. Versions track the
+Notable, user-facing changes to the Orchestra skills + CLI. Versions track the
 plugin: `package.json`, `.claude-plugin/plugin.json`,
 `.claude-plugin/marketplace.json`, `.cursor-plugin/plugin.json`,
 `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
@@ -15,24 +15,11 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
-### Changed
+## [0.7.0] — 2026-10-27
 
-- **Lighter installer.** One question up front: (1) Orchestra account + plugin
-  for your coding agents, (2) the same plus the local model lab on Apple
-  Silicon, or (3) CLI only; `a`/`--advanced` picks agents, and the default is
-  every detected agent. You sign in right in the terminal (an emailed one-time
-  code), and an existing sign-in is kept instead of being reset
-  (`--fresh-login` restores the old reset for demos; `--skip-login` skips).
-  The local model lab (`--local-models`) starts the managed MLX runtime install
-  and the Orchestra 2B model download in the background; uv is never installed
-  without asking. The CLI installs from the npm release
-  `@orchestraai/agent-tools`, falling back to the source build when npm has
-  none (`--from-source` forces it). Claude Code opens only if you say yes, in
-  your own permission mode, with a one-line prompt and no session recording.
-- **Onboarding without the download.** The onboarding skill no longer pulls a
-  model first. It checks the sign-in, reports the installer's local model lab
-  if one is running, interviews once, and moves to your real workload; local
-  models are opt-in and Mac-only.
+First release as Orchestra, and the first published to npm as
+`@orchestraai/agent-tools`. It covers everything since 0.6.0: the 0.6.x
+versions in between shipped without changelog headings.
 
 ### Added
 
@@ -40,17 +27,6 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
   runs the full check and publishes `@orchestraai/agent-tools` with
   provenance (npm trusted publishing, or an `NPM_TOKEN` environment secret).
 
-### Changed
-
-- **Orchestra wording.** Installer messages, CLI help and messages, and skill
-  copy now say Orchestra instead of Understudy, and say "specialist model"
-  where they meant the trained model. Schema IDs, `UNDERSTUDY_*` env vars,
-  skill names, `~/.understudy` paths and "Understudy Desktop" are unchanged;
-  onboarding and product questions still recognize the old name. The Devin
-  hint now says to run the installer in the environment blueprint instead of
-  an `npm install` that never worked.
-
-### Added
 
 - **`@orchestraai/agent-tools` package and `orchestra-agent-tools` repo.** The
   package is now `@orchestraai/agent-tools` (was
@@ -88,22 +64,6 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
   `.understudy/`), plugin and skill names, and gateway headers are
   unchanged.
 
-### Removed
-
-- **Understudy Desktop.** The Tauri app in `apps/homescreen`, its
-  `desktop-release` workflow, the `desktop:*` and `runtime:desktop-readiness`
-  npm scripts, the release tooling under `scripts/`, and the tests that covered
-  only the app are removed. The last release is `desktop-v0.3.44-mvp`; the
-  updater pointer no longer advances, so installed apps will not receive
-  updates. See `docs/desktop-deprecation.md`.
-
-### Deprecated
-
-- **`understudy desktop ...` commands.** The command group still works against
-  an already-installed app but now prints a one-line deprecation warning to
-  stderr and will be removed in a future release. stdout is unchanged.
-
-### Added
 
 - **`dspy-gepa` multi-predictor task specs.** `--task-spec PATH`
   (`understudy.dspy_gepa_task_spec.v1`) declares several typed predictors over
@@ -273,6 +233,33 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Changed
 
+- **Lighter installer.** One question up front: (1) Orchestra account + plugin
+  for your coding agents, (2) the same plus the local model lab on Apple
+  Silicon, or (3) CLI only; `a`/`--advanced` picks agents, and the default is
+  every detected agent. You sign in right in the terminal (an emailed one-time
+  code), and an existing sign-in is kept instead of being reset
+  (`--fresh-login` restores the old reset for demos; `--skip-login` skips).
+  The local model lab (`--local-models`) starts the managed MLX runtime install
+  and the Orchestra 2B model download in the background; uv is never installed
+  without asking. The CLI installs from the npm release
+  `@orchestraai/agent-tools`, falling back to the source build when npm has
+  none (`--from-source` forces it). Claude Code opens only if you say yes, in
+  your own permission mode, with a one-line prompt and no session recording.
+- **Onboarding without the download.** The onboarding skill no longer pulls a
+  model first. It checks the sign-in, reports the installer's local model lab
+  if one is running, interviews once, and moves to your real workload; local
+  models are opt-in and Mac-only.
+
+
+- **Orchestra wording.** Installer messages, CLI help and messages, and skill
+  copy now say Orchestra instead of Understudy, and say "specialist model"
+  where they meant the trained model. Schema IDs, `UNDERSTUDY_*` env vars,
+  skill names, `~/.understudy` paths and "Understudy Desktop" are unchanged;
+  onboarding and product questions still recognize the old name. The Devin
+  hint now says to run the installer in the environment blueprint instead of
+  an `npm install` that never worked.
+
+
 - **`dspy-gepa` runs on DSPy 3.4.1 and GEPA 0.1.4.** The v2 runtime now pins
   `dspy==3.4.1`, `gepa[dspy]==0.1.4`, and `cloudpickle==3.1.2` with a bounded
   `litellm>=1.83,<2` on Python 3.13, and records all four in its package
@@ -306,6 +293,21 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
   ids/timestamps only — capture content stays behind the dashboard login).
   The legacy `routing-status` / `provider-health` / `status` endpoints stay
   documented as deprecated for older deployments.
+
+### Deprecated
+
+- **`understudy desktop ...` commands.** The command group still works against
+  an already-installed app but now prints a one-line deprecation warning to
+  stderr and will be removed in a future release. stdout is unchanged.
+
+### Removed
+
+- **Understudy Desktop.** The Tauri app in `apps/homescreen`, its
+  `desktop-release` workflow, the `desktop:*` and `runtime:desktop-readiness`
+  npm scripts, the release tooling under `scripts/`, and the tests that covered
+  only the app are removed. The last release is `desktop-v0.3.44-mvp`; the
+  updater pointer no longer advances, so installed apps will not receive
+  updates. See `docs/desktop-deprecation.md`.
 
 ### Fixed
 
