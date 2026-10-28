@@ -3,13 +3,14 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { startTargets } from "../dist/onboarding/agents.js";
 import { Checklist } from "../dist/onboarding/checklist.js";
 import { installedAgentsLine, readAdapterResults, readAttention } from "../dist/onboarding/init.js";
 import { onboardingPrompt } from "../dist/onboarding/prompt.js";
-import { runStart } from "../dist/onboarding/start.js";
+import { promptBox, runStart } from "../dist/onboarding/start.js";
 
 const probe = ({ platform = "darwin", commands = [], apps = [] } = {}) => ({
   platform,
@@ -71,7 +72,7 @@ describe("runStart", () => {
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
   function deps(overrides = {}) {
-    const calls = { printed: [], ran: [], copied: [], opened: [], asked: [] };
+    const calls = { printed: [], ran: [], copied: [], opened: [], urls: [], asked: [] };
     const value = {
       cwd: root,
       home: join(root, "home"),
@@ -88,6 +89,10 @@ describe("runStart", () => {
       },
       openApp: (app, folder) => {
         calls.opened.push([app, folder]);
+        return true;
+      },
+      openUrl: (url) => {
+        calls.urls.push(url);
         return true;
       },
       run: async (command, args, cwd) => {
@@ -108,16 +113,61 @@ describe("runStart", () => {
     assert.deepEqual(calls.copied, []);
   });
 
-  it("copies the prompt, opens the app, and shows only that app's steps", async () => {
-    const { value, calls } = deps({ choose: async () => "codex-app" });
+  it("opens a new Codex chat in the project with the prompt filled in", async () => {
+    const project = join(root, "my app");
+    mkdirSync(project);
+    const { value, calls } = deps({ cwd: project, choose: async () => "codex-app" });
     const result = await runStart(value);
     assert.equal(result.copied, true);
     assert.deepEqual(calls.copied, [value.prompt]);
-    assert.deepEqual(calls.opened, [["ChatGPT", undefined]]);
-    const text = calls.printed.join("\n");
-    assert.match(text, /Switch to Codex/);
-    assert.doesNotMatch(text, /Reload Window/);
+    assert.deepEqual(calls.urls, [
+      `codex://new?path=${encodeURIComponent(project)}&prompt=${encodeURIComponent(value.prompt)}`,
+    ]);
+    assert.deepEqual(calls.opened, []);
+    const text = stripAnsi(calls.printed.join("\n"));
+    assert.match(text, /Opened a new ChatGPT · Codex chat in .*my app with the prompt filled in/);
+    assert.match(text, /Press Enter in the new chat/);
+    // The link puts the chat in Codex and in the project already.
+    assert.doesNotMatch(text, /Switch to Codex|paste the prompt/);
     assert.deepEqual(calls.ran, []);
+  });
+
+  it("falls back to opening the app with paste steps when the link fails", async () => {
+    const { value, calls } = deps({ choose: async () => "codex-app", openUrl: () => false });
+    await runStart(value);
+    assert.deepEqual(calls.opened, [["ChatGPT", undefined]]);
+    const text = stripAnsi(calls.printed.join("\n"));
+    assert.match(text, /Switch to Codex/);
+    assert.match(text, /paste the prompt into a new thread/);
+    assert.doesNotMatch(text, /Reload Window|filled in/);
+  });
+
+  it("shows the prompt in a box for every app and paste target", async () => {
+    for (const target of ["codex-app", "cursor", "other"]) {
+      const { value, calls } = deps({ choose: async () => target, copy: () => false });
+      await runStart(value);
+      const lines = calls.printed.map(stripAnsi);
+      const top = lines.findIndex((line) => line.startsWith("╭─ Prompt · copy this"));
+      assert.ok(top > -1, `${target}: no prompt box\n${lines.join("\n")}`);
+      assert.match(lines[top + 1], /^│ Use the Orchestra onboarding skill for this project\. +│$/);
+      assert.match(lines[top + 2], /^╰─+╯$/);
+      assert.equal(new Set(lines.slice(top, top + 3).map((line) => line.length)).size, 1, `${target}: ragged box`);
+    }
+  });
+
+  it("wraps a long prompt inside the box", () => {
+    const prompt = `${"word ".repeat(40)}end`;
+    const lines = promptBox(prompt, "Prompt", 60).map(stripAnsi);
+    assert.ok(lines.length > 3);
+    assert.equal(new Set(lines.map((line) => line.length)).size, 1);
+    assert.ok(lines.every((line) => line.length <= 60));
+    const inside = lines.slice(1, -1).map((line) => line.slice(2, -2).trim()).join(" ");
+    assert.equal(inside, prompt);
+  });
+
+  it("uses a normal width when the terminal reports none", () => {
+    const lines = promptBox("Use the Orchestra onboarding skill for this project.", "Prompt", 0).map(stripAnsi);
+    assert.equal(lines.length, 3);
   });
 
   it("opens Cursor on the project folder", async () => {

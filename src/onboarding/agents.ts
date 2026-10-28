@@ -27,6 +27,11 @@ export type StartTarget =
       /** Whether `open -a <app> <folder>` opens the project (editors do). */
       opensFolder: boolean;
       steps: (project: string) => string[];
+      /**
+       * A link that opens a new chat in the project with the prompt already in
+       * the composer, and the steps left after it opens.
+       */
+      link?: { url: (project: string, prompt: string) => string; steps: string[] };
     }
   | { id: "other"; label: string; hint: string; kind: "paste"; steps: (project: string) => string[] }
   | { id: "later"; label: string; hint: string; kind: "later" };
@@ -87,7 +92,7 @@ export function startTargets(probe: AgentProbe): StartTarget[] {
     targets.push({
       id: "codex-app",
       label: codexApp === "ChatGPT" ? "ChatGPT · Codex" : "Codex",
-      hint: "copies the prompt and opens the app",
+      hint: "opens a new chat with the prompt",
       kind: "app",
       app: codexApp,
       opensFolder: false,
@@ -96,6 +101,13 @@ export function startTargets(probe: AgentProbe): StartTarget[] {
         "Enable orchestra under Plugins if you haven't yet",
         `Open ${project} and paste the prompt into a new thread`,
       ],
+      // codex://new opens a new Codex chat in `path` with `prompt` in the
+      // composer, unsent; ChatGPT.app keeps the scheme from the Codex app.
+      link: {
+        url: (project, prompt) =>
+          `codex://new?path=${encodeURIComponent(project)}&prompt=${encodeURIComponent(prompt)}`,
+        steps: ["Enable orchestra under Plugins if you haven't yet", "Press Enter in the new chat to send the prompt"],
+      },
     });
   }
   if (mac && probe.hasApp("Cursor")) {

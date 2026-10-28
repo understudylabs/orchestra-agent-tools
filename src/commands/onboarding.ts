@@ -25,6 +25,11 @@ function openApp(app: string, folder?: string): boolean {
   return spawnSync("open", ["-a", app, ...(folder ? [folder] : [])], { stdio: "ignore" }).status === 0;
 }
 
+function openUrl(url: string): boolean {
+  if (process.platform !== "darwin") return false;
+  return spawnSync("open", [url], { stdio: "ignore" }).status === 0;
+}
+
 function runInTerminal(command: string, args: string[], cwd: string): Promise<number> {
   return new Promise((done) => {
     const child = spawn(command, args, { cwd, stdio: "inherit" });
@@ -54,8 +59,10 @@ function systemStartDeps(prompt: string): StartDeps {
       }).then((value) => value.replace(/^~(?=$|\/)/, homedir())),
     copy: copyToClipboard,
     openApp,
+    openUrl,
     run: runInTerminal,
     print: (line) => process.stdout.write(`  ${line}\n`),
+    columns: process.stdout.columns,
   };
 }
 
