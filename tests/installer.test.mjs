@@ -577,7 +577,7 @@ describe("install.sh", () => {
     assert.doesNotMatch(result.stdout, /OpenCode exited with status/);
   });
 
-  it("hands off to detected OpenCode in auto mode even when Claude Code is disabled", () => {
+  it("leaves detected OpenCode alone in auto mode now that it is deprecated", () => {
     const script = readFileSync("install.sh", "utf8");
     const home = join(root, "home");
     const bin = join(root, "bin");
@@ -612,9 +612,8 @@ describe("install.sh", () => {
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /OpenCode skills and commands are installed/);
-    assert.match(result.stdout, /Open a fresh OpenCode TUI session/);
-    assert.doesNotMatch(result.stdout, /no other launchable adapter is available/);
+    assert.doesNotMatch(result.stdout, /OpenCode skills and commands are installed/);
+    assert.match(result.stdout, /no other launchable adapter is available/);
   });
 
   it("registers the Hermes skills tree through a stable symlink when explicitly requested", () => {
@@ -711,7 +710,9 @@ describe("install.sh", () => {
     assert.match(result.stdout, /Orchestra plugin installed/);
     assert.match(result.stdout, /Orchestra Cursor plugin linked/);
     assert.match(result.stdout, /Orchestra Codex marketplace registered/);
-    assert.match(result.stdout, /Orchestra OpenCode skills linked/);
+    // OpenCode is deprecated: detected, but not installed unless named.
+    assert.doesNotMatch(result.stdout, /Orchestra OpenCode skills linked/);
+    assert.equal(existsSync(join(home, ".config", "opencode", "skills", "onboard")), false);
     const callsText = readFileSync(calls, "utf8");
     assert.match(callsText, /claude plugin marketplace add /);
     assert.match(callsText, /claude plugin install orchestra@orchestra-skills/);
@@ -742,7 +743,7 @@ describe("install.sh", () => {
 
     const result = spawnSync(
       "bash",
-      ["-s", "--", "--non-interactive", "--only-step", "2", "--no-launch-claude", "--lab", join(root, "lab")],
+      ["-s", "--", "--non-interactive", "--only-step", "2", "--agents", "claude-code,cursor,codex,opencode", "--no-launch-claude", "--lab", join(root, "lab")],
       {
         cwd: process.cwd(),
         input: script,
@@ -1629,8 +1630,8 @@ describe("install.sh", () => {
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.doesNotMatch(result.stdout, /Installing the Orchestra Cursor plugin from/);
     assert.doesNotMatch(result.stdout, /Orchestra Cursor plugin linked at/);
-    assert.match(result.stdout, /Adapter summary/);
-    assert.match(result.stdout, /cursor: plugin linked/);
+    assert.doesNotMatch(result.stdout, /Adapter summary/);
+    assert.match(result.stdout, /Plugin installed: Cursor/);
     assert.match(result.stdout, /Full install log: /);
     const logs = readdirSync(join(root, "logs")).map((name) => readFileSync(join(root, "logs", name), "utf8")).join("\n");
     assert.match(logs, /Installing the Orchestra Cursor plugin from/);
@@ -1645,5 +1646,42 @@ describe("install.sh", () => {
     assert.match(result.stdout, /Use the Orchestra onboarding skill for this project\./);
     // Signed out: the prompt asks the agent to send the person to `orchestra login`.
     assert.match(result.stdout, /ask me to run `orchestra login` in my terminal/);
+  });
+
+  it("installs deprecated OpenCode only when named, with a deprecation notice", () => {
+    mkdirSync(join(root, "home", ".config", "opencode"), { recursive: true });
+    // Only node and system tools on PATH, so no real coding agent is invoked.
+    const nodeBin = join(root, "node-bin");
+    mkdirSync(nodeBin, { recursive: true });
+    symlinkSync(process.execPath, join(nodeBin, "node"));
+    writeFileSync(join(nodeBin, "npm"), `#!/bin/bash\ncase "$*" in\n  "root -g") echo "${join(root, "npm-root")}" ;;\n  "prefix -g") echo "${root}" ;;\nesac\n`);
+    chmodSync(join(nodeBin, "npm"), 0o755);
+    const isolated = { PATH: `${nodeBin}:/usr/bin:/bin` };
+    let result = runStepTwo(["--agents", "all"], isolated);
+    assert.doesNotMatch(result.stdout, /Orchestra OpenCode skills linked/);
+    assert.doesNotMatch(result.stdout, /registered Orchestra skills in skills\.external_dirs/);
+
+    result = runStepTwo(["--agents", "opencode"], isolated);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /OpenCode support is deprecated and will be removed in a future release/);
+    assert.match(result.stdout, /Orchestra OpenCode skills linked/);
+  });
+
+  it("collects problems into one Needs attention block after progress in quiet output", () => {
+    const skillRoot = join(root, "home", ".config", "opencode", "skills");
+    mkdirSync(join(skillRoot, "onboard"), { recursive: true });
+
+    const result = runStepTwo(["--agents", "cursor,opencode"], { UNDERSTUDY_INSTALL_OUTPUT: "quiet" });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const out = result.stdout;
+    const summary = out.indexOf("Plugin installed: Cursor, OpenCode");
+    const block = out.indexOf("Needs attention");
+    assert.ok(summary > -1 && block > summary, out);
+    // Nothing that needs the person shows up before the progress is done.
+    assert.doesNotMatch(out.slice(0, summary), /deprecated|already exist/);
+    assert.match(out.slice(block), /OpenCode support is deprecated/);
+    assert.match(out.slice(block), /1 OpenCode skills already exist/);
+    assert.match(out.slice(block), /mkdir -p .*skills\.bak/);
   });
 });

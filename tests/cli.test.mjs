@@ -1395,8 +1395,8 @@ describe("understudy CLI", () => {
     assert.equal(payload.adapters.find((adapter) => adapter.id === "opencode").manifestPath, ".opencode/adapter.json");
     assert.equal(payload.adapters.find((adapter) => adapter.id === "hermes").manifestPath, ".hermes/adapter.json");
     assert.equal(payload.adapters.find((adapter) => adapter.id === "codex").status, "supported");
-    assert.equal(payload.adapters.find((adapter) => adapter.id === "opencode").status, "supported");
-    assert.equal(payload.adapters.find((adapter) => adapter.id === "hermes").status, "supported");
+    assert.equal(payload.adapters.find((adapter) => adapter.id === "opencode").status, "deprecated");
+    assert.equal(payload.adapters.find((adapter) => adapter.id === "hermes").status, "deprecated");
     assert.equal(payload.adapters.find((adapter) => adapter.id === "devin").manifestPath, ".devin/adapter.json");
     assert.equal(payload.adapters.find((adapter) => adapter.id === "devin").status, "supported");
   });

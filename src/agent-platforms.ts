@@ -1,4 +1,4 @@
-export type AgentPlatformStatus = "supported" | "planned";
+export type AgentPlatformStatus = "supported" | "deprecated" | "planned";
 
 export type AgentPlatformAdapter = {
   id: string;
@@ -77,7 +77,7 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
   {
     id: "opencode",
     displayName: "OpenCode",
-    status: "supported",
+    status: "deprecated",
     manifestPath: ".opencode/adapter.json",
     discovery: "OpenCode skills/commands adapter: native skills discovered from .opencode/skills or ~/.config/opencode/skills; command markdown discovered from .opencode/commands or ~/.config/opencode/commands",
     install: [
@@ -103,7 +103,7 @@ export const agentPlatformAdapters: AgentPlatformAdapter[] = [
   {
     id: "hermes",
     displayName: "Hermes Agent",
-    status: "supported",
+    status: "deprecated",
     manifestPath: ".hermes/adapter.json",
     discovery:
       "Hermes Agent registers a durable ~/.understudy/skills symlink (to the shared skills/ tree) in skills.external_dirs (~/.hermes/config.yaml); it discovers SKILL.md skills natively alongside ~/.hermes/skills, with local skills winning on name conflicts",
