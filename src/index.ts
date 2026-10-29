@@ -393,6 +393,7 @@ function prerequisites(): Record<string, unknown> {
       claude_code: probe.hasCommand("claude"),
       codex: probe.hasCommand("codex") || probe.hasApp("ChatGPT") || probe.hasApp("Codex"),
       cursor: probe.hasCommand("cursor") || probe.hasApp("Cursor"),
+      conductor: probe.hasApp("Conductor"),
     },
     local_models: appleSilicon
       ? { supported: true, uv: probe.hasCommand("uv") }

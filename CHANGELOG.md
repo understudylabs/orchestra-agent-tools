@@ -15,6 +15,17 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-10-28
+
+### Added
+
+- **Conductor is a start choice.** When Conductor is installed, `orchestra
+  init` and `orchestra start` offer it. Choosing it opens Conductor's
+  new-workspace screen on the git repository that holds your project, with the
+  onboarding prompt filled in; click Create to send it. A project outside a git
+  repository gets Conductor opened with steps to add it and paste the prompt.
+- `orchestra doctor` reports whether Conductor is installed.
+
 ## [0.8.2] — 2026-10-28
 
 ### Added

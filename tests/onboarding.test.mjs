@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { startTargets } from "../dist/onboarding/agents.js";
+import { gitRoot, startTargets } from "../dist/onboarding/agents.js";
 import { Checklist } from "../dist/onboarding/checklist.js";
 import { installedAgentsLine, readAdapterResults, readAttention } from "../dist/onboarding/init.js";
 import { onboardingPrompt } from "../dist/onboarding/prompt.js";
@@ -22,7 +22,9 @@ let root;
 
 describe("onboarding start targets", () => {
   it("orders Claude Code first, then desktop apps, then the Codex CLI", () => {
-    const targets = startTargets(probe({ commands: ["claude", "codex"], apps: ["Claude", "ChatGPT", "Cursor"] }));
+    const targets = startTargets(
+      probe({ commands: ["claude", "codex"], apps: ["Claude", "ChatGPT", "Cursor", "Conductor"] }),
+    );
     assert.deepEqual(
       targets.map((target) => [target.id, target.label]),
       [
@@ -30,6 +32,7 @@ describe("onboarding start targets", () => {
         ["claude-desktop", "Claude desktop"],
         ["codex-app", "ChatGPT · Codex"],
         ["cursor", "Cursor"],
+        ["conductor", "Conductor"],
         ["codex-cli", "Codex (terminal)"],
         ["other", "Another app"],
         ["later", "Later"],
@@ -48,7 +51,7 @@ describe("onboarding start targets", () => {
   });
 
   it("offers no desktop apps off macOS", () => {
-    const targets = startTargets(probe({ platform: "linux", commands: ["claude"], apps: ["Claude", "ChatGPT", "Cursor"] }));
+    const targets = startTargets(probe({ platform: "linux", commands: ["claude"], apps: ["Claude", "ChatGPT", "Cursor", "Conductor"] }));
     assert.deepEqual(targets.map((target) => target.id), ["claude-code", "other", "later"]);
   });
 });
@@ -145,9 +148,42 @@ describe("runStart", () => {
     assert.doesNotMatch(text, /Reload Window|filled in/);
   });
 
+  it("opens a Conductor workspace on the repository root that holds the project", async () => {
+    const repo = join(root, "my app");
+    const project = join(repo, "packages", "web");
+    mkdirSync(project, { recursive: true });
+    assert.equal(spawnSync("git", ["init", "-q", repo]).status, 0);
+    const top = gitRoot(project);
+    assert.ok(top?.endsWith("my app"), top);
+    const targets = startTargets(probe({ apps: ["Conductor"] }));
+    const { value, calls } = deps({ cwd: project, targets, choose: async () => "conductor" });
+    await runStart(value);
+    assert.deepEqual(calls.urls, [
+      `conductor://prompt=${encodeURIComponent(value.prompt)}&path=${encodeURIComponent(top)}`,
+    ]);
+    assert.deepEqual(calls.opened, []);
+    const text = stripAnsi(calls.printed.join("\n"));
+    assert.match(text, /Opened a new Conductor workspace in .*web with the prompt filled in/);
+    assert.match(text, /Click Create to start the workspace/);
+    assert.match(text, /No prompt\? Paste the prompt above into a new workspace/);
+  });
+
+  it("opens Conductor with paste steps when the project is not in a git repository", async () => {
+    const targets = startTargets(probe({ apps: ["Conductor"] }));
+    const { value, calls } = deps({ targets, choose: async () => "conductor" });
+    await runStart(value);
+    assert.deepEqual(calls.urls, []);
+    assert.deepEqual(calls.opened, [["Conductor", undefined]]);
+    const text = stripAnsi(calls.printed.join("\n"));
+    assert.match(text, /as a repository \(Conductor works in git repositories\)/);
+    assert.match(text, /Paste the prompt into a new workspace/);
+    assert.doesNotMatch(text, /filled in|Click Create/);
+  });
+
   it("shows the prompt in a box for every app and paste target", async () => {
-    for (const target of ["codex-app", "cursor", "other"]) {
-      const { value, calls } = deps({ choose: async () => target, copy: () => false });
+    for (const target of ["codex-app", "cursor", "conductor", "other"]) {
+      const targets = startTargets(probe({ commands: ["claude", "codex"], apps: ["ChatGPT", "Cursor", "Conductor"] }));
+      const { value, calls } = deps({ targets, choose: async () => target, copy: () => false });
       await runStart(value);
       const lines = calls.printed.map(stripAnsi);
       const top = lines.findIndex((line) => line.startsWith("╭─ Prompt · copy this"));
