@@ -78,8 +78,11 @@ export async function runStart(deps: StartDeps): Promise<StartResult> {
   let steps = chosen.steps(project);
   if (chosen.kind === "app") {
     const folder = isDirectory(project) ? project : undefined;
-    if (chosen.link && folder && deps.openUrl(chosen.link.url(folder, deps.prompt))) {
-      deps.print(`${kleur.green("✓")} Opened a new ${chosen.label} chat in ${folder} with the prompt filled in.`);
+    const url = chosen.link && folder ? chosen.link.url(folder, deps.prompt) : undefined;
+    if (chosen.link && url && deps.openUrl(url)) {
+      deps.print(
+        `${kleur.green("✓")} Opened a new ${chosen.label} ${chosen.link.noun ?? "chat"} in ${folder} with the prompt filled in.`,
+      );
       steps = chosen.link.steps;
     } else if (!deps.openApp(chosen.app, chosen.opensFolder ? folder : undefined)) {
       deps.print(kleur.gray(`Open ${chosen.label} yourself.`));

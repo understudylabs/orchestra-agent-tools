@@ -60,7 +60,7 @@ describe("Node version", () => {
     assert.equal(report.prerequisites.node.required, MIN_NODE);
     assert.equal(report.prerequisites.node.ok, true);
     assert.equal(typeof report.prerequisites.git, "boolean");
-    assert.deepEqual(Object.keys(report.prerequisites.coding_agents), ["claude_code", "codex", "cursor"]);
+    assert.deepEqual(Object.keys(report.prerequisites.coding_agents), ["claude_code", "codex", "cursor", "conductor"]);
   });
 });
 

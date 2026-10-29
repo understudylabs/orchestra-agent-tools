@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -29,9 +30,10 @@ export type StartTarget =
       steps: (project: string) => string[];
       /**
        * A link that opens a new chat in the project with the prompt already in
-       * the composer, and the steps left after it opens.
+       * the composer, and the steps left after it opens. `url` returns nothing
+       * when the link cannot open this project.
        */
-      link?: { url: (project: string, prompt: string) => string; steps: string[] };
+      link?: { url: (project: string, prompt: string) => string | undefined; noun?: string; steps: string[] };
     }
   | { id: "other"; label: string; hint: string; kind: "paste"; steps: (project: string) => string[] }
   | { id: "later"; label: string; hint: string; kind: "later" };
@@ -42,6 +44,19 @@ export interface AgentProbe {
   hasCommand(name: string): boolean;
   /** True when a macOS app bundle with this name is installed. */
   hasApp(name: string): boolean;
+}
+
+/** The top folder of the git repository holding `dir`, if there is one. */
+export function gitRoot(dir: string): string | undefined {
+  try {
+    const root = execFileSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return root || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function systemAgentProbe(env: NodeJS.ProcessEnv = process.env): AgentProbe {
@@ -123,6 +138,36 @@ export function startTargets(probe: AgentProbe): StartTarget[] {
       app: "Cursor",
       opensFolder: true,
       steps: () => ["Run Developer: Reload Window", "Paste the prompt into a new Agent chat"],
+    });
+  }
+  if (mac && probe.hasApp("Conductor")) {
+    targets.push({
+      id: "conductor",
+      label: "Conductor",
+      hint: "opens a new workspace with the prompt",
+      kind: "app",
+      app: "Conductor",
+      opensFolder: false,
+      steps: (project) => [
+        `Add ${project} as a repository (Conductor works in git repositories)`,
+        "Paste the prompt into a new workspace",
+      ],
+      // conductor://prompt=… opens the new-workspace composer with the prompt
+      // filled in; it is sent when the person clicks Create. `path` must be
+      // the root of a repository added to Conductor, and a path that matches
+      // none leaves the current one selected without an error.
+      link: {
+        url: (project, prompt) => {
+          const root = gitRoot(project);
+          return root && `conductor://prompt=${encodeURIComponent(prompt)}&path=${encodeURIComponent(root)}`;
+        },
+        noun: "workspace",
+        steps: [
+          "Check your project is the selected repository; add it in Conductor if it's missing",
+          "Click Create to start the workspace with the prompt",
+          "No prompt? Paste the prompt above into a new workspace",
+        ],
+      },
     });
   }
   if (probe.hasCommand("codex")) {
