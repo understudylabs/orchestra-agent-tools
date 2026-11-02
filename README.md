@@ -498,7 +498,7 @@ Run Claude Code with persistent session and Git attribution using
 Run `orchestra claude-setup` once to choose an organization, project, workload,
 traffic environment, and Claude model. The wizard explains gateway traffic and
 capture before you enable it. Then use `claude` and `claude --resume` normally;
-repository configuration is not required. Requires Claude Code 2.1.312 or later.
+repository configuration is not required. Requires Claude Code 2.1.309 or later.
 
 `orchestra start` offers optional launch, resume, setup status, and session
 reports. `orchestra claude-setup remove` restores the settings Orchestra changed

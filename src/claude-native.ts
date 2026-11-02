@@ -67,8 +67,8 @@ export function checkClaudeVersion(): string {
     throw new Error("Could not run claude --version. Install Claude Code or fix PATH, then retry. https://code.claude.com/docs/en/setup");
   }
   const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
-  if (!match || Number(match[1]) < 2 || (Number(match[1]) === 2 && (Number(match[2]) < 1 || (Number(match[2]) === 1 && Number(match[3]) < 312)))) {
-    throw new Error(`Detected Claude Code ${version || "unknown"}. Persistent Orchestra setup requires 2.1.312 or later.`);
+  if (!match || Number(match[1]) < 2 || (Number(match[1]) === 2 && (Number(match[2]) < 1 || (Number(match[2]) === 1 && Number(match[3]) < 309)))) {
+    throw new Error(`Detected Claude Code ${version || "unknown"}. Persistent Orchestra setup requires 2.1.309 or later.`);
   }
   return version;
 }
