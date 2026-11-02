@@ -134,7 +134,7 @@ export async function setupNativeClaude(opts: Options = {}) {
   const selectedWorkload = await chooseCodingWorkload(resolved, workloads, opts.workload);
   if (!selectedWorkload) return;
   const workload = selectedWorkload.name;
-  const environment = z.enum(["test", "production"]).parse(await choose("Traffic environment", opts.environment, [{ name: "Test", value: "test" }, { name: "Production", value: "production" }]));
+  const environment = z.enum(["test", "production"]).parse(await choose("How will you use Claude Code?", opts.environment, [{ name: "Everyday coding (Production — recommended)", value: "production" }, { name: "Setup checks and experiments (Test)", value: "test" }]));
   const catalog = (await request({ orgId: org, url: `/admin/v1/orgs/${org}/models` }, z.object({ models: z.array(z.object({ id: z.string(), display_name: z.string().optional() })) }))).data.models;
   // The initial native integration is validated with Claude models only.
   const models = catalog.filter(m => m.id.startsWith("claude-"));
