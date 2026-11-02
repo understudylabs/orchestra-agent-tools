@@ -26,6 +26,7 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 ### Fixed
 
 - Run protected private-term scans before npm publication, matching the existing maintainer release requirements.
+- Handle large bundled-package manifests and validate public dependencies against their lockfile identities without applying first-party content rules to upstream examples.
 
 ## [0.8.2] — 2026-10-28
 
