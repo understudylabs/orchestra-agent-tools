@@ -141,10 +141,10 @@ export async function setupNativeClaude(opts: Options = {}) {
     if (!catalog.some(candidate => candidate.id === model && candidate.id.startsWith("claude-"))) throw new Error("The requested Claude model is not available in this organization.");
   }
   const capture = selectedWorkload.capture_enabled;
-  process.stdout.write(`\n${version}\nDefault: ${organizationLabel} / ${project} / ${workload} (${environment})\nModel: ${model ?? "Use Claude’s current/default model; switch with /model"}\n\nNormal claude launches will send model requests, responses, and repository/branch metadata through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
+  process.stdout.write(`\n${version}\nDefault: ${organizationLabel} / ${project} / ${workload} (${environment})\nModel: ${model ?? "Use Claude’s current/default model; switch with /model"}\n\nThis user-level setup applies to future claude sessions across repositories. Model requests, responses, and repository/branch metadata will go through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
   if (!opts.yes) {
     if (!process.stdin.isTTY) throw new Error("Use --yes to enable this persistent default after reviewing the routing and capture scope.");
-    if (!await confirm({ message: "Use Orchestra by default for Claude Code?", default: false })) return;
+    if (!await confirm({ message: "Use Orchestra for future Claude Code sessions?", default: true })) return;
   }
   const result = enableNativeClaude({ version: 1, org, project, workload, environment, model, gateway_url: auth.gatewayUrl, harness_version: version }, fileURLToPath(new URL("../bin.js", import.meta.url)));
   process.stdout.write(result.next + "\n");

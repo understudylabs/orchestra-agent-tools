@@ -123,7 +123,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   // Save recovery state first: interruption before settings write remains safely removable.
   writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed });
   writeNativeJson(settingsPath, { ...before, ...installed, env: { ...env, ...installed.env } });
-  return { enabled: true, settings_path: settingsPath, next: "Run claude normally. To restore previous settings: orchestra claude-setup remove" };
+  return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
 
 export function removeNativeClaude() {
