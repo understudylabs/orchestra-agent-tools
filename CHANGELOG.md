@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-11-02
+
+### Fixed
+
+- Accept Claude Code 2.1.309 for persistent gateway setup instead of requiring 2.1.312. The native mod’s launch/resume and session-header flow was verified with the real 2.1.309 binary against a local synthetic gateway, so compatible Homebrew stable users do not need to switch release channels.
+
 ## [0.10.1] — 2026-11-02
 
 ### Fixed
