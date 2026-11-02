@@ -14,7 +14,7 @@ import { chooseCodingWorkload } from "../onboarding/coding-workload.js";
 import { listWorkloads } from "../internal/workloads.js";
 import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
-import { checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
+import { hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
 
 interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean }
 async function choose(message: string, supplied: string | undefined, choices: { name: string; value: string }[]) {
@@ -115,7 +115,35 @@ export async function accessibleOrganization(choices: { name: string; value: str
   }
 }
 
+export async function existingClaudeSetup(deps = {
+  exists: hasNativeClaudeSetup,
+  read: readNativeState,
+  interactive: Boolean(process.stdin.isTTY),
+  select: () => select({ message: "Claude Code already uses Orchestra", choices: [
+    { name: "Keep current setup (recommended)", value: "keep" },
+    { name: "Remove current setup and configure again", value: "reconfigure" },
+    { name: "Remove Orchestra from Claude Code", value: "remove" },
+  ] }),
+  confirm: (reconfigure: boolean) => confirm({ message: reconfigure
+    ? "Restore previous Claude settings before configuring again? If you cancel the new setup, Orchestra stays disabled."
+    : "Remove Orchestra and restore previous Claude settings?", default: false }),
+  remove: removeNativeClaude,
+  write: (message: string) => { process.stdout.write(message + "\n"); },
+}): Promise<boolean> {
+  if (!deps.exists()) return true;
+  const state = deps.read();
+  deps.write(`Orchestra is already configured: ${state.config.org} / ${state.config.project} / ${state.config.workload} (${state.config.environment}).\nRun claude normally. Check health: orchestra claude-setup status. Remove: orchestra claude-setup remove.`);
+  if (!deps.interactive) throw new Error("Setup is already configured; nothing changed. Run orchestra claude-setup interactively to keep, remove, or reconfigure it.");
+  const action = await deps.select();
+  if (action === "keep" || !await deps.confirm(action === "reconfigure")) return false;
+  const removed = deps.remove();
+  deps.write(removed.next);
+  if (removed.preserved_user_edits.length) deps.write(`Preserved your changes: ${removed.preserved_user_edits.join(", ")}`);
+  return action === "reconfigure";
+}
+
 export async function setupNativeClaude(opts: Options = {}) {
+  if (!await existingClaudeSetup()) return;
   const version = await prepareClaudeVersion();
   if (!version) return;
   const credentials = readCredentials();

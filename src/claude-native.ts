@@ -35,6 +35,7 @@ const StateSchema = z.object({
   config: ClaudeNativeConfigSchema, settings_path: z.string(),
   before: z.record(z.string(), z.unknown()), installed: z.record(z.string(), z.unknown()),
 });
+export const hasNativeClaudeSetup = () => existsSync(statePath());
 export function readNativeState() {
   if (!existsSync(statePath())) throw new Error("Claude integration is not enabled. Run orchestra claude-setup.");
   return StateSchema.parse(readJson(statePath()));
