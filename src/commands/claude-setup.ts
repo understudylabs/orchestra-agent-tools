@@ -11,7 +11,7 @@ import { readCredentials, type Credentials } from "../config/credentials.js";
 import { listProjects, resolveProject } from "../internal/projects.js";
 import { chooseCodingProject } from "../onboarding/coding-project.js";
 import { listWorkloads, WorkloadSchema } from "../internal/workloads.js";
-import { request, resolveAuth } from "../internal/http.js";
+import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
 import { checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
 
@@ -82,6 +82,38 @@ export async function organizationChoices(credentials: Credentials, lookup = asy
   }));
 }
 
+export async function accessibleOrganization(choices: { name: string; value: string }[], supplied?: string, deps = {
+  interactive: Boolean(process.stdin.isTTY),
+  pick: (available: { name: string; value: string }[]) => select({ message: "Organization", choices: available }),
+  load: (org: string) => listProjects(resolveAuth(org)),
+  recover: (another: boolean) => select({ message: "Organization access needs attention", choices: [
+    ...(another ? [{ name: "Choose another organization", value: "another" }] : []),
+    { name: "Stop and sign in again", value: "login" },
+    { name: "Skip gateway setup for now", value: "skip" },
+  ] }),
+  write: (message: string) => { process.stderr.write(message + "\n"); },
+}) {
+  let available = choices;
+  let selected = supplied;
+  for (;;) {
+    if (selected && !available.some(choice => choice.value === selected)) throw new Error("Organization: selection is not available.");
+    if (!selected) {
+      if (!deps.interactive && available.length !== 1) throw new Error("Supply --org in noninteractive mode.");
+      selected = available.length === 1 ? available[0]!.value : await deps.pick(available);
+    }
+    try { return { org: selected, projects: await deps.load(selected) }; } catch (error) {
+      if (!(error instanceof UnderstudyApiError) || ![401, 403].includes(error.status)) throw error;
+      const label = available.find(choice => choice.value === selected)?.name ?? selected;
+      const message = `Cannot access ${label}. Its saved credential may have expired, been revoked, or lack organization access. Run orchestra login to refresh access, then orchestra claude-setup. Request ID: ${error.requestId || "unavailable"}.`;
+      if (!deps.interactive) throw new UnderstudyApiError({ status: error.status, errorType: error.errorType, requestId: error.requestId, message });
+      deps.write(message);
+      available = available.filter(choice => choice.value !== selected);
+      if (await deps.recover(available.length > 0) !== "another") return;
+      selected = undefined;
+    }
+  }
+}
+
 export async function setupNativeClaude(opts: Options = {}) {
   const version = await prepareClaudeVersion();
   if (!version) return;
@@ -89,10 +121,11 @@ export async function setupNativeClaude(opts: Options = {}) {
   if (!credentials || !Object.keys(credentials.orgs).length) throw new Error("Sign in first with orchestra login, then run orchestra claude-setup.");
   if (process.env.UNDERSTUDY_API_KEY || process.env.UNDERSTUDY_GATEWAY_URL) throw new Error("Unset shell credential/gateway overrides; persistent setup uses your saved organization credential.");
   const organizations = await organizationChoices(credentials);
-  const org = await choose("Organization", opts.org, organizations);
+  const accessible = await accessibleOrganization(organizations, opts.org);
+  if (!accessible) return;
+  const { org, projects } = accessible;
   const organizationLabel = organizations.find(choice => choice.value === org)!.name;
   const auth = resolveAuth(org);
-  const projects = await listProjects(auth);
   const project = await chooseCodingProject(org, credentials, projects, opts.project);
   if (!project) return;
   const resolved = await resolveProject({ org, project });

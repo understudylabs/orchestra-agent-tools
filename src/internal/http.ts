@@ -160,24 +160,15 @@ export function resolveAuth(orgId?: string): ResolvedAuth {
     );
   }
 
-  if (credentials.api_key) {
-    const chosen = resolveOrgId(credentials, orgId);
-    return {
-      token: credentials.api_key,
-      mode: "api_key",
-      gatewayUrl: fallbackGatewayUrl,
-      orgId: chosen,
-    };
-  }
-
   const chosen = resolveOrgId(credentials, orgId);
-  const entry = credentials.orgs[chosen]!;
-  return {
-    token: entry.api_key,
-    mode: "api_key",
-    gatewayUrl: entry.gateway_url || fallbackGatewayUrl,
-    orgId: chosen,
-  };
+  const entry = credentials.orgs[chosen];
+  if (entry) {
+    return { token: entry.api_key, mode: "api_key", gatewayUrl: entry.gateway_url, orgId: chosen };
+  }
+  if (credentials.api_key) {
+    return { token: credentials.api_key, mode: "api_key", gatewayUrl: fallbackGatewayUrl, orgId: chosen };
+  }
+  throw new Error("No saved credential for this organization. Run orchestra login again.");
 }
 
 function resolveOrgId(

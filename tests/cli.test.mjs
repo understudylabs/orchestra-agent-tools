@@ -3155,7 +3155,7 @@ class ChainOfThought(Predict):
       assert.equal(reportingPayload.future_field, "preserved");
       assert.equal(requests.at(-1).path, "/admin/v1/orgs/org_1/reporting");
       assert.equal(requests.at(-1).search, "?window=7d&group_by=workload&exclude_project_id=proj_internal");
-      assert.equal(requests.at(-1).headers.authorization, "Bearer sk_test_hosted");
+      assert.equal(requests.at(-1).headers.authorization, "Bearer sk_test_org");
 
       const usage = await runWithEnvAsync([
         "--json",
@@ -4514,7 +4514,7 @@ class ChainOfThought(Predict):
       assert.doesNotMatch(anthropic.stdout + anthropic.stderr, /sk_test|provider_secret_value|SECRET_COMPLETION/);
       const anthropicRequest = requests.at(-1);
       assert.equal(anthropicRequest.path, "/v1/messages");
-      assert.equal(anthropicRequest.headers["x-api-key"], "sk_test_hosted");
+      assert.equal(anthropicRequest.headers["x-api-key"], "sk_test_org");
       assert.equal(anthropicRequest.headers["x-understudy-upstream-key"], "provider_secret_value");
       assert.equal(anthropicRequest.headers["x-understudy-project"], "rehearsal");
       assert.equal(anthropicRequest.headers["x-understudy-workload"], "classify");
@@ -4527,7 +4527,7 @@ class ChainOfThought(Predict):
       assert.equal(openai.status, 0, openai.stderr);
       const openaiRequest = requests.at(-1);
       assert.equal(openaiRequest.path, "/v1/chat/completions");
-      assert.equal(openaiRequest.headers.authorization, "Bearer sk_test_hosted");
+      assert.equal(openaiRequest.headers.authorization, "Bearer sk_test_org");
       assert.equal(openaiRequest.body.stream, true);
       assert.equal(openaiRequest.body.max_tokens, 8);
       assert.equal(JSON.parse(openai.stdout).served_model, "gpt-4o-mini");
