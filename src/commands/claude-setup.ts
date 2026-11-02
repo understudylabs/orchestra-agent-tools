@@ -5,8 +5,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { stripVTControlCharacters } from "node:util";
 import { globalConfigDir } from "../config/paths.js";
-import { readCredentials } from "../config/credentials.js";
+import { readCredentials, type Credentials } from "../config/credentials.js";
 import { listProjects, resolveProject } from "../internal/projects.js";
 import { listWorkloads } from "../internal/workloads.js";
 import { request, resolveAuth } from "../internal/http.js";
@@ -57,13 +58,38 @@ export async function prepareClaudeVersion(deps = {
   }
 }
 
+const OrganizationIdentityResponseSchema = z.object({ organization: z.object({ id: z.string(), name: z.string() }) });
+
+export async function organizationChoices(credentials: Credentials, lookup = async (id: string) => {
+  const entry = credentials.orgs[id]!;
+  const { data } = await request({
+    orgId: id,
+    url: `${entry.gateway_url.replace(/\/+$/, "")}/admin/v1/orgs/${encodeURIComponent(id)}/identity`,
+    headers: { Authorization: `Bearer ${entry.api_key}` },
+    signal: AbortSignal.timeout(6_000),
+  }, OrganizationIdentityResponseSchema);
+  if (data.organization.id !== id) throw new Error("Organization identity mismatch");
+  return data.organization.name;
+}) {
+  return Promise.all(Object.keys(credentials.orgs).map(async value => {
+    try {
+      const label = stripVTControlCharacters(await lookup(value)).replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim();
+      return { name: label ? `${label} (${value})` : value, value };
+    } catch {
+      return { name: `${value} (name unavailable)`, value };
+    }
+  }));
+}
+
 export async function setupNativeClaude(opts: Options = {}) {
   const version = await prepareClaudeVersion();
   if (!version) return;
   const credentials = readCredentials();
   if (!credentials || !Object.keys(credentials.orgs).length) throw new Error("Sign in first with orchestra login, then run orchestra claude-setup.");
   if (process.env.UNDERSTUDY_API_KEY || process.env.UNDERSTUDY_GATEWAY_URL) throw new Error("Unset shell credential/gateway overrides; persistent setup uses your saved organization credential.");
-  const org = await choose("Organization", opts.org, Object.keys(credentials.orgs).map(value => ({ name: value, value })));
+  const organizations = await organizationChoices(credentials);
+  const org = await choose("Organization", opts.org, organizations);
+  const organizationLabel = organizations.find(choice => choice.value === org)!.name;
   const auth = resolveAuth(org);
   const projects = await listProjects(auth);
   const project = await choose("Project", opts.project, projects.map(p => ({ name: p.name ?? p.slug, value: p.slug })));
@@ -76,7 +102,7 @@ export async function setupNativeClaude(opts: Options = {}) {
   const models = catalog.filter(m => m.id.startsWith("claude-"));
   const model = await choose("Claude model", opts.model, models.map(m => ({ name: m.display_name ?? m.id, value: m.id })));
   const capture = workloads.find(w => w.name === workload)?.capture_enabled;
-  process.stdout.write(`\n${version}\nDefault: ${org} / ${project} / ${workload} (${environment})\nModel: ${model}\n\nNormal claude launches will send model requests, responses, and repository/branch metadata through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
+  process.stdout.write(`\n${version}\nDefault: ${organizationLabel} / ${project} / ${workload} (${environment})\nModel: ${model}\n\nNormal claude launches will send model requests, responses, and repository/branch metadata through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
   if (!opts.yes) {
     if (!process.stdin.isTTY) throw new Error("Use --yes to enable this persistent default after reviewing the routing and capture scope.");
     if (!await confirm({ message: "Use Orchestra by default for Claude Code?", default: false })) return;
