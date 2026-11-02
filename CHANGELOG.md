@@ -15,6 +15,8 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-11-02
+
 ### Added
 
 - Opt in to persistent Claude Code gateway setup from `orchestra init` or `orchestra claude-setup`; normal `claude` launches and resumes retain session attribution through a native mod.
