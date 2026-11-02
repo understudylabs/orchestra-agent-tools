@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, accessSync, constants, realpathSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import { globalConfigDir, samePath } from "./config/paths.js";
 import { readCredentials } from "./config/credentials.js";
@@ -46,6 +46,17 @@ export function storedNativeCredential(config: ClaudeNativeConfig): string {
   const entry = readCredentials()?.orgs[config.org];
   if (!entry || entry.gateway_url !== config.gateway_url) throw new Error("Claude credential is missing or its gateway changed. Sign in and run orchestra claude-setup again.");
   return entry.api_key;
+}
+
+export function claudeUpdateCommand(searchPath = process.env.PATH ?? "") {
+  for (const directory of searchPath.split(delimiter)) {
+    const executable = join(directory || ".", "claude");
+    try { accessSync(executable, constants.X_OK); } catch { continue; }
+    const target = realpathSync(executable);
+    const cask = /[/\\]Caskroom[/\\](claude-code(?:@latest)?)[/\\]/.exec(target)?.[1];
+    return cask ? { command: "brew", args: ["upgrade", cask] } : { command: "claude", args: ["update"] };
+  }
+  return { command: "claude", args: ["update"] };
 }
 
 export function checkClaudeVersion(): string {

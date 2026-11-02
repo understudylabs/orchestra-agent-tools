@@ -14,7 +14,7 @@ import { chooseCodingWorkload } from "../onboarding/coding-workload.js";
 import { listWorkloads } from "../internal/workloads.js";
 import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
-import { hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
+import { claudeUpdateCommand, hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
 
 interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean }
 async function choose(message: string, supplied: string | undefined, choices: { name: string; value: string }[]) {
@@ -34,12 +34,13 @@ export async function prepareClaudeVersion(deps = {
   check: checkClaudeVersion,
   interactive: Boolean(process.stdin.isTTY),
   choose: () => select({ message: "Claude Code needs attention", choices: [
-    { name: "Run claude update, then check again", value: "update" },
+    { name: `Run ${[claudeUpdateCommand().command, ...claudeUpdateCommand().args].join(" ")}, then check again`, value: "update" },
     { name: "Check again (I updated Claude separately)", value: "retry" },
     { name: "Skip gateway setup for now", value: "skip" },
   ] }),
   update: () => new Promise<boolean>(resolve => {
-    const child = spawn("claude", ["update"], { stdio: "inherit" });
+    const update = claudeUpdateCommand();
+    const child = spawn(update.command, update.args, { stdio: "inherit" });
     child.on("error", () => resolve(false));
     child.on("close", code => resolve(code === 0));
   }),
