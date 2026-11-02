@@ -15,6 +15,18 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-02
+
+### Added
+
+- Launch and resume Claude Code through Orchestra with persistent repository, branch, session, and W3C trace attribution.
+- Account for session requests through existing customer trace and billing APIs without exported transcripts. Failed calls, missing prices, capture gaps, and unknown attribution remain explicit.
+- Link sessions to GitHub pull requests and refresh merge evidence automatically; optionally verify captured request and response payloads in private local files.
+
+### Fixed
+
+- Run protected private-term scans before npm publication, matching the existing maintainer release requirements.
+
 ## [0.8.2] — 2026-10-28
 
 ### Added
