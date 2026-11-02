@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { nativeModSource } from '../dist/claude-native.js';
+
+const moduleUrl = new URL('../dist/claude-native.js', import.meta.url).href;
+test('persistent setup, native session/resume, unknown git, and ownership-aware removal', () => {
+  const home = mkdtempSync(join(tmpdir(), 'orchestra-native-'));
+  try {
+    mkdirSync(join(home,'.understudy'));
+    writeFileSync(join(home,'.understudy','credentials.json'), JSON.stringify({orgs:{org_example:{api_key:'synthetic-key',gateway_url:'https://gateway.example.com'}}}), {mode:0o600});
+    const script = `
+      import assert from 'node:assert/strict';
+      import { readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+      import { join } from 'node:path';
+      import { enableNativeClaude, removeNativeClaude, nativeClaudeEnvironment, claudeSettingsPath, BLOCKED_GATEWAY } from ${JSON.stringify(moduleUrl)};
+      const settings = claudeSettingsPath(); mkdirSync(join(process.env.HOME,'.claude'));
+      const before={env:{ANTHROPIC_API_KEY:'previous-key',KEEP:'yes'},theme:'dark',model:'previous-model',hooks:{SessionStart:[]}};
+      writeFileSync(settings,JSON.stringify(before));
+      const config={version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com',model:'claude-example'};
+      enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
+      const enabled=JSON.parse(readFileSync(settings));
+      assert.equal(enabled.env.ANTHROPIC_BASE_URL,BLOCKED_GATEWAY);
+      assert.ok(!readFileSync(settings,'utf8').includes('synthetic-key'));
+      assert.equal(statSync(settings).mode&0o777,0o600);
+      assert.throws(()=>enableNativeClaude(config,'cli'),/already enabled/);
+      const id='11111111-1111-4111-8111-111111111111';
+      const first=nativeClaudeEnvironment(id,process.env.HOME);
+      assert.equal(first.ANTHROPIC_API_KEY,'synthetic-key');
+      assert.deepEqual(nativeClaudeEnvironment(id,process.env.HOME),first);
+      assert.ok(!first.ANTHROPIC_CUSTOM_HEADERS.includes('"repository"'));
+      assert.throws(()=>nativeClaudeEnvironment('../escape',process.env.HOME));
+      enabled.theme='light'; enabled.env.KEEP='changed'; enabled.model='user-choice';
+      enabled.env.CLAUDE_CODE_PLUGIN_DIRS += ':/tmp/another-plugin';
+      writeFileSync(settings,JSON.stringify(enabled));
+      const removed=removeNativeClaude();
+      const after=JSON.parse(readFileSync(settings));
+      assert.equal(after.env.ANTHROPIC_API_KEY,'previous-key');
+      assert.equal(after.env.ANTHROPIC_BASE_URL,undefined);
+      assert.equal(after.model,'user-choice'); assert.equal(after.theme,'light');
+      assert.equal(after.env.KEEP,'changed'); assert.equal(after.env.CLAUDE_CODE_PLUGIN_DIRS,'/tmp/another-plugin');
+      assert.deepEqual(removed.preserved_user_edits,['model']);
+      assert.throws(()=>nativeClaudeEnvironment(id),/not enabled/);
+    `;
+    const env = {...process.env, HOME:home, CLAUDE_CONFIG_DIR:''};
+    for (const key of Object.keys(env)) if (/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(key)) delete env[key];
+    const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,encoding:'utf8',cwd:home});
+    assert.equal(result.status,0,result.stderr);
+  } finally { rmSync(home,{recursive:true,force:true}); }
+});
+
+test('native mod applies credentials only after attribution and blocks failed steps', async () => {
+  const source=nativeModSource(['node','example-cli','claude-native-env']);
+  const mod=await import('data:text/javascript,'+encodeURIComponent(source));
+  const handlers={}; mod.register((name,handler)=>{handlers[name]=handler;});
+  const writes=[]; let succeed=true;
+  const $={env:{set:async(k,v)=>writes.push([k,v])},session:{id:async()=> 'id'},process:{run:async()=>({exitCode:succeed?0:1,stdout:JSON.stringify({ANTHROPIC_CUSTOM_HEADERS:'session-header',ANTHROPIC_API_KEY:'synthetic',ANTHROPIC_BASE_URL:'https://gateway.example.com'})})},ui:{log:()=>{}}};
+  let next=0;
+  await handlers['session.start']($,{},async()=>{next++;});
+  assert.equal(writes[0][1],'http://127.0.0.1:1');
+  assert.equal(writes.at(-1)[1],'https://gateway.example.com');
+  assert.equal(next,1);
+  succeed=false;
+  for await (const value of handlers['turn.step']($,{},async function*(){next++;yield 1;})) assert.fail('failed initialization yielded inference');
+  assert.equal(next,1);
+  assert.deepEqual(writes.at(-1),['ANTHROPIC_API_KEY','orchestra-initialization-required']);
+});
+
+import { verifySessionCapture } from '../dist/claude-reconciliation.js';
+test('missing git attribution stays absent in flat string tags and capture verification', () => {
+  const session={session_id:'session',environment:'test',repository:null,branch:null,base_commit:null};
+  const capture={request_id:'request',request_environment:'test',tags:{run_id:'session',harness:'claude-code'},customer_request_body:{messages:[]},response_body:{content:[]}};
+  verifySessionCapture(capture,session,'request');
+  assert.throws(()=>verifySessionCapture({...capture,tags:{...capture.tags,repository:'invented/repo'}},session,'request'),/Unexpected/);
+});

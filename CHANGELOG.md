@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Added
+
+- Opt in to persistent Claude Code gateway setup from `orchestra init` or `orchestra claude-setup`; normal `claude` launches and resumes retain session attribution through a native mod.
+- Inspect setup and session reports from the optional `orchestra start` menu. Remove the default with `orchestra claude-setup remove`, restoring prior settings while preserving subsequent user edits.
+- Account for sessions outside GitHub repositories without inventing repository or commit attribution. Persistent setup requires Claude Code 2.1.312 or later and uses saved organization credentials without copying keys into Claude settings.
+
 ## [0.9.0] — 2026-11-02
 
 ### Added

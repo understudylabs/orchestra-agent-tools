@@ -1,12 +1,16 @@
 import { spawn, spawnSync } from "node:child_process";
-import { statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { globalConfigDir } from "../config/paths.js";
+import { ClaudeSessionSchema } from "./claude.js";
 
 import { checkbox, confirm, input, select } from "@inquirer/prompts";
 import { Command } from "commander";
 import kleur from "kleur";
 
+import { setupNativeClaude } from "./claude-setup.js";
+import { readNativeState, removeNativeClaude } from "../claude-native.js";
 import { readCredentials } from "../config/credentials.js";
 import { readCliVersion } from "../internal/version.js";
 import { startTargets, systemAgentProbe } from "../onboarding/agents.js";
@@ -69,6 +73,7 @@ function systemStartDeps(prompt: string): StartDeps {
 const systemInitPrompts: InitPrompts = {
   setup: (localModelsDefault, labAvailable) => {
     const choices: { value: SetupChoice; name: string; description: string }[] = [
+      { value: "gateway", name: "Use Claude Code through Orchestra", description: "Set up normal claude launches once; reversible" },
       { value: "plugin", name: "Account + coding-agent plugin", description: "Recommended · about a minute" },
       { value: "choose", name: "Choose coding agents…", description: "Pick which agents get the plugin" },
       { value: "cli", name: "Just the CLI", description: "Already installed; skip the rest" },
@@ -147,6 +152,7 @@ export function registerOnboardingCommands(program: Command): void {
         }
         const outcome = await runInit(opts, systemInitPrompts, readCliVersion());
         printAttention(outcome.attention);
+        if (outcome.choice === "gateway") { await setupNativeClaude(); return; }
         if (outcome.choice === "cli" || !opts.start) {
           process.stdout.write(`\n  Run ${kleur.cyan("orchestra start")} when you're ready to start onboarding in a coding agent.\n`);
           return;
@@ -166,6 +172,43 @@ export function registerOnboardingCommands(program: Command): void {
     .option("--lower-anthropic-bill", "Focus onboarding on lowering an Anthropic bill.")
     .action(async (opts: { lowerAnthropicBill?: boolean }) => {
       await quietOnExit(async () => {
+        let configured = false;
+        try {
+          const { config } = readNativeState(); configured = true;
+          process.stdout.write(`\nClaude Code · ${config.model}\n${config.org} / ${config.project} / ${config.workload} (${config.environment})\nRun claude normally; this menu is optional.\n\n`);
+        } catch { /* First setup remains available. */ }
+        const action = await select({ message: "Orchestra", choices: [
+          ...(configured ? [
+            { value: "launch", name: "Start Claude Code" },
+            { value: "resume", name: "Resume Claude Code" },
+            { value: "status", name: "Check Claude gateway setup" },
+            { value: "report", name: "View a session cost and capture report" },
+            { value: "remove", name: "Remove Claude gateway default" },
+          ] : [{ value: "setup", name: "Set up Claude Code through Orchestra" }]),
+          { value: "plugin", name: "Start plugin onboarding in a coding agent" },
+          { value: "exit", name: "Exit" },
+        ] });
+        if (action === "exit") return;
+        if (action === "setup") { await setupNativeClaude(); return; }
+        if (action === "launch" || action === "resume") {
+          process.exitCode = await runInTerminal("claude", action === "resume" ? ["--resume"] : [], process.cwd()); return;
+        }
+        if (action === "remove") {
+          if (await confirm({ message: "Restore previous Claude settings?", default: false })) process.stdout.write(JSON.stringify(removeNativeClaude(), null, 2) + "\n");
+          return;
+        }
+        if (action === "report") {
+          const dir = join(globalConfigDir(), "claude-sessions");
+          const sessions = existsSync(dir) ? readdirSync(dir).filter(name => /^[a-f0-9-]{36}\.json$/.test(name)).flatMap(name => {
+            try { return [ClaudeSessionSchema.parse(JSON.parse(readFileSync(join(dir, name), "utf8")))]; } catch { return []; }
+          }).sort((a, b) => b.created_at.localeCompare(a.created_at)) : [];
+          if (!sessions.length) { process.stdout.write("No sessions yet. Run claude to start one.\n"); return; }
+          const id = await select({ message: "Session report", choices: sessions.map(s => ({ value: s.session_id, name: `${s.created_at} · ${s.repository ?? "No GitHub remote"} · ${s.branch ?? "No branch"} · ${s.session_id.slice(0, 8)}` })) });
+          process.exitCode = await runInTerminal(process.execPath, [process.argv[1]!, "claude-session", "account", id], process.cwd()); return;
+        }
+        if (action === "status") {
+          process.exitCode = await runInTerminal(process.execPath, [process.argv[1]!, "claude-setup", action], process.cwd()); return;
+        }
         await runStart(
           systemStartDeps(
             onboardingPrompt({

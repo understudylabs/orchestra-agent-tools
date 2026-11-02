@@ -23,6 +23,7 @@ const PullRequestSchema = z.object({
 });
 
 export function verifyClaudePullRequest(session: z.infer<typeof ClaudeSessionSchema>, value: unknown) {
+  if (!session.repository || !session.branch || !session.base_commit) throw new Error("Session has no complete GitHub branch attribution.");
   const pr = PullRequestSchema.parse(value);
   const headRepository = `${pr.headRepositoryOwner?.login}/${pr.headRepository?.name}`;
   if (headRepository !== session.repository || pr.headRefName !== session.branch) {
@@ -53,6 +54,7 @@ export function verifyClaudePullRequest(session: z.infer<typeof ClaudeSessionSch
 }
 
 export function resolveClaudePullRequest(session: z.infer<typeof ClaudeSessionSchema>, number?: string) {
+  if (!session.repository || !session.branch || !session.base_commit) throw new Error("Session has no complete GitHub branch attribution.");
   if (number !== undefined && !/^[1-9][0-9]*$/.test(number)) throw new Error("--pr must be a positive pull request number.");
   if (number === undefined) {
     const candidates = z.array(z.object({ number: z.number().int().positive() })).parse(JSON.parse(execFileSync("gh", ["pr", "list", "--repo", session.repository, "--head", session.branch, "--state", "all", "--limit", "2", "--json", "number"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })));

@@ -16,14 +16,15 @@ export const ClaudeSessionSchema = z.object({
   traceparent: z.string().regex(/^00-(?!0{32}-)[a-f0-9]{32}-(?!0{16}-)[a-f0-9]{16}-01$/).optional(),
   created_at: z.string().datetime(),
   root: z.string(),
-  repository: HeaderValue,
-  branch: HeaderValue,
-  base_commit: z.string().regex(/^[a-f0-9]{40,64}$/),
+  repository: HeaderValue.nullable(),
+  branch: HeaderValue.nullable(),
+  base_commit: z.string().regex(/^[a-f0-9]{40,64}$/).nullable(),
   org: HeaderValue,
   project: HeaderValue,
   workload: HeaderValue,
   environment: z.enum(["test", "production"]),
   gateway_url: z.string().url(),
+  harness_version: z.string().optional(),
 });
 type Session = z.infer<typeof ClaudeSessionSchema>;
 interface Options {
@@ -51,6 +52,12 @@ export function validateClaudeArgs(args: string[]): void {
   }
 }
 
+export function claudeSessionTags(session: Session): Record<string, string> {
+  return Object.fromEntries(Object.entries({ harness: "claude-code", harness_version: session.harness_version,
+    run_id: session.session_id, repository: session.repository, branch: session.branch, base_commit: session.base_commit,
+  }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
 export function claudeEnvironment(env: NodeJS.ProcessEnv, session: Session, token: string): NodeJS.ProcessEnv {
   const result = { ...env };
   for (const key of Object.keys(result)) {
@@ -66,7 +73,7 @@ export function claudeEnvironment(env: NodeJS.ProcessEnv, session: Session, toke
     `x-understudy-workload: ${session.workload}`,
     `x-understudy-session-id: ${session.session_id}`,
     ...(session.traceparent ? [`traceparent: ${session.traceparent}`] : []),
-    `x-understudy-tags: ${JSON.stringify({ harness: "claude-code", run_id: session.session_id, repository: session.repository, branch: session.branch, base_commit: session.base_commit })}`,
+    `x-understudy-tags: ${JSON.stringify(claudeSessionTags(session))}`,
   ].join("\n");
   return result;
 }
