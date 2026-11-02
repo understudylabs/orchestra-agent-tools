@@ -487,3 +487,8 @@ command outputs that do not contain private payloads.
 ## License
 
 MIT.
+
+### Claude Code gateway attribution
+
+Run Claude Code with persistent session and Git attribution using
+`orchestra claude`. See [setup, resume, capture/cost reconciliation and PR linking](docs/claude-gateway.md).
