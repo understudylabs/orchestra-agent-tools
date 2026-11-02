@@ -24,6 +24,7 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
       const enabled=JSON.parse(readFileSync(settings));
       assert.equal(enabled.env.ANTHROPIC_BASE_URL,BLOCKED_GATEWAY);
+      for (const key of ['ANTHROPIC_MODEL','ANTHROPIC_DEFAULT_OPUS_MODEL','ANTHROPIC_DEFAULT_SONNET_MODEL','ANTHROPIC_DEFAULT_HAIKU_MODEL']) assert.equal(enabled.env[key],undefined);
       assert.ok(!readFileSync(settings,'utf8').includes('synthetic-key'));
       assert.equal(statSync(settings).mode&0o777,0o600);
       assert.throws(()=>enableNativeClaude(config,'cli'),/already enabled/);
@@ -44,6 +45,16 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       assert.equal(after.env.KEEP,'changed'); assert.equal(after.env.CLAUDE_CODE_PLUGIN_DIRS,'/tmp/another-plugin');
       assert.deepEqual(removed.preserved_user_edits,['model']);
       assert.throws(()=>nativeClaudeEnvironment(id),/not enabled/);
+      delete config.model;
+      enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
+      const unpinned=JSON.parse(readFileSync(settings));
+      assert.equal(unpinned.model,'user-choice');
+      unpinned.model='next-picker-choice'; writeFileSync(settings,JSON.stringify(unpinned));
+      const switched=nativeClaudeEnvironment('22222222-2222-4222-8222-222222222222',process.env.HOME);
+      assert.equal(switched.ANTHROPIC_MODEL,undefined);
+      removeNativeClaude();
+      assert.equal(JSON.parse(readFileSync(settings)).model,'next-picker-choice');
+
     `;
     const env = {...process.env, HOME:home, CLAUDE_CONFIG_DIR:''};
     for (const key of Object.keys(env)) if (/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(key)) delete env[key];

@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, accessSync, constants, realpathSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import { globalConfigDir, samePath } from "./config/paths.js";
 import { readCredentials } from "./config/credentials.js";
@@ -12,7 +12,7 @@ export const BLOCKED_GATEWAY = "http://127.0.0.1:1";
 const Header = z.string().min(1).max(256).regex(/^[\x20-\x7e]+$/);
 export const ClaudeNativeConfigSchema = z.object({
   version: z.literal(1), org: Header, project: Header, workload: Header,
-  environment: z.enum(["test", "production"]), gateway_url: z.string().url(), model: Header, harness_version: z.string().optional(),
+  environment: z.enum(["test", "production"]), gateway_url: z.string().url(), model: Header.optional(), harness_version: z.string().optional(),
 });
 export type ClaudeNativeConfig = z.infer<typeof ClaudeNativeConfigSchema>;
 type Document = Record<string, unknown>;
@@ -35,6 +35,7 @@ const StateSchema = z.object({
   config: ClaudeNativeConfigSchema, settings_path: z.string(),
   before: z.record(z.string(), z.unknown()), installed: z.record(z.string(), z.unknown()),
 });
+export const hasNativeClaudeSetup = () => existsSync(statePath());
 export function readNativeState() {
   if (!existsSync(statePath())) throw new Error("Claude integration is not enabled. Run orchestra claude-setup.");
   return StateSchema.parse(readJson(statePath()));
@@ -47,11 +48,27 @@ export function storedNativeCredential(config: ClaudeNativeConfig): string {
   return entry.api_key;
 }
 
+export function claudeUpdateCommand(searchPath = process.env.PATH ?? "") {
+  for (const directory of searchPath.split(delimiter)) {
+    const executable = join(directory || ".", "claude");
+    try { accessSync(executable, constants.X_OK); } catch { continue; }
+    const target = realpathSync(executable);
+    const cask = /[/\\]Caskroom[/\\](claude-code(?:@latest)?)[/\\]/.exec(target)?.[1];
+    return cask ? { command: "brew", args: ["upgrade", cask] } : { command: "claude", args: ["update"] };
+  }
+  return { command: "claude", args: ["update"] };
+}
+
 export function checkClaudeVersion(): string {
-  const version = execFileSync("claude", ["--version"], { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"] }).trim();
+  let version: string;
+  try {
+    version = execFileSync("claude", ["--version"], { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"] }).trim();
+  } catch {
+    throw new Error("Could not run claude --version. Install Claude Code or fix PATH, then retry. https://code.claude.com/docs/en/setup");
+  }
   const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
   if (!match || Number(match[1]) < 2 || (Number(match[1]) === 2 && (Number(match[2]) < 1 || (Number(match[2]) === 1 && Number(match[3]) < 312)))) {
-    throw new Error("Persistent Orchestra setup requires Claude Code 2.1.312 or later. Update Claude and retry.");
+    throw new Error(`Detected Claude Code ${version || "unknown"}. Persistent Orchestra setup requires 2.1.312 or later.`);
   }
   return version;
 }
@@ -109,12 +126,8 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
       ANTHROPIC_CUSTOM_HEADERS: "",
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       CLAUDE_CODE_PLUGIN_DIRS: plugins + plugin,
-      ANTHROPIC_MODEL: config.model,
-      ANTHROPIC_DEFAULT_OPUS_MODEL: config.model,
-      ANTHROPIC_DEFAULT_SONNET_MODEL: config.model,
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: config.model,
     },
-    model: config.model,
+    ...(config.model ? { model: config.model } : {}),
   };
   writeNativeJson(join(plugin, ".claude-plugin", "plugin.json"), { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" });
   writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });
@@ -122,7 +135,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   // Save recovery state first: interruption before settings write remains safely removable.
   writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed });
   writeNativeJson(settingsPath, { ...before, ...installed, env: { ...env, ...installed.env } });
-  return { enabled: true, settings_path: settingsPath, next: "Run claude normally. To restore previous settings: orchestra claude-setup remove" };
+  return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
 
 export function removeNativeClaude() {

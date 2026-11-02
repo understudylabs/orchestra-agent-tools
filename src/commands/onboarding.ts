@@ -12,6 +12,7 @@ import kleur from "kleur";
 import { setupNativeClaude } from "./claude-setup.js";
 import { readNativeState, removeNativeClaude } from "../claude-native.js";
 import { readCredentials } from "../config/credentials.js";
+import { runAction } from "../internal/output.js";
 import { readCliVersion } from "../internal/version.js";
 import { startTargets, systemAgentProbe } from "../onboarding/agents.js";
 import { AGENT_NAMES, runInit, type AttentionItem, type InitPrompts, type SetupChoice } from "../onboarding/init.js";
@@ -121,7 +122,7 @@ function printAttention(items: AttentionItem[]): void {
 }
 
 /** Ctrl-C in a prompt ends the screen quietly instead of with a stack trace. */
-async function quietOnExit(work: () => Promise<void>): Promise<void> {
+async function quietOnExit(cmd: Command, work: () => Promise<void>): Promise<void> {
   try {
     await work();
   } catch (error) {
@@ -130,7 +131,7 @@ async function quietOnExit(work: () => Promise<void>): Promise<void> {
       process.exitCode = 130;
       return;
     }
-    throw error;
+    await runAction(cmd, async () => { throw error; });
   }
 }
 
@@ -144,8 +145,8 @@ export function registerOnboardingCommands(program: Command): void {
     .option("--advanced", "Choose which coding agents get the plugin.")
     .option("--lower-anthropic-bill", "Focus onboarding on lowering an Anthropic bill.")
     .option("--no-start", "Finish without the start screen.")
-    .action(async (opts: { agents?: string; localModels?: boolean; skipLogin?: boolean; advanced?: boolean; lowerAnthropicBill?: boolean; start: boolean }) => {
-      await quietOnExit(async () => {
+    .action(async function (this: Command, opts: { agents?: string; localModels?: boolean; skipLogin?: boolean; advanced?: boolean; lowerAnthropicBill?: boolean; start: boolean }) {
+      await quietOnExit(this, async () => {
         // The installer has just shown its banner; standalone runs get a header.
         if (process.env.ORCHESTRA_INIT_FROM_INSTALLER !== "1") {
           process.stdout.write(`\n  ${kleur.bold("orchestra")} ${kleur.gray("· Turn AI spend into AI you own.")}\n\n`);
@@ -170,12 +171,12 @@ export function registerOnboardingCommands(program: Command): void {
     .command("start")
     .description("Start Orchestra onboarding in a coding agent: open Claude Code or Codex here, or copy the prompt for a desktop app.")
     .option("--lower-anthropic-bill", "Focus onboarding on lowering an Anthropic bill.")
-    .action(async (opts: { lowerAnthropicBill?: boolean }) => {
-      await quietOnExit(async () => {
+    .action(async function (this: Command, opts: { lowerAnthropicBill?: boolean }) {
+      await quietOnExit(this, async () => {
         let configured = false;
         try {
           const { config } = readNativeState(); configured = true;
-          process.stdout.write(`\nClaude Code · ${config.model}\n${config.org} / ${config.project} / ${config.workload} (${config.environment})\nRun claude normally; this menu is optional.\n\n`);
+          process.stdout.write(`\nClaude Code · Use /model to choose a model\n${config.org} / ${config.project} / ${config.workload} (${config.environment})\nRun claude normally; this menu is optional.\n\n`);
         } catch { /* First setup remains available. */ }
         const action = await select({ message: "Orchestra", choices: [
           ...(configured ? [
