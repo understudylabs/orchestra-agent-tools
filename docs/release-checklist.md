@@ -41,9 +41,14 @@ Before publishing a package, run:
 npm run package:smoke -- --release
 ```
 
-It runs `npm pack --dry-run --json` and inspects the included files for local
+It runs `npm pack --dry-run --json` and inspects Orchestra-owned files for local
 artifacts, private paths, raw payload markers, production/control-plane URLs,
 and secret-shaped strings.
+
+Bundled public dependencies are checked against npm registry integrity entries in
+`package-lock.json` and their installed names/versions. Run `npm ci` before this
+check: npm verifies the downloaded archives. Upstream examples and localized
+strings are outside Orchestra's private-term policy; unpinned dependencies fail.
 
 ## Desktop release
 

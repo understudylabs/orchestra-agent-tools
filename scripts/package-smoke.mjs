@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { validateBundledDependency } from "./bundled-dependency-policy.mjs";
 import {
   configuredPrivateTermPolicy,
   privateTermsEnvironmentVariable,
@@ -48,7 +49,8 @@ const requiredPackageMembers = [
 ];
 
 function npmPackFiles() {
-  const result = spawnSync("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
+  // Bundled dependencies make the file manifest larger than Node's default 1 MiB buffer.
+  const result = spawnSync("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
   if (result.status !== 0) {
     throw new Error(result.stderr || "npm pack failed");
   }
@@ -95,9 +97,18 @@ function main() {
   if (cliEntry && (!Number.isInteger(cliEntry.mode) || (cliEntry.mode & 0o111) === 0)) {
     errors.push("package/dist/bin.js: CLI entry must be executable on Unix");
   }
+  const lockfile = packageFiles.some(entry => entry.path.startsWith("node_modules/"))
+    ? JSON.parse(readFileSync("package-lock.json", "utf8"))
+    : {};
   for (const entry of packageFiles) {
     const path = entry.path;
     const packageName = `package/${path}`;
+    try {
+      if (validateBundledDependency(path, lockfile)) continue;
+    } catch (error) {
+      errors.push(error.message);
+      continue;
+    }
     for (const forbidden of forbiddenMemberParts) {
       if (path.includes(forbidden) || path.endsWith(forbidden)) {
         errors.push(`${packageName}: forbidden packaged path ${JSON.stringify(forbidden)}`);
