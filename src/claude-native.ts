@@ -12,7 +12,7 @@ export const BLOCKED_GATEWAY = "http://127.0.0.1:1";
 const Header = z.string().min(1).max(256).regex(/^[\x20-\x7e]+$/);
 export const ClaudeNativeConfigSchema = z.object({
   version: z.literal(1), org: Header, project: Header, workload: Header,
-  environment: z.enum(["test", "production"]), gateway_url: z.string().url(), model: Header, harness_version: z.string().optional(),
+  environment: z.enum(["test", "production"]), gateway_url: z.string().url(), model: Header.optional(), harness_version: z.string().optional(),
 });
 export type ClaudeNativeConfig = z.infer<typeof ClaudeNativeConfigSchema>;
 type Document = Record<string, unknown>;
@@ -114,12 +114,8 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
       ANTHROPIC_CUSTOM_HEADERS: "",
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       CLAUDE_CODE_PLUGIN_DIRS: plugins + plugin,
-      ANTHROPIC_MODEL: config.model,
-      ANTHROPIC_DEFAULT_OPUS_MODEL: config.model,
-      ANTHROPIC_DEFAULT_SONNET_MODEL: config.model,
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: config.model,
     },
-    model: config.model,
+    ...(config.model ? { model: config.model } : {}),
   };
   writeNativeJson(join(plugin, ".claude-plugin", "plugin.json"), { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" });
   writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });

@@ -135,12 +135,13 @@ export async function setupNativeClaude(opts: Options = {}) {
   if (!selectedWorkload) return;
   const workload = selectedWorkload.name;
   const environment = z.enum(["test", "production"]).parse(await choose("How will you use Claude Code?", opts.environment, [{ name: "Everyday coding (Production — recommended)", value: "production" }, { name: "Setup checks and experiments (Test)", value: "test" }]));
-  const catalog = (await request({ orgId: org, url: `/admin/v1/orgs/${org}/models` }, z.object({ models: z.array(z.object({ id: z.string(), display_name: z.string().optional() })) }))).data.models;
-  // The initial native integration is validated with Claude models only.
-  const models = catalog.filter(m => m.id.startsWith("claude-"));
-  const model = await choose("Claude model", opts.model, models.map(m => ({ name: m.display_name ?? m.id, value: m.id })));
+  const model = opts.model;
+  if (model) {
+    const catalog = (await request({ orgId: org, url: `/admin/v1/orgs/${org}/models` }, z.object({ models: z.array(z.object({ id: z.string() })) }))).data.models;
+    if (!catalog.some(candidate => candidate.id === model && candidate.id.startsWith("claude-"))) throw new Error("The requested Claude model is not available in this organization.");
+  }
   const capture = selectedWorkload.capture_enabled;
-  process.stdout.write(`\n${version}\nDefault: ${organizationLabel} / ${project} / ${workload} (${environment})\nModel: ${model}\n\nNormal claude launches will send model requests, responses, and repository/branch metadata through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
+  process.stdout.write(`\n${version}\nDefault: ${organizationLabel} / ${project} / ${workload} (${environment})\nModel: ${model ?? "Use Claude’s current/default model; switch with /model"}\n\nNormal claude launches will send model requests, responses, and repository/branch metadata through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
   if (!opts.yes) {
     if (!process.stdin.isTTY) throw new Error("Use --yes to enable this persistent default after reviewing the routing and capture scope.");
     if (!await confirm({ message: "Use Orchestra by default for Claude Code?", default: false })) return;
@@ -152,7 +153,7 @@ export async function setupNativeClaude(opts: Options = {}) {
 export function registerClaudeSetupCommand(program: Command) {
   const command = program.command("claude-setup").description("Configure normal Claude Code launches through Orchestra; reversible user-level setup.")
     .option("--org <id>").option("--project <slug>").option("--workload <name>")
-    .option("--environment <environment>", "test or production").option("--model <id>")
+    .option("--environment <environment>", "test or production").option("--model <id>", "Optional starting Claude model; /model remains available")
     .option("--yes", "Confirm persistent routing and capture scope")
     .action(async function (this: Command, opts: Options) { await runAction(this, () => setupNativeClaude(opts)); });
   command.command("status").description("Check saved defaults, credentials, and settings drift without inference").action(async function (this: Command) {
@@ -161,6 +162,8 @@ export function registerClaudeSetupCommand(program: Command) {
       const current = JSON.parse(readFileSync(state.settings_path, "utf8"));
       const drift: string[] = [];
       for (const [key, value] of Object.entries(state.installed)) {
+        // /model intentionally updates this setting after an explicit starting model.
+        if (key === "model") continue;
         if (key === "env") {
           for (const [name, expected] of Object.entries(value as Record<string, unknown>)) if (current.env?.[name] !== expected) drift.push(`env.${name}`);
         } else if (current[key] !== value) drift.push(key);

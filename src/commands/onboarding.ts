@@ -176,7 +176,7 @@ export function registerOnboardingCommands(program: Command): void {
         let configured = false;
         try {
           const { config } = readNativeState(); configured = true;
-          process.stdout.write(`\nClaude Code · ${config.model}\n${config.org} / ${config.project} / ${config.workload} (${config.environment})\nRun claude normally; this menu is optional.\n\n`);
+          process.stdout.write(`\nClaude Code · Use /model to choose a model\n${config.org} / ${config.project} / ${config.workload} (${config.environment})\nRun claude normally; this menu is optional.\n\n`);
         } catch { /* First setup remains available. */ }
         const action = await select({ message: "Orchestra", choices: [
           ...(configured ? [
