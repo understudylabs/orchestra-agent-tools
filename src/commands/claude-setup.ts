@@ -9,7 +9,8 @@ import { stripVTControlCharacters } from "node:util";
 import { globalConfigDir } from "../config/paths.js";
 import { readCredentials, type Credentials } from "../config/credentials.js";
 import { listProjects, resolveProject } from "../internal/projects.js";
-import { listWorkloads } from "../internal/workloads.js";
+import { chooseCodingProject } from "../onboarding/coding-project.js";
+import { listWorkloads, WorkloadSchema } from "../internal/workloads.js";
 import { request, resolveAuth } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
 import { checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
@@ -92,9 +93,16 @@ export async function setupNativeClaude(opts: Options = {}) {
   const organizationLabel = organizations.find(choice => choice.value === org)!.name;
   const auth = resolveAuth(org);
   const projects = await listProjects(auth);
-  const project = await choose("Project", opts.project, projects.map(p => ({ name: p.name ?? p.slug, value: p.slug })));
+  const project = await chooseCodingProject(org, credentials, projects, opts.project);
+  if (!project) return;
   const resolved = await resolveProject({ org, project });
   const workloads = await listWorkloads(resolved);
+  if (!workloads.length && !opts.workload && process.stdin.isTTY) {
+    if (!await confirm({ message: "This project has no workloads. Create a coding workload for your harness traffic?", default: false })) return;
+    const capture = await confirm({ message: "Capture model requests and responses for session reports? Payloads are stored under your organization’s capture policy.", default: false });
+    const created = await request({ orgId: org, url: `/admin/v1/orgs/${encodeURIComponent(org)}/projects/${encodeURIComponent(resolved.projectId)}/workloads`, method: "POST", body: { name: "coding", capture_enabled: capture } }, WorkloadSchema);
+    workloads.push(created.data);
+  }
   const workload = await choose("Workload", opts.workload, workloads.map(w => ({ name: w.name, value: w.name })));
   const environment = z.enum(["test", "production"]).parse(await choose("Traffic environment", opts.environment, [{ name: "Test", value: "test" }, { name: "Production", value: "production" }]));
   const catalog = (await request({ orgId: org, url: `/admin/v1/orgs/${org}/models` }, z.object({ models: z.array(z.object({ id: z.string(), display_name: z.string().optional() })) }))).data.models;
