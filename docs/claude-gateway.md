@@ -34,26 +34,61 @@ The launcher disables user/project/local settings sources for this invocation
 because settings can replace gateway credentials and attribution headers.
 It leaves saved configuration untouched. Supply tool permissions and MCP
 configuration explicitly when needed. Organization-managed settings still
-apply; this is not a bypass of administrator policy. The initial verification
-used Claude Code 2.1.312 in headless mode; interactive and other versions need
-separate compatibility checks.
+apply; this is not a bypass of administrator policy. Claude Code 2.1.312 has been verified in headless and interactive terminal modes,
+including Read/Edit and close/reopen resume. Other versions and background/cloud
+launch modes need separate compatibility checks.
+
+## Account for a session without transcripts
+
+```sh
+orchestra claude-session account <session-id>
+```
+
+This reads the customer request-log API, including failed requests and background
+calls carrying the same session ID, and joins customer billing records. It walks
+a frozen ingestion snapshot and verifies the server applied the exact session,
+organization, project, workload and environment filters. Sessions must have
+started within the last seven days. Re-run after ingestion/pricing catches up.
+
+The report separates priced cost from unpriced request IDs and uncaptured
+request IDs. A total stays null if any request is unpriced or the inventory is
+empty. Coverage warnings are preserved: requests without the session ID, early
+rejections without a record, and later arrivals cannot be inferred from the
+snapshot. Missing-ID and shared-ID ambiguity is unknown, never a fabricated zero.
+
+With authenticated `gh`, the command discovers the unique PR for the branch,
+checks repository/branch/base ancestry, and refreshes its merge status. Use
+`--pr <number>` to select among multiple PRs. A missing or ambiguous linkage is
+reported separately from request cost. Both source and merge commits are retained.
+
+To verify stored request/response bodies as well, pass
+`--out <private-directory> --include-payload --yes`. The metadata-only command
+does not download payloads. Capture presence in the request log is an expectation,
+not proof of successful download; capture verification records missing exports.
+
+The command requires a gateway version supporting the `session_id` request-log
+filter. An older server is rejected rather than returning unrelated traffic.
 
 ## Reconcile a completed headless run
 
 Keep stream output private: it contains prompts, tool results and completions.
-Use a separate output file for each invocation, including resumes.
+Use a separate output file for each invocation, including resumes. The
+transcripts and the capture export go under a private temporary directory
+created with `mktemp -d`, which is readable only by you.
 
 ```sh
 umask 077
+artifacts=$(mktemp -d)
 orchestra claude --org org_example --project example --workload coding \
   --environment test -- --model <gateway-model-id> --max-budget-usd 1 \
-  --output-format stream-json --verbose -p 'Describe this repository' > initial.jsonl
+  --output-format stream-json --verbose -p 'Describe this repository' \
+  > "$artifacts/initial.jsonl"
 orchestra claude --resume <session-id> -- --model <gateway-model-id> \
   --max-budget-usd 1 --output-format stream-json --verbose \
-  -p 'Summarize your previous answer' > resumed.jsonl
+  -p 'Summarize your previous answer' > "$artifacts/resumed.jsonl"
 orchestra claude-session reconcile <session-id> \
-  --transcript initial.jsonl resumed.jsonl --out ./private-captures \
-  --include-payload --yes
+  --transcript "$artifacts/initial.jsonl" "$artifacts/resumed.jsonl" \
+  --out "$artifacts/captures" --include-payload --yes
 ```
 
 Reconciliation resolves assistant message IDs through the customer cost API,
@@ -74,6 +109,8 @@ report as the cost of an entire session. Keep exports outside version control.
 With the GitHub CLI authenticated:
 
 ```sh
+orchestra claude-session link <session-id>
+# Select explicitly if more than one PR matches the branch:
 orchestra claude-session link <session-id> --pr 12
 ```
 

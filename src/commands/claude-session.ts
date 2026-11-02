@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { z } from "zod";
 import { globalConfigDir } from "../config/paths.js";
 import { runAction } from "../internal/output.js";
+import { accountClaudeSession } from "../claude-accounting.js";
 import { reconcileClaudeSession } from "../claude-reconciliation.js";
 import { writePrivateText } from "./captures.js";
 import { ClaudeSessionSchema } from "./claude.js";
@@ -51,6 +52,21 @@ export function verifyClaudePullRequest(session: z.infer<typeof ClaudeSessionSch
   };
 }
 
+export function resolveClaudePullRequest(session: z.infer<typeof ClaudeSessionSchema>, number?: string) {
+  if (number !== undefined && !/^[1-9][0-9]*$/.test(number)) throw new Error("--pr must be a positive pull request number.");
+  if (number === undefined) {
+    const candidates = z.array(z.object({ number: z.number().int().positive() })).parse(JSON.parse(execFileSync("gh", ["pr", "list", "--repo", session.repository, "--head", session.branch, "--state", "all", "--limit", "2", "--json", "number"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })));
+    if (candidates.length !== 1) throw new Error(candidates.length ? "Multiple PRs match this branch; select --pr explicitly." : "No PR matches this session branch yet.");
+    number = String(candidates[0]!.number);
+  }
+  const fields = Object.keys(PullRequestSchema.shape).join(",");
+  const raw = execFileSync("gh", ["pr", "view", number, "--repo", session.repository, "--json", fields], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const linkage = verifyClaudePullRequest(session, JSON.parse(raw));
+  const comparison = execFileSync("gh", ["api", `repos/${session.repository}/compare/${session.base_commit}...${linkage.head_commit}`, "--jq", ".status"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  if (comparison !== "ahead" && comparison !== "identical") throw new Error("PR head does not descend from the session base commit.");
+  return linkage;
+}
+
 export function registerClaudeSessionCommand(program: Command): void {
   const command = program.command("claude-session").description("Inspect and link Orchestra-managed Claude sessions.");
   command.command("show <session-id>").action(async function (this: Command, id: string) {
@@ -58,6 +74,27 @@ export function registerClaudeSessionCommand(program: Command): void {
       process.stdout.write(JSON.stringify(readSession(id), null, 2) + "\n");
     });
   });
+  command.command("account <session-id>")
+    .description("Account for gateway session requests without transcripts, including failed and background calls")
+    .option("--pr <number>", "Resolve a specific PR instead of discovering by branch")
+    .option("--out <directory>", "Private capture export directory")
+    .option("--include-payload", "Download and verify request/response captures")
+    .option("--yes", "Confirm local payload export")
+    .action(async function (this: Command, id: string, opts: { pr?: string; out?: string; includePayload?: boolean; yes?: boolean }) {
+      await runAction(this, async () => {
+        if ((opts.out || opts.includePayload || opts.yes) && !(opts.out && opts.includePayload && opts.yes)) throw new Error("Capture verification requires --out, --include-payload and --yes together.");
+        const session = readSession(id);
+        const accounting = await accountClaudeSession(session, opts.out);
+        let pullRequest: ReturnType<typeof resolveClaudePullRequest> | null = null;
+        let linkageGap: string | null = null;
+        try { pullRequest = resolveClaudePullRequest(session, opts.pr); }
+        catch { linkageGap = "PR linkage is unavailable or ambiguous. Run claude-session link with an explicit --pr to diagnose."; }
+        const report = { ...accounting, pull_request: pullRequest, linkage_gap: linkageGap };
+        if (pullRequest) writePrivateText(join(globalConfigDir(), "claude-sessions", `${id}.pr.json`), JSON.stringify(pullRequest, null, 2) + "\n");
+        writePrivateText(join(globalConfigDir(), "claude-sessions", `${id}.accounting.json`), JSON.stringify(report, null, 2) + "\n");
+        process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+      });
+    });
   command.command("reconcile <session-id>")
     .requiredOption("--transcript <files...>", "Completed Claude stream-json outputs, including resume invocations")
     .requiredOption("--out <directory>", "Private capture export directory")
@@ -73,16 +110,11 @@ export function registerClaudeSessionCommand(program: Command): void {
       });
     });
   command.command("link <session-id>")
-    .requiredOption("--pr <number>", "Pull request number in the session repository")
-    .action(async function (this: Command, id: string, opts: { pr: string }) {
+    .option("--pr <number>", "Pull request number; otherwise discover the unique PR for the branch")
+    .action(async function (this: Command, id: string, opts: { pr?: string }) {
       await runAction(this, async () => {
         const session = readSession(id);
-        if (!/^[1-9][0-9]*$/.test(opts.pr)) throw new Error("--pr must be a positive pull request number.");
-        const fields = Object.keys(PullRequestSchema.shape).join(",");
-        const raw = execFileSync("gh", ["pr", "view", opts.pr, "--repo", session.repository, "--json", fields], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-        const linkage = verifyClaudePullRequest(session, JSON.parse(raw));
-        const comparison = execFileSync("gh", ["api", `repos/${session.repository}/compare/${session.base_commit}...${linkage.head_commit}`, "--jq", ".status"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-        if (comparison !== "ahead" && comparison !== "identical") throw new Error("PR head does not descend from the session base commit.");
+        const linkage = resolveClaudePullRequest(session, opts.pr);
         writePrivateText(join(globalConfigDir(), "claude-sessions", `${session.session_id}.pr.json`), JSON.stringify(linkage, null, 2) + "\n");
         process.stdout.write(JSON.stringify(linkage, null, 2) + "\n");
       });
