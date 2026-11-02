@@ -48,12 +48,14 @@ test('real CLI persists scoped launch, resumes, rejects branch drift, and propag
     assert.equal(first.status,0,first.stderr);
     const sessions=join(dir,'.understudy','claude-sessions'); const file=join(sessions,readdirSync(sessions)[0]);
     const session=JSON.parse(readFileSync(file));
+    assert.match(session.traceparent,/^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/);
     assert.equal(statSync(file).mode & 0o777,0o600);
     assert.ok(!readFileSync(file,'utf8').includes('synthetic-test-key'));
     assert.ok(!first.stderr.includes('synthetic-test-key'));
     const initial=JSON.parse(readFileSync(captured));
     assert.deepEqual(initial.args.slice(0,4),['--setting-sources','','--session-id',session.session_id]);
     assert.equal(initial.key,'synthetic-test-key');
+    assert.ok(initial.headers.includes(`traceparent: ${session.traceparent}`));
     const lock=join(sessions,session.session_id+'.lock');
     writeFileSync(lock,'');
     assert.match(run(['--resume',session.session_id]).stderr,/already running/);

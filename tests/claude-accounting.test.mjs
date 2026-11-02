@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { collectSessionRequests } from '../dist/claude-accounting.js';
-const scope={org:'org_example',projectId:'project',workloadId:'workload',sessionId:'session',environment:'test',startedAt:'2026-11-02T10:00:00.000Z'};
-const row=(id,status=200)=>({request_id:`019faa55-0000-7000-8000-${String(id).padStart(12,'0')}`,ts:'2026-11-02T11:00:00.000Z',project_id:'project',workload_id:'workload',request_environment:'test',status_code:status,outcome:status===200?'success':'error',tokens:{input_tokens:1,output_tokens:2,cache_read_input_tokens:0,cache_creation_input_tokens:0,reasoning_output_tokens:0},capture_state:status===200?'expected':'disabled'});
-const page=(calls,next_cursor=null)=>({org_id:'org_example',window_start:'2026-11-01T00:00:00.000Z',window_end:'2026-11-02T12:00:00.000Z',snapshot_watermark:'2026-11-02T12:00:01.000Z',filters:{session_id:'session',project_id:'project',workload_id:'workload',request_environment:'test'},calls,next_cursor,coverage:{source_timestamp:null,data_completeness:1,known_gaps:['late arrivals possible']}});
+const scope={org:'org_example',projectId:'project',workloadId:'workload',traceId:'a'.repeat(32),environment:'test',startedAt:'2026-11-02T10:00:00.000Z'};
+const row=(id,status=200)=>({request_id:`019faa55-0000-7000-8000-${String(id).padStart(12,'0')}`,ts:'2026-11-02T11:00:00.000Z',project_id:'project',workload_id:'workload',request_environment:'test',trace_id:scope.traceId,status_code:status,outcome:status===200?'success':'error',tokens:{input_tokens:1,output_tokens:2,cache_read_input_tokens:0,cache_creation_input_tokens:0,reasoning_output_tokens:0},capture_state:status===200?'expected':'disabled'});
+const page=(calls,next_cursor=null,total=calls.length)=>({org_id:'org_example',trace_id:scope.traceId,snapshot_watermark:'2026-11-02T12:00:01.000Z',groups:[{project_id:'project',total_count:total,calls}],next_cursor,coverage:{source_timestamp:null,data_completeness:1,known_gaps:['late arrivals possible']}});
 test('walks frozen pages including failed requests without a transcript',async()=>{
- const cursors=[];const result=await collectSessionRequests(scope,async c=>{cursors.push(c);return c===null?page([row(2)],'next'):page([row(1,400)]);});
+ const cursors=[];const result=await collectSessionRequests(scope,async c=>{cursors.push(c);return c===null?page([row(1)],'next',2):page([row(2,400)],null,2);});
  assert.deepEqual(cursors,[null,'next']);assert.equal(result.calls.length,2);assert.equal(result.calls[1].status_code,400);assert.deepEqual(result.known_gaps,['late arrivals possible']);
 });
-test('refuses scope drift, ignored session filter, and clipped session windows',async()=>{
+test('refuses scope drift and mismatched trace IDs',async()=>{
  await assert.rejects(collectSessionRequests(scope,async()=>({...page([]),org_id:'another'})),/scope mismatch/);
- await assert.rejects(collectSessionRequests(scope,async()=>({...page([]),filters:{...page([]).filters,session_id:'another'}})),/scope mismatch/);
- await assert.rejects(collectSessionRequests({...scope,startedAt:'2026-10-01T00:00:00Z'},async()=>page([])),/before the inventory/);
+ await assert.rejects(collectSessionRequests(scope,async()=>({...page([]),trace_id:'another'})),/scope mismatch/);
+ await assert.rejects(collectSessionRequests(scope,async()=>page([{...row(1),trace_id:'another'}])),/scope mismatch/);
 });
 test('refuses duplicate requests and changed pagination snapshots',async()=>{
- await assert.rejects(collectSessionRequests(scope,async c=>c===null?page([row(1)],'next'):page([row(1)])),/Repeated or unordered/);
- await assert.rejects(collectSessionRequests(scope,async c=>c===null?page([row(2)],'next'):{...page([row(1)]),snapshot_watermark:'2026-11-02T12:00:02Z'}),/snapshot changed/);
+ await assert.rejects(collectSessionRequests(scope,async c=>c===null?page([row(1)],'next',2):page([row(1)],null,2)),/Repeated or unordered/);
+ await assert.rejects(collectSessionRequests(scope,async c=>c===null?page([row(1)],'next',2):{...page([row(2)],null,2),snapshot_watermark:'2026-11-02T12:00:02Z'}),/snapshot changed/);
  await assert.rejects(collectSessionRequests(scope,async()=>page([],'next')),/Invalid inventory/);
 });
 
@@ -28,7 +28,7 @@ test('customer API accounting preserves failed calls and unknown prices and reje
   const root = mkdtempSync(join(tmpdir(), 'orchestra-account-'));
   const saved = Object.fromEntries(['HOME','UNDERSTUDY_API_KEY','UNDERSTUDY_GATEWAY_URL'].map(key => [key, process.env[key]]));
   const originalFetch = globalThis.fetch;
-  const session = {org:scope.org,project:'example',workload:'example',session_id:scope.sessionId,environment:'test',created_at:scope.startedAt,gateway_url:'https://synthetic.example.test'};
+  const session = {org:scope.org,project:'example',workload:'example',session_id:'session',traceparent:`00-${scope.traceId}-bbbbbbbbbbbbbbbb-01`,environment:'test',created_at:scope.startedAt,gateway_url:'https://synthetic.example.test'};
   let mode = 'missing';
   const cost = call => ({...call,org_id:scope.org,provider:'managed',served_model:'example',unpriced_reason:null,cost_categories:null,coverage:page([]).coverage,generated_at:call.ts,pricing_status:'priced',customer_cost_usd:0.01});
   try {
@@ -41,11 +41,11 @@ test('customer API accounting preserves failed calls and unknown prices and reje
       let status = 200;
       if (url.pathname.endsWith('/projects')) body = {projects:[{id:'project',slug:'example'}]};
       else if (url.pathname.endsWith('/workloads')) body = {workloads:[{id:'workload',name:'example',project_id:'project'}]};
-      else if (url.pathname.endsWith('/request-logs')) {
-        assert.equal(url.searchParams.get('session_id'),scope.sessionId);
+      else if (url.pathname.endsWith(`/request-logs/traces/${scope.traceId}`)) {
+        assert.equal(url.searchParams.has('session_id'),false);
         assert.equal(url.searchParams.get('request_environment'),'test');
         assert.equal(url.searchParams.get('include_rejection_details'),'true');
-        body = page(mode === 'empty' ? [] : [row(2),row(1,400)]);
+        body = page(mode === 'empty' ? [] : [row(1,400),row(2)]);
       } else if (url.pathname.endsWith(`/${row(2).request_id}/cost`)) body = {...cost(row(2)),...(mode === 'foreign' ? {org_id:'another'} : {})};
       else if (url.pathname.endsWith(`/${row(1).request_id}/cost`)) {
         if (mode === 'missing') { status = 404; body = {error:'Not found'}; }
@@ -76,4 +76,9 @@ test('customer API accounting preserves failed calls and unknown prices and reje
     }
     rmSync(root,{recursive:true,force:true});
   }
+});
+
+
+test('older sessions cannot silently acquire partial trace accounting', async () => {
+  await assert.rejects(accountClaudeSession({session_id:'legacy'}),/predates trace attribution/);
 });

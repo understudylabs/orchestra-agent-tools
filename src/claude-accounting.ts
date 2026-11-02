@@ -12,60 +12,68 @@ import { verifySessionCapture } from "./claude-reconciliation.js";
 // Customer request-log wire subset; unknown fields never enter the report.
 const SessionRequestSchema = z.object({
   request_id: z.string().uuid(), ts: z.string(), project_id: z.string(), workload_id: z.string(),
-  request_environment: z.enum(["test", "production"]), status_code: z.number().int(),
+  request_environment: z.enum(["test", "production"]), trace_id: z.string(), status_code: z.number().int(),
   outcome: z.string(), tokens: TokenCountsSchema,
   capture_state: z.enum(["expected", "disabled", "unknown"]),
 });
 const SessionPageSchema = z.object({
-  org_id: z.string(), window_start: z.string(), window_end: z.string(), snapshot_watermark: z.string(),
-  filters: z.object({ session_id: z.string(), project_id: z.string(), workload_id: z.string(), request_environment: z.string() }),
-  calls: z.array(SessionRequestSchema), next_cursor: z.string().nullable(), coverage: CoverageSchema,
+  org_id: z.string(), trace_id: z.string(), snapshot_watermark: z.string(),
+  groups: z.array(z.object({ project_id: z.string(), total_count: z.number().int().nonnegative(), calls: z.array(SessionRequestSchema) })),
+  next_cursor: z.string().nullable(), coverage: CoverageSchema,
 });
 type Session = z.infer<typeof ClaudeSessionSchema>;
-interface Scope { org: string; projectId: string; workloadId: string; sessionId: string; environment: string; startedAt: string }
+interface Scope { org: string; projectId: string; workloadId: string; traceId: string; environment: string }
 
 export async function collectSessionRequests(scope: Scope, pageRequest: (cursor: string | null) => Promise<unknown>) {
   const calls: z.infer<typeof SessionRequestSchema>[] = [];
   const seenRequests = new Set<string>(); const seenCursors = new Set<string>();
   const gaps = new Set<string>();
   let cursor: string | null = null;
-  let snapshot: { window_start: string; window_end: string; snapshot_watermark: string } | undefined;
+  let snapshot: string | undefined;
+  let total: number | undefined;
   let previous: { ts: string; request_id: string } | undefined;
   do {
     const page = SessionPageSchema.parse(await pageRequest(cursor));
-    if (page.org_id !== scope.org || page.filters.session_id !== scope.sessionId || page.filters.project_id !== scope.projectId || page.filters.workload_id !== scope.workloadId || page.filters.request_environment !== scope.environment) throw new Error("Session inventory scope mismatch.");
-    const anchors = { window_start: page.window_start, window_end: page.window_end, snapshot_watermark: page.snapshot_watermark };
-    if (Object.values(anchors).some(value => !Number.isFinite(Date.parse(value)))) throw new Error("Invalid inventory timeline.");
-    if (snapshot && JSON.stringify(snapshot) !== JSON.stringify(anchors)) throw new Error("Inventory snapshot changed during pagination.");
-    snapshot ??= anchors;
-    if (Date.parse(scope.startedAt) < Date.parse(page.window_start)) throw new Error("Session starts before the inventory window; this command supports sessions within the last seven days.");
+    if (page.org_id !== scope.org || page.trace_id !== scope.traceId) throw new Error("Session inventory scope mismatch.");
+    if (!Number.isFinite(Date.parse(page.snapshot_watermark))) throw new Error("Invalid inventory timeline.");
+    if (snapshot && snapshot !== page.snapshot_watermark) throw new Error("Inventory snapshot changed during pagination.");
+    snapshot ??= page.snapshot_watermark;
     for (const gap of page.coverage.known_gaps) gaps.add(gap);
     if (page.coverage.data_completeness < 1) gaps.add("Some gateway request metadata is incomplete.");
-    for (const call of page.calls) {
-      if (call.project_id !== scope.projectId || call.workload_id !== scope.workloadId || call.request_environment !== scope.environment) throw new Error("Request scope mismatch.");
-      const at = Date.parse(call.ts);
-      if (!Number.isFinite(at) || at < Date.parse(page.window_start) || at >= Date.parse(page.window_end)) throw new Error("Request falls outside inventory window.");
-      if (seenRequests.has(call.request_id) || (previous && (at > Date.parse(previous.ts) || (at === Date.parse(previous.ts) && call.request_id >= previous.request_id)))) throw new Error("Repeated or unordered request in inventory.");
-      previous = call; seenRequests.add(call.request_id); calls.push(call);
-      if (calls.length > 100_000) throw new Error("Session exceeds 100000 requests; no partial report was returned.");
+    let pageCount = 0;
+    for (const group of page.groups) {
+      if (group.project_id !== scope.projectId) throw new Error("Trace spans another project; attribution is ambiguous.");
+      if (total !== undefined && total !== group.total_count) throw new Error("Inventory total changed during pagination.");
+      total ??= group.total_count;
+      for (const call of group.calls) {
+        if (call.project_id !== scope.projectId || call.workload_id !== scope.workloadId || call.request_environment !== scope.environment || call.trace_id !== scope.traceId) throw new Error("Request scope mismatch.");
+        const at = Date.parse(call.ts);
+        if (!Number.isFinite(at)) throw new Error("Invalid request timestamp.");
+        if (seenRequests.has(call.request_id) || (previous && (at < Date.parse(previous.ts) || (at === Date.parse(previous.ts) && call.request_id <= previous.request_id)))) throw new Error("Repeated or unordered request in inventory.");
+        previous = call; seenRequests.add(call.request_id); calls.push(call); pageCount++;
+        if (calls.length > 100_000) throw new Error("Session exceeds 100000 requests; no partial report was returned.");
+      }
     }
     cursor = page.next_cursor;
     if (cursor !== null) {
-      if (!cursor || seenCursors.has(cursor) || page.calls.length === 0) throw new Error("Invalid inventory continuation cursor.");
+      if (!cursor || seenCursors.has(cursor) || pageCount === 0) throw new Error("Invalid inventory continuation cursor.");
       seenCursors.add(cursor);
     }
   } while (cursor !== null);
-  return { calls, snapshot: snapshot!, known_gaps: [...gaps] };
+  if (calls.length !== (total ?? 0)) throw new Error("Inventory count does not match the trace total.");
+  return { calls, snapshot: { snapshot_watermark: snapshot! }, known_gaps: [...gaps] };
 }
 
 export async function accountClaudeSession(session: Session, captureDirectory?: string) {
+  if (!session.traceparent) throw new Error("This session predates trace attribution. Start a new session for transcript-free accounting; use reconcile for older sessions.");
+  const traceId = session.traceparent.split("-")[1]!;
   const project = await resolveProject({ org: session.org, project: session.project });
   if (project.auth.gatewayUrl !== session.gateway_url) throw new Error("Gateway changed since session launch.");
   const workload = await resolveWorkload(project, session.workload);
-  const inventory = await collectSessionRequests({ org: session.org, projectId: project.projectId, workloadId: workload.id, sessionId: session.session_id, environment: session.environment, startedAt: session.created_at }, async cursor => {
-    const params = new URLSearchParams({ session_id: session.session_id, project_id: project.projectId, workload_id: workload.id, request_environment: session.environment, window: "7d", limit: "100", include_rejection_details: "true" });
+  const inventory = await collectSessionRequests({ org: session.org, projectId: project.projectId, workloadId: workload.id, traceId, environment: session.environment }, async cursor => {
+    const params = new URLSearchParams({ request_environment: session.environment, limit: "100", include_rejection_details: "true" });
     if (cursor) params.set("cursor", cursor);
-    return (await request({ orgId: session.org, url: `/admin/v1/orgs/${encodeURIComponent(session.org)}/request-logs?${params}` }, SessionPageSchema)).data;
+    return (await request({ orgId: session.org, url: `/admin/v1/orgs/${encodeURIComponent(session.org)}/request-logs/traces/${traceId}?${params}` }, SessionPageSchema)).data;
   });
   const records = [];
   for (const call of inventory.calls) {
@@ -104,13 +112,13 @@ export async function accountClaudeSession(session: Session, captureDirectory?: 
   const unpriced = records.filter(row => row.customer_cost_usd === null).map(row => row.request_id);
   const pricedCost = records.reduce((sum, row) => sum + (row.customer_cost_usd ?? 0), 0);
   return {
-    session_id: session.session_id, snapshot: inventory.snapshot, requests: records.length,
+    session_id: session.session_id, trace_id: traceId, snapshot: inventory.snapshot, requests: records.length,
     failed_requests: records.filter(row => row.status_code >= 400 || row.outcome === "error").length,
     priced_cost_usd: pricedCost, customer_cost_usd: unpriced.length || !records.length ? null : pricedCost,
     unpriced_request_ids: unpriced, uncaptured_request_ids: records.filter(row => row.capture_state !== "expected").map(row => row.request_id),
-    known_gaps: [...new Set([...inventory.known_gaps, "Snapshot covers ingested requests carrying this session ID, including background calls; later arrivals and traffic without the ID require a fresh inventory or separate investigation."])],
+    known_gaps: [...new Set([...inventory.known_gaps, "Snapshot covers ingested requests carrying this session trace ID, including background calls; later arrivals and traffic without the ID require a fresh inventory or separate investigation."])],
     unmatched_requests: null, ambiguous_requests: null,
-    attribution_note: "Session membership is explicit. Requests missing this session ID and shared/reused IDs cannot be quantified from this filtered inventory alone.",
+    attribution_note: "Session membership is explicit. Requests missing this session trace ID and shared/reused IDs cannot be quantified from this filtered inventory alone.",
     records,
   };
 }

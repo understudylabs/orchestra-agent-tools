@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
@@ -13,6 +13,7 @@ const HeaderValue = z.string().min(1).max(256).regex(/^[\x20-\x7e]+$/);
 export const ClaudeSessionSchema = z.object({
   version: z.literal(1),
   session_id: z.string().uuid(),
+  traceparent: z.string().regex(/^00-(?!0{32}-)[a-f0-9]{32}-(?!0{16}-)[a-f0-9]{16}-01$/).optional(),
   created_at: z.string().datetime(),
   root: z.string(),
   repository: HeaderValue,
@@ -64,6 +65,7 @@ export function claudeEnvironment(env: NodeJS.ProcessEnv, session: Session, toke
     `x-understudy-project: ${session.project}`,
     `x-understudy-workload: ${session.workload}`,
     `x-understudy-session-id: ${session.session_id}`,
+    ...(session.traceparent ? [`traceparent: ${session.traceparent}`] : []),
     `x-understudy-tags: ${JSON.stringify({ harness: "claude-code", run_id: session.session_id, repository: session.repository, branch: session.branch, base_commit: session.base_commit })}`,
   ].join("\n");
   return result;
@@ -101,7 +103,7 @@ async function launchClaude(args: string[], opts: Options): Promise<void> {
     }
   } else {
     const auth = resolveOrganizationAuth(opts.org);
-    session = ClaudeSessionSchema.parse({ version: 1, session_id: randomUUID(), created_at: new Date().toISOString(), root, repository, branch, base_commit: git("rev-parse", "HEAD"), org: auth.orgId, project: opts.project, workload: opts.workload, environment: opts.environment, gateway_url: auth.gatewayUrl });
+    session = ClaudeSessionSchema.parse({ version: 1, session_id: randomUUID(), traceparent: `00-${randomUUID().replaceAll("-", "")}-${randomBytes(8).toString("hex")}-01`, created_at: new Date().toISOString(), root, repository, branch, base_commit: git("rev-parse", "HEAD"), org: auth.orgId, project: opts.project, workload: opts.workload, environment: opts.environment, gateway_url: auth.gatewayUrl });
   }
   const auth = resolveOrganizationAuth(session.org);
   if (auth.gatewayUrl !== session.gateway_url) throw new Error("Gateway changed since this session was created.");

@@ -44,15 +44,16 @@ launch modes need separate compatibility checks.
 orchestra claude-session account <session-id>
 ```
 
-This reads the customer request-log API, including failed requests and background
-calls carrying the same session ID, and joins customer billing records. It walks
-a frozen ingestion snapshot and verifies the server applied the exact session,
-organization, project, workload and environment filters. Sessions must have
-started within the last seven days. Re-run after ingestion/pricing catches up.
+The launcher gives each new session a persistent W3C traceparent header. This
+command reads the existing customer trace API, including failed requests and
+background calls carrying that trace ID, and joins customer billing records. It
+walks a frozen ingestion snapshot and checks every request against the session
+trace, organization, project, workload and environment. Re-run after
+ingestion/pricing catches up. No platform changes are required.
 
 The report separates priced cost from unpriced request IDs and uncaptured
 request IDs. A total stays null if any request is unpriced or the inventory is
-empty. Coverage warnings are preserved: requests without the session ID, early
+empty. Coverage warnings are preserved: requests without the session trace ID, early
 rejections without a record, and later arrivals cannot be inferred from the
 snapshot. Missing-ID and shared-ID ambiguity is unknown, never a fabricated zero.
 
@@ -66,8 +67,9 @@ To verify stored request/response bodies as well, pass
 does not download payloads. Capture presence in the request log is an expectation,
 not proof of successful download; capture verification records missing exports.
 
-The command requires a gateway version supporting the `session_id` request-log
-filter. An older server is rejected rather than returning unrelated traffic.
+Sessions created before trace attribution remain resumable, but cannot use this
+accounting path. Start a new session, or use transcript reconciliation below for
+earlier sessions. Trace retention and gateway coverage limits still apply.
 
 ## Reconcile a completed headless run
 
