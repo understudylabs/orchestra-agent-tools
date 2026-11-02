@@ -49,7 +49,8 @@ command reads the existing customer trace API, including failed requests and
 background calls carrying that trace ID, and joins customer billing records. It
 walks a frozen ingestion snapshot and checks every request against the session
 trace, organization, project, workload and environment. Re-run after
-ingestion/pricing catches up. No platform changes are required.
+ingestion/pricing catches up. No platform changes are required. Resuming a
+session preserves its trace ID, so resumed invocations are accounted together.
 
 The report separates priced cost from unpriced request IDs and uncaptured
 request IDs. A total stays null if any request is unpriced or the inventory is
