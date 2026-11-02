@@ -10,7 +10,8 @@ import { globalConfigDir } from "../config/paths.js";
 import { readCredentials, type Credentials } from "../config/credentials.js";
 import { listProjects, resolveProject } from "../internal/projects.js";
 import { chooseCodingProject } from "../onboarding/coding-project.js";
-import { listWorkloads, WorkloadSchema } from "../internal/workloads.js";
+import { chooseCodingWorkload } from "../onboarding/coding-workload.js";
+import { listWorkloads } from "../internal/workloads.js";
 import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
 import { checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
@@ -130,19 +131,15 @@ export async function setupNativeClaude(opts: Options = {}) {
   if (!project) return;
   const resolved = await resolveProject({ org, project });
   const workloads = await listWorkloads(resolved);
-  if (!workloads.length && !opts.workload && process.stdin.isTTY) {
-    if (!await confirm({ message: "This project has no workloads. Create a coding workload for your harness traffic?", default: false })) return;
-    const capture = await confirm({ message: "Capture model requests and responses for session reports? Payloads are stored under your organization’s capture policy.", default: false });
-    const created = await request({ orgId: org, url: `/admin/v1/orgs/${encodeURIComponent(org)}/projects/${encodeURIComponent(resolved.projectId)}/workloads`, method: "POST", body: { name: "coding", capture_enabled: capture } }, WorkloadSchema);
-    workloads.push(created.data);
-  }
-  const workload = await choose("Workload", opts.workload, workloads.map(w => ({ name: w.name, value: w.name })));
+  const selectedWorkload = await chooseCodingWorkload(resolved, workloads, opts.workload);
+  if (!selectedWorkload) return;
+  const workload = selectedWorkload.name;
   const environment = z.enum(["test", "production"]).parse(await choose("Traffic environment", opts.environment, [{ name: "Test", value: "test" }, { name: "Production", value: "production" }]));
   const catalog = (await request({ orgId: org, url: `/admin/v1/orgs/${org}/models` }, z.object({ models: z.array(z.object({ id: z.string(), display_name: z.string().optional() })) }))).data.models;
   // The initial native integration is validated with Claude models only.
   const models = catalog.filter(m => m.id.startsWith("claude-"));
   const model = await choose("Claude model", opts.model, models.map(m => ({ name: m.display_name ?? m.id, value: m.id })));
-  const capture = workloads.find(w => w.name === workload)?.capture_enabled;
+  const capture = selectedWorkload.capture_enabled;
   process.stdout.write(`\n${version}\nDefault: ${organizationLabel} / ${project} / ${workload} (${environment})\nModel: ${model}\n\nNormal claude launches will send model requests, responses, and repository/branch metadata through Orchestra.\nWorkload capture: ${capture === true ? "enabled" : capture === false ? "disabled" : "unknown"}. Retention follows workspace policy; this wizard does not verify retention.\nExisting settings are backed up privately. Remove with: orchestra claude-setup remove\n`);
   if (!opts.yes) {
     if (!process.stdin.isTTY) throw new Error("Use --yes to enable this persistent default after reviewing the routing and capture scope.");
