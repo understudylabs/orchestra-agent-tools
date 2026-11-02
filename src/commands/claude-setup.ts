@@ -1,4 +1,5 @@
 import { confirm, select } from "@inquirer/prompts";
+import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,8 +25,41 @@ async function choose(message: string, supplied: string | undefined, choices: { 
   return select({ message, choices });
 }
 
+const updateGuidance = "Native/npm install: claude update. Homebrew: brew upgrade claude-code (or claude-code@latest if installed). WinGet: winget upgrade Anthropic.ClaudeCode. For managed installs, ask your administrator. Then run orchestra claude-setup again.";
+
+export async function prepareClaudeVersion(deps = {
+  check: checkClaudeVersion,
+  interactive: Boolean(process.stdin.isTTY),
+  choose: () => select({ message: "Claude Code needs attention", choices: [
+    { name: "Run claude update, then check again", value: "update" },
+    { name: "Check again (I updated Claude separately)", value: "retry" },
+    { name: "Skip gateway setup for now", value: "skip" },
+  ] }),
+  update: () => new Promise<boolean>(resolve => {
+    const child = spawn("claude", ["update"], { stdio: "inherit" });
+    child.on("error", () => resolve(false));
+    child.on("close", code => resolve(code === 0));
+  }),
+  write: (message: string) => { process.stderr.write(message + "\n"); },
+}): Promise<string | undefined> {
+  for (;;) {
+    try { return deps.check(); } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not check Claude Code.";
+      if (!deps.interactive) throw new Error(`${message} ${updateGuidance} No gateway settings were changed.`);
+      deps.write(`${message}\n${updateGuidance}\nGateway setup has not changed your Claude settings.`);
+    }
+    const action = await deps.choose();
+    if (action === "skip") {
+      deps.write("Gateway setup skipped. Run orchestra claude-setup when ready.");
+      return;
+    }
+    if (action === "update" && !await deps.update()) deps.write("Claude update did not complete. Use the installation-specific instructions above, then check again or skip.");
+  }
+}
+
 export async function setupNativeClaude(opts: Options = {}) {
-  const version = checkClaudeVersion();
+  const version = await prepareClaudeVersion();
+  if (!version) return;
   const credentials = readCredentials();
   if (!credentials || !Object.keys(credentials.orgs).length) throw new Error("Sign in first with orchestra login, then run orchestra claude-setup.");
   if (process.env.UNDERSTUDY_API_KEY || process.env.UNDERSTUDY_GATEWAY_URL) throw new Error("Unset shell credential/gateway overrides; persistent setup uses your saved organization credential.");
