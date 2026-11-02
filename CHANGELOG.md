@@ -15,6 +15,20 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-11-02
+
+### Fixed
+
+- Recover from outdated Claude Code with installation-aware updates, version rechecks, and a skip option. Homebrew casks use their matching upgrade command.
+- Use the selected organization's saved credential, show organization names when available, and offer recovery for authorization failures without stack traces.
+- Detect existing Claude setup before onboarding and offer keep, remove, or confirmed reconfiguration.
+- Preserve Claude's native model picker instead of mapping every model family to one model. Existing 0.10.0 setups should remove and reconfigure to clear old model overrides.
+
+### Changed
+
+- Recommend a personal coding project and a dedicated `claude-code` workload, with explicit resource creation and capture consent.
+- Recommend production labeling for everyday coding and persistent setup for future sessions, with a visible removal path.
+
 ## [0.10.0] — 2026-11-02
 
 ### Added
