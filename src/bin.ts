@@ -28,7 +28,17 @@ process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
   emitWarning(warning, ...rest);
 }) as typeof process.emitWarning;
 
-if (process.argv[2] === INTERNAL_CONVERSATION_SIDECAR_ARG) {
+if (process.argv[2] === "claude-native-env") {
+  try {
+    const { nativeClaudeEnvironment } = await import("./claude-native.js");
+    const { readFileSync } = await import("node:fs");
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    process.stdout.write(JSON.stringify(nativeClaudeEnvironment(input.session_id)));
+  } catch {
+    process.stderr.write("Orchestra Claude initialization failed. Run orchestra claude-setup status.\n");
+    process.exitCode = 1;
+  }
+} else if (process.argv[2] === INTERNAL_CONVERSATION_SIDECAR_ARG) {
   const { runConversationSidecarMain } = await import("./runtime/conversation/sidecar.js");
   await runConversationSidecarMain();
 } else {

@@ -6,7 +6,7 @@ import { CallCostResponseSchema } from "./internal/reporting-contracts.js";
 import { resolveProject } from "./internal/projects.js";
 import { resolveWorkload } from "./internal/workloads.js";
 import { exportCapturesByRequestIds } from "./commands/captures.js";
-import { ClaudeSessionSchema } from "./commands/claude.js";
+import { claudeSessionTags, ClaudeSessionSchema } from "./commands/claude.js";
 
 const tokenKeys = ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] as const;
 const UsageSchema = z.object(Object.fromEntries(tokenKeys.map(key => [key, z.number().int().nonnegative()])));
@@ -45,7 +45,10 @@ export function readClaudeEvidence(files: string[], sessionId: string) {
 export function verifySessionCapture(value: unknown, session: Session, requestId: string): void {
   const capture = z.object({ request_id: z.string(), request_environment: z.string(), tags: z.record(z.string(), z.string()), customer_request_body: z.unknown(), response_body: z.unknown() }).parse(value);
   if (capture.request_id !== requestId || capture.request_environment !== session.environment) throw new Error("Capture identity or environment mismatch.");
-  const expected = { run_id: session.session_id, repository: session.repository, branch: session.branch, base_commit: session.base_commit, harness: "claude-code" };
+  const expected = claudeSessionTags(session);
+  for (const field of ["repository", "branch", "base_commit"] as const) {
+    if (session[field] === null && capture.tags[field] !== undefined) throw new Error(`Unexpected capture attribution: ${field}.`);
+  }
   for (const [key, expectedValue] of Object.entries(expected)) {
     if (capture.tags[key] !== expectedValue) throw new Error(`Capture attribution mismatch: ${key}.`);
   }

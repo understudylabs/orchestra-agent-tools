@@ -492,3 +492,18 @@ MIT.
 
 Run Claude Code with persistent session and Git attribution using
 `orchestra claude`. See [setup, resume, capture/cost reconciliation and PR linking](docs/claude-gateway.md).
+
+### Use Claude Code through Orchestra by default
+
+Run `orchestra claude-setup` once to choose an organization, project, workload,
+traffic environment, and Claude model. The wizard explains gateway traffic and
+capture before you enable it. Then use `claude` and `claude --resume` normally;
+repository configuration is not required. Requires Claude Code 2.1.312 or later.
+
+`orchestra start` offers optional launch, resume, setup status, and session
+reports. `orchestra claude-setup remove` restores the settings Orchestra changed
+and preserves later user edits. Restart Claude after removal. This is a local
+terminal integration; managed policies, disabled mods, and explicit settings or
+shell overrides can prevent it. Setup does not change those policies. Repository
+or branch changes within a session require a new session to keep attribution
+consistent. Captures and prices can arrive later; reports expose those gaps.
