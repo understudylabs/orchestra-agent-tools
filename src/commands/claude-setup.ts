@@ -206,6 +206,9 @@ export function registerClaudeSetupCommand(program: Command) {
         if (key === "model") continue;
         if (key === "env") {
           for (const [name, expected] of Object.entries(value as Record<string, unknown>)) if (current.env?.[name] !== expected) drift.push(`env.${name}`);
+        } else if (key === "modelSettings") {
+          // Users can tune compaction and effort without invalidating gateway routing.
+          continue;
         } else if (current[key] !== value) drift.push(key);
       }
       const hook = nativeClaudeHookStatus();

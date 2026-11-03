@@ -123,16 +123,34 @@ function pickerDefaults(env: Document): Document {
   };
 }
 
+function compactionDefaults(settings: Document): Document {
+  if (Object.hasOwn(settings, "autoCompactWindow") || Object.hasOwn(object(settings.env ?? {}), "CLAUDE_CODE_AUTO_COMPACT_WINDOW")) return {};
+  const models = object(settings.modelSettings ?? {});
+  const model = object(models[codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION] ?? {});
+  // Per-model settings avoid imposing DeepSeek's policy on Claude models.
+  return Object.hasOwn(model, "autoCompactWindow") ? {} : {
+    [codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION]: { autoCompactWindow: 786432 },
+  };
+}
+
+function mergeModelSettings(current: unknown, additions: Document): Document {
+  const models = { ...object(current ?? {}) };
+  for (const [id, values] of Object.entries(additions)) models[id] = { ...object(models[id] ?? {}), ...object(values) };
+  return models;
+}
+
 export function refreshNativeClaudeModels() {
   const state = readNativeState();
   if (lstatSync(state.settings_path).isSymbolicLink()) throw new Error("Claude settings is a symlink. Configure its owner directly.");
   const current = readJson(state.settings_path);
   const env = object(current.env ?? {});
   const additions = pickerDefaults(env);
-  if (!Object.keys(additions).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017." };
+  const modelDefaults = compactionDefaults(current);
+  if (!Object.keys(additions).length && !Object.keys(modelDefaults).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017." };
   state.installed.env = { ...object(state.installed.env ?? {}), ...additions };
+  if (Object.keys(modelDefaults).length) state.installed.modelSettings = mergeModelSettings(state.installed.modelSettings, modelDefaults);
   writeNativeJson(statePath(), state);
-  writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions } });
+  writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions }, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(current.modelSettings, modelDefaults) } : {}) });
   return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your default model is unchanged. Managed model restrictions still apply." };
 }
 
@@ -156,7 +174,9 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   for (const key of Object.keys(env)) if (key.startsWith("CLAUDE_CODE_USE_") && env[key] && env[key] !== "0") throw new Error(`Remove conflicting provider setting env.${key} before setup.`);
   const plugin = join(globalConfigDir(), "claude-native-mod");
   const plugins = typeof env.CLAUDE_CODE_PLUGIN_DIRS === "string" && env.CLAUDE_CODE_PLUGIN_DIRS ? env.CLAUDE_CODE_PLUGIN_DIRS + (process.platform === "win32" ? ";" : ":") : "";
+  const modelDefaults = compactionDefaults(before);
   const installed = {
+    ...(Object.keys(modelDefaults).length ? { modelSettings: modelDefaults } : {}),
     env: {
       ...pickerDefaults(env),
       ANTHROPIC_BASE_URL: BLOCKED_GATEWAY,
@@ -173,7 +193,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   writeFileSync(join(plugin, "hooks", "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
   // Save recovery state first: interruption before settings write remains safely removable.
   writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed, onboarding: { path: onboardingPath, before: profile.hasCompletedOnboarding } });
-  writeNativeJson(settingsPath, { ...before, ...installed, env: { ...env, ...installed.env } });
+  writeNativeJson(settingsPath, { ...before, ...installed, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(before.modelSettings, modelDefaults) } : {}), env: { ...env, ...installed.env } });
   writeNativeJson(onboardingPath, { ...profile, hasCompletedOnboarding: true });
   return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
@@ -244,6 +264,20 @@ export function removeNativeClaude() {
         } else preserved.push(`env.${name}`);
       }
       if (Object.keys(env).length || Object.hasOwn(state.before, "env")) current.env = env; else delete current.env;
+    } else if (key === "modelSettings") {
+      const models = object(current.modelSettings ?? {});
+      const original = object(state.before.modelSettings ?? {});
+      for (const [id, values] of Object.entries(object(installed))) {
+        const row = object(models[id] ?? {});
+        const before = object(original[id] ?? {});
+        for (const [field, expected] of Object.entries(object(values))) {
+          if (same(row[field], expected)) {
+            if (Object.hasOwn(before, field)) row[field] = before[field]; else delete row[field];
+          } else preserved.push(`modelSettings.${id}.${field}`);
+        }
+        if (Object.keys(row).length || Object.hasOwn(original, id)) models[id] = row; else delete models[id];
+      }
+      if (Object.keys(models).length || Object.hasOwn(state.before, "modelSettings")) current.modelSettings = models; else delete current.modelSettings;
     } else if (same(current[key], installed)) {
       if (Object.hasOwn(state.before, key)) current[key] = state.before[key]; else delete current[key];
     } else preserved.push(key);

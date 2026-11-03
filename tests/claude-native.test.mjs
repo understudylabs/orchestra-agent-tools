@@ -18,11 +18,12 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       import { join } from 'node:path';
       import { enableNativeClaude, removeNativeClaude, nativeClaudeEnvironment, claudeSettingsPath, BLOCKED_GATEWAY, refreshNativeClaudeModels } from ${JSON.stringify(moduleUrl)};
       const settings = claudeSettingsPath(); mkdirSync(join(process.env.HOME,'.claude'));
-      const before={env:{ANTHROPIC_API_KEY:'previous-key',KEEP:'yes'},theme:'dark',model:'previous-model',hooks:{SessionStart:[]}};
+      const before={env:{ANTHROPIC_API_KEY:'previous-key',KEEP:'yes'},theme:'dark',model:'previous-model',modelSettings:{'claude-example':{effortLevel:'high'}},hooks:{SessionStart:[]}};
       writeFileSync(settings,JSON.stringify(before));
       const config={version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com',model:'claude-example'};
       enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
       const enabled=JSON.parse(readFileSync(settings));
+      assert.equal(enabled.modelSettings['deepseek-v4.1-flash-1017'].autoCompactWindow,786432);
       assert.equal(enabled.env.ANTHROPIC_BASE_URL,BLOCKED_GATEWAY);
       assert.equal(enabled.env.ANTHROPIC_API_KEY,'');
       assert.equal(enabled.env.ANTHROPIC_AUTH_TOKEN,'orchestra-initialization-required');
@@ -63,6 +64,7 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       assert.equal(after.env.ANTHROPIC_BASE_URL,undefined);
       assert.equal(after.env.ANTHROPIC_CUSTOM_MODEL_OPTION,undefined);
       assert.equal(after.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,undefined);
+      assert.deepEqual(after.modelSettings,before.modelSettings);
       assert.equal(after.model,'user-choice'); assert.equal(after.theme,'light');
       assert.equal(after.env.KEEP,'changed'); assert.equal(after.env.CLAUDE_CODE_PLUGIN_DIRS,'/tmp/another-plugin');
       assert.deepEqual(removed.preserved_user_edits,['model']);
@@ -186,6 +188,47 @@ test('repair migrates legacy auth without replacing routing, model, edits, or un
       assert.equal(removed.model,'user-selected');
     `;
     const env={...process.env,HOME:home,CLAUDE_CONFIG_DIR:'',PATH:join(home,'bin')+':'+process.env.PATH};
+    for(const key of Object.keys(env)) if(/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(key)) delete env[key];
+    const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,encoding:'utf8',cwd:home});
+    assert.equal(result.status,0,result.stderr);
+  } finally {rmSync(home,{recursive:true,force:true});}
+});
+
+test('compaction preset preserves explicit windows and later model settings edits', () => {
+  const home=mkdtempSync(join(tmpdir(),'orchestra-compaction-'));
+  try {
+    mkdirSync(join(home,'.understudy'));
+    writeFileSync(join(home,'.understudy','credentials.json'),JSON.stringify({orgs:{org_example:{api_key:'synthetic-key',gateway_url:'https://gateway.example.com'}}}));
+    const script=`
+      import assert from 'node:assert/strict';
+      import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+      import {dirname} from 'node:path';
+      import {enableNativeClaude,removeNativeClaude,refreshNativeClaudeModels,claudeSettingsPath} from ${JSON.stringify(moduleUrl)};
+      const model='deepseek-v4.1-flash-1017';
+      const path=claudeSettingsPath(); mkdirSync(dirname(path),{recursive:true});
+      const config={version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com'};
+      for(const before of [
+        {modelSettings:{[model]:{autoCompactWindow:250000,effortLevel:'high'}}},
+        {autoCompactWindow:300000},
+        {env:{CLAUDE_CODE_AUTO_COMPACT_WINDOW:'350000'}},
+      ]) {
+        writeFileSync(path,JSON.stringify(before));
+        enableNativeClaude(config,'example-cli');
+        refreshNativeClaudeModels();
+        const enabled=JSON.parse(readFileSync(path));
+        assert.equal(enabled.modelSettings?.[model]?.autoCompactWindow,before.modelSettings?.[model]?.autoCompactWindow);
+        removeNativeClaude();
+        assert.deepEqual(JSON.parse(readFileSync(path)),before);
+      }
+      writeFileSync(path,'{}'); enableNativeClaude(config,'example-cli');
+      const edited=JSON.parse(readFileSync(path));
+      edited.modelSettings[model]={autoCompactWindow:400000,effortLevel:'high'};
+      edited.modelSettings['another-model']={effortLevel:'low'};
+      writeFileSync(path,JSON.stringify(edited));
+      refreshNativeClaudeModels(); removeNativeClaude();
+      assert.deepEqual(JSON.parse(readFileSync(path)).modelSettings,edited.modelSettings);
+    `;
+    const env={...process.env,HOME:home,CLAUDE_CONFIG_DIR:''};
     for(const key of Object.keys(env)) if(/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(key)) delete env[key];
     const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,encoding:'utf8',cwd:home});
     assert.equal(result.status,0,result.stderr);
