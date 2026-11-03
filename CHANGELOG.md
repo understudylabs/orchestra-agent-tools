@@ -19,36 +19,15 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Added
 
+- Repair existing Claude integrations in place, including missing or corrupted generated plugin manifests, while preserving routing, model choices, user edits, and the original uninstall backup. Status separates configuration from unverified inference and capture.
+- Add a DeepSeek V4.1 Flash 1017-specific compaction window, preserving explicit user settings and restoring owned settings on removal.
+- Reconcile native interactive Claude transcripts with `claude-session reconcile --transcript-format native`, counting completed responses once across content blocks and resumed snapshots. Conflicting usage, incomplete responses, and mixed-session or subagent evidence fail explicitly.
 - Inspect gateway-reported limits and features with `orchestra models capabilities [model]`. Missing metadata stays unknown, invalid metadata is identified without hiding the model, and existing harness settings remain unchanged.
 
-## [0.10.9] — 2026-11-02
-
-### Added
-
-- Reconcile native interactive Claude transcripts with `claude-session reconcile --transcript-format native`, counting each completed response once across content blocks and resumed snapshots. Conflicting usage, incomplete responses, and mixed-session or subagent evidence fail explicitly.
-
 ### Fixed
 
+- Scope the DeepSeek context hint to its model selection rather than setting a global window for every unknown model. Refresh migrates unchanged Orchestra-owned settings and preserves explicit user context overrides.
 - Keep unknown capture state separate from explicitly disabled capture in session accounting reports.
-
-## [0.10.8] — 2026-11-02
-
-### Fixed
-
-- Scope the DeepSeek context hint to its model selection instead of setting a global window for all unknown models. Model refresh migrates unchanged Orchestra-owned settings and preserves explicit user context overrides. Selected DeepSeek defaults keep the same underlying model; removal restores the previous setting unless edited afterward.
-
-## [0.10.7] — 2026-11-02
-
-### Added
-
-- Repair an existing Claude integration in place with `orchestra claude-setup repair` or the setup menu, preserving routing, model choices, user edits, and the original uninstall backup. Status distinguishes local configuration from unverified inference and capture.
-- Add a DeepSeek V4.1 Flash 1017-specific compaction window during setup or `claude-setup models`, preserving explicit compaction settings and restoring owned settings on removal.
-
-## [0.10.6] — 2026-11-02
-
-### Fixed
-
-- Declare the DeepSeek V4.1 Flash 1017 context window during setup and `claude-setup models`, removing Claude’s unknown-model warning. Preserve explicit context-window overrides and existing custom picker entries. The setting also applies to other unrecognized custom model IDs; configure their window before switching.
 
 ## [0.10.5] — 2026-11-02
 
