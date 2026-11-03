@@ -208,8 +208,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
     },
     ...(config.model ? { model: config.model === deepSeekModel ? scopedDeepSeek(env) : config.model } : before.model === deepSeekModel ? { model: scopedDeepSeek(env) } : {}),
   };
-  writeNativeJson(join(plugin, ".claude-plugin", "plugin.json"), { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" });
-  writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });
+  for (const [file, value] of Object.entries(nativePluginManifests)) writeNativeJson(join(plugin, file), value);
   writeFileSync(join(plugin, "hooks", "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
   // Save recovery state first: interruption before settings write remains safely removable.
   writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed, onboarding: { path: onboardingPath, before: profile.hasCompletedOnboarding } });
@@ -218,8 +217,21 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
 
+const nativePluginManifests = {
+  ".claude-plugin/plugin.json": { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" },
+  "hooks/hooks.json": { modules: ["./register.js"] },
+};
+
 export function nativeClaudeHookStatus(): "current" | "missing" | "outdated_or_modified" {
-  const path = join(globalConfigDir(), "claude-native-mod", "hooks", "register.js");
+  const plugin = join(globalConfigDir(), "claude-native-mod");
+  for (const [file, expected] of Object.entries(nativePluginManifests)) {
+    const manifest = join(plugin, file);
+    if (!existsSync(manifest)) return "missing";
+    if (lstatSync(manifest).isSymbolicLink()) return "outdated_or_modified";
+    try { if (!same(readJson(manifest), expected)) return "outdated_or_modified"; }
+    catch { return "outdated_or_modified"; }
+  }
+  const path = join(plugin, "hooks", "register.js");
   if (!existsSync(path)) return "missing";
   if (lstatSync(path).isSymbolicLink()) return "outdated_or_modified";
   const source = readFileSync(path, "utf8");
@@ -237,7 +249,7 @@ export function repairNativeClaude(cli: string, node = process.execPath) {
   checkClaudeVersion();
   const plugin = join(globalConfigDir(), "claude-native-mod");
   const profilePath = state.onboarding?.path ?? join(process.env.CLAUDE_CONFIG_DIR || homedir(), ".claude.json");
-  for (const path of [state.settings_path, profilePath, plugin, join(plugin, "hooks"), join(plugin, "hooks", "register.js")]) {
+  for (const path of [state.settings_path, profilePath, plugin, join(plugin, ".claude-plugin"), ...Object.keys(nativePluginManifests).map(file => join(plugin, file)), join(plugin, "hooks"), join(plugin, "hooks", "register.js")]) {
     if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error("Claude integration contains a symlink. Configure its owner directly.");
   }
   if (!existsSync(state.settings_path)) throw new Error("Claude settings are missing. Reconfigure Orchestra to restore routing.");
@@ -260,6 +272,7 @@ export function repairNativeClaude(cli: string, node = process.execPath) {
   writeNativeJson(state.settings_path, { ...current, env });
   if (migrateOnboarding) writeNativeJson(profilePath, { ...profile, hasCompletedOnboarding: true });
   mkdirSync(join(plugin, "hooks"), { recursive: true, mode: 0o700 });
+  for (const [file, value] of Object.entries(nativePluginManifests)) writeNativeJson(join(plugin, file), value);
   const temp = mkdtempSync(join(plugin, "hooks", ".orchestra-repair-"));
   try {
     writeFileSync(join(temp, "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
