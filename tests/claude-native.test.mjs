@@ -16,7 +16,7 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       import assert from 'node:assert/strict';
       import { readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
       import { join } from 'node:path';
-      import { enableNativeClaude, removeNativeClaude, nativeClaudeEnvironment, claudeSettingsPath, BLOCKED_GATEWAY } from ${JSON.stringify(moduleUrl)};
+      import { enableNativeClaude, removeNativeClaude, nativeClaudeEnvironment, claudeSettingsPath, BLOCKED_GATEWAY, refreshNativeClaudeModels } from ${JSON.stringify(moduleUrl)};
       const settings = claudeSettingsPath(); mkdirSync(join(process.env.HOME,'.claude'));
       const before={env:{ANTHROPIC_API_KEY:'previous-key',KEEP:'yes'},theme:'dark',model:'previous-model',hooks:{SessionStart:[]}};
       writeFileSync(settings,JSON.stringify(before));
@@ -24,6 +24,8 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
       const enabled=JSON.parse(readFileSync(settings));
       assert.equal(enabled.env.ANTHROPIC_BASE_URL,BLOCKED_GATEWAY);
+      assert.equal(enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION,'deepseek-v4.1-flash-1017');
+      assert.equal(refreshNativeClaudeModels().changed,false);
       for (const key of ['ANTHROPIC_MODEL','ANTHROPIC_DEFAULT_OPUS_MODEL','ANTHROPIC_DEFAULT_SONNET_MODEL','ANTHROPIC_DEFAULT_HAIKU_MODEL']) assert.equal(enabled.env[key],undefined);
       assert.ok(!readFileSync(settings,'utf8').includes('synthetic-key'));
       assert.equal(statSync(settings).mode&0o777,0o600);
@@ -41,6 +43,7 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       const after=JSON.parse(readFileSync(settings));
       assert.equal(after.env.ANTHROPIC_API_KEY,'previous-key');
       assert.equal(after.env.ANTHROPIC_BASE_URL,undefined);
+      assert.equal(after.env.ANTHROPIC_CUSTOM_MODEL_OPTION,undefined);
       assert.equal(after.model,'user-choice'); assert.equal(after.theme,'light');
       assert.equal(after.env.KEEP,'changed'); assert.equal(after.env.CLAUDE_CODE_PLUGIN_DIRS,'/tmp/another-plugin');
       assert.deepEqual(removed.preserved_user_edits,['model']);
@@ -54,6 +57,32 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       assert.equal(switched.ANTHROPIC_MODEL,undefined);
       removeNativeClaude();
       assert.equal(JSON.parse(readFileSync(settings)).model,'next-picker-choice');
+      const custom=JSON.parse(readFileSync(settings));
+      custom.env.ANTHROPIC_CUSTOM_MODEL_OPTION='user-model';
+      custom.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME='User model';
+      writeFileSync(settings,JSON.stringify(custom));
+      enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
+      assert.equal(refreshNativeClaudeModels().changed,false);
+      assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,'user-model');
+      removeNativeClaude();
+      assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,'user-model');
+      delete custom.env.ANTHROPIC_CUSTOM_MODEL_OPTION;
+      delete custom.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME;
+      writeFileSync(settings,JSON.stringify(custom));
+      enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
+      const statePath=join(process.env.HOME,'.understudy','claude-native.json');
+      const legacy=JSON.parse(readFileSync(statePath));
+      const legacySettings=JSON.parse(readFileSync(settings));
+      for(const key of Object.keys(legacy.installed.env).filter(k=>k.startsWith('ANTHROPIC_CUSTOM_MODEL_OPTION'))) {
+        delete legacy.installed.env[key]; delete legacySettings.env[key];
+      }
+      writeFileSync(statePath,JSON.stringify(legacy)); writeFileSync(settings,JSON.stringify(legacySettings));
+      assert.equal(refreshNativeClaudeModels().changed,true);
+      assert.equal(refreshNativeClaudeModels().changed,false);
+      assert.equal(JSON.parse(readFileSync(settings)).model,'next-picker-choice');
+      removeNativeClaude();
+      assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,undefined);
+
 
     `;
     const env = {...process.env, HOME:home, CLAUDE_CONFIG_DIR:''};
