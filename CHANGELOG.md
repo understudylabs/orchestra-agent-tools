@@ -15,6 +15,13 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.7] — 2026-11-02
+
+### Added
+
+- Repair an existing Claude integration in place with `orchestra claude-setup repair` or the setup menu, preserving routing, model choices, user edits, and the original uninstall backup. Status distinguishes local configuration from unverified inference and capture.
+- Add a DeepSeek V4.1 Flash 1017-specific compaction window during setup or `claude-setup models`, preserving explicit compaction settings and restoring owned settings on removal.
+
 ## [0.10.6] — 2026-11-02
 
 ### Fixed
