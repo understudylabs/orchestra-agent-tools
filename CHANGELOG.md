@@ -13,6 +13,12 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
+## [0.10.12] — 2026-11-03
+
+### Fixed
+
+- Finish verified Claude setup with an explicit launch or next-step choice. Open Claude in the current or selected project folder, explain where to type, and show shell commands after exit. Respect `--no-start` and noninteractive use; repeated setup and unverified exits retain actionable next steps.
+
 ## [0.10.11] — 2026-11-03
 
 ### Added
