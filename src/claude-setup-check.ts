@@ -11,10 +11,21 @@ import { ClaudeSessionSchema } from "./commands/claude.js";
 
 const Result = z.object({ is_error: z.literal(false), result: z.string().min(1), session_id: z.string().uuid() });
 
+export class ClaudeSetupCheckError extends Error {}
+
+export function assertSetupProvider(settingsEnv: Record<string, unknown>, shellEnv: Record<string, unknown>) {
+  for (const key of ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"]) {
+    const value = Object.hasOwn(settingsEnv, key) ? settingsEnv[key] : shellEnv[key];
+    if (value && value !== "0" && value !== "false") throw new ClaudeSetupCheckError(`Disable ${key} before checking Orchestra; that provider mode can bypass the configured gateway.`);
+  }
+}
+
 export async function checkClaudeSetup() {
+  const { config, settings_path } = readNativeState();
+  const settings = z.object({ env: z.record(z.string(), z.unknown()).optional() }).parse(JSON.parse(readFileSync(settings_path, "utf8")));
+  assertSetupProvider(settings.env ?? {}, process.env);
   const sessionId = randomUUID();
   const cwd = mkdtempSync(join(tmpdir(), "orchestra-setup-check-"));
-  const { config } = readNativeState();
   try {
     const { stdout } = await promisify(execFile)("claude", [
       "-p", "Reply with exactly ORCHESTRA_SETUP_OK.",

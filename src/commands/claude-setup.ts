@@ -1,4 +1,4 @@
-import { checkClaudeSetup } from "../claude-setup-check.js";
+import { checkClaudeSetup, ClaudeSetupCheckError } from "../claude-setup-check.js";
 import { confirm, input, select } from "@inquirer/prompts";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
@@ -254,7 +254,8 @@ export async function verifyClaudeSetup(deps = {
       const result = await deps.check();
       deps.write(`Ready: Claude responded through the configured integration. Capture has not been verified. Check session: ${result.session_id}.`);
       return "verified";
-    } catch {
+    } catch (error) {
+      if (error instanceof ClaudeSetupCheckError) deps.write(error.message);
       deps.write("Claude did not complete the setup check. Configuration is not verified. Check access, model availability and connection before retrying.");
       if (!deps.interactive) throw new Error("Claude setup check failed; run orchestra claude-setup verify interactively for recovery.");
     }

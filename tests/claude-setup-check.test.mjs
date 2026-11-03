@@ -31,3 +31,12 @@ test('noninteractive failure reports failure without retries or hidden login',as
 test('cancelled login never produces Ready',async()=>{
   const f=fixture(['login']);f.deps.login=async()=>false;assert.equal(await verifyClaudeSetup(f.deps),'unverified');assert.equal(f.attempts,1);
 });
+
+import { assertSetupProvider } from '../dist/claude-setup-check.js';
+test('alternate provider modes cannot produce a gateway readiness claim',()=>{
+  for(const key of ['CLAUDE_CODE_USE_BEDROCK','CLAUDE_CODE_USE_VERTEX','CLAUDE_CODE_USE_FOUNDRY']){
+    assert.throws(()=>assertSetupProvider({}, {[key]:'1'}),/bypass/);
+    assert.throws(()=>assertSetupProvider({[key]:'1'}, {}),/bypass/);
+    assert.doesNotThrow(()=>assertSetupProvider({[key]:''}, {[key]:'1'}));
+  }
+});
