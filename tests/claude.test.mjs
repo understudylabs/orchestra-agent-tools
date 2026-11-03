@@ -108,3 +108,37 @@ test('capture verification refuses cross-session data and missing response paylo
   assert.throws(()=>verifySessionCapture({...capture,tags:{...capture.tags,run_id:'other'}},session,'request'),/attribution/);
   assert.throws(()=>verifySessionCapture({...capture,response_body:null},session,'request'),/missing/);
 });
+
+import { readNativeClaudeEvidence } from '../dist/claude-reconciliation.js';
+test('native transcripts reconcile unique completed responses across blocks and resumed snapshots', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'claude-native-evidence-'));
+  const first = join(dir, 'first.jsonl');
+  const resumed = join(dir, 'resumed.jsonl');
+  const usage = {input_tokens:2, output_tokens:3, cache_read_input_tokens:4, cache_creation_input_tokens:5};
+  const assistant = {type:'assistant', sessionId:'session', message:{id:'msg_synthetic', stop_reason:'tool_use', usage}};
+  const write = (file, rows) => writeFileSync(file, rows.map(row => JSON.stringify(row)).join('\n'));
+  try {
+    write(first, [{type:'file-history-snapshot'}, assistant, {...assistant, uuid:'another-block'}]);
+    write(resumed, [assistant, {type:'system', sessionId:'session', subtype:'compact_boundary'}, {...assistant, message:{...assistant.message,id:'msg_resumed',stop_reason:'end_turn'}}]);
+    assert.deepEqual(readNativeClaudeEvidence([first,resumed], 'session'), {
+      messageIds:['msg_synthetic','msg_resumed'],
+      usage:Object.fromEntries(Object.entries(usage).map(([key,value]) => [key,value*2])),
+    });
+    for (const [record, pattern] of [
+      [{...assistant,sessionId:'another'}, /different session/],
+      [{...assistant,session_id:'another'}, /different session/],
+      [{...assistant,sessionId:undefined}, /missing its session/],
+      [{...assistant,isSidechain:true}, /subagent/],
+      [{...assistant,message:{...assistant.message,stop_reason:null}}, /completed usage/],
+      [{...assistant,isApiErrorMessage:true}, /completed usage/],
+      [{...assistant,message:{...assistant.message,usage:{...usage,input_tokens:-1}}}, /completed usage/],
+    ]) {
+      write(resumed,[record]);
+      assert.throws(() => readNativeClaudeEvidence([resumed], 'session'), pattern);
+    }
+    write(resumed,[assistant,{...assistant,message:{...assistant.message,usage:{...usage,output_tokens:9}}}]);
+    assert.throws(() => readNativeClaudeEvidence([resumed], 'session'), /Conflicting usage/);
+    writeFileSync(resumed,'private invalid JSON');
+    assert.throws(() => readNativeClaudeEvidence([resumed], 'session'), error => /raw content omitted/.test(error.message) && !error.message.includes('private'));
+  } finally { rmSync(dir,{recursive:true,force:true}); }
+});
