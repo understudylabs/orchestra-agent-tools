@@ -15,6 +15,13 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.3] — 2026-11-02
+
+### Added
+
+- Add DeepSeek V4.1 Flash 1017 to Claude Code's model picker during gateway setup without changing the default model or built-in choices. Existing custom entries are preserved.
+- Existing setups can add the picker entry from the setup menu or with `orchestra claude-setup models`, without removing their integration. Removal restores Orchestra-owned picker settings and preserves subsequent user edits.
+
 ## [0.10.2] — 2026-11-02
 
 ### Fixed

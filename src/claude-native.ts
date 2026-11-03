@@ -102,6 +102,30 @@ export function register(on) {
 `;
 }
 
+const codingModelOption = {
+  ANTHROPIC_CUSTOM_MODEL_OPTION: "deepseek-v4.1-flash-1017",
+  ANTHROPIC_CUSTOM_MODEL_OPTION_NAME: "DeepSeek V4.1 Flash 1017",
+  ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION: "Through Orchestra",
+};
+
+function pickerDefaults(env: Document): Document {
+  // Claude has one custom-option slot; never take over a user's existing entry.
+  return Object.keys(codingModelOption).some(key => Object.hasOwn(env, key)) ? {} : codingModelOption;
+}
+
+export function refreshNativeClaudeModels() {
+  const state = readNativeState();
+  if (lstatSync(state.settings_path).isSymbolicLink()) throw new Error("Claude settings is a symlink. Configure its owner directly.");
+  const current = readJson(state.settings_path);
+  const env = object(current.env ?? {});
+  const additions = pickerDefaults(env);
+  if (!Object.keys(additions).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017." };
+  state.installed.env = { ...object(state.installed.env ?? {}), ...additions };
+  writeNativeJson(statePath(), state);
+  writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions } });
+  return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your default model is unchanged. Managed model restrictions still apply." };
+}
+
 export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node = process.execPath) {
   const config = ClaudeNativeConfigSchema.parse(value);
   const url = new URL(config.gateway_url);
@@ -120,6 +144,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   const plugins = typeof env.CLAUDE_CODE_PLUGIN_DIRS === "string" && env.CLAUDE_CODE_PLUGIN_DIRS ? env.CLAUDE_CODE_PLUGIN_DIRS + (process.platform === "win32" ? ";" : ":") : "";
   const installed = {
     env: {
+      ...pickerDefaults(env),
       ANTHROPIC_BASE_URL: BLOCKED_GATEWAY,
       ANTHROPIC_API_KEY: "orchestra-initialization-required",
       ANTHROPIC_AUTH_TOKEN: "",

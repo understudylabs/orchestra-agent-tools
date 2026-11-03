@@ -507,3 +507,10 @@ terminal integration; managed policies, disabled mods, and explicit settings or
 shell overrides can prevent it. Setup does not change those policies. Repository
 or branch changes within a session require a new session to keep attribution
 consistent. Captures and prices can arrive later; reports expose those gaps.
+
+Gateway setup adds **DeepSeek V4.1 Flash 1017** to Claude's `/model` picker
+without changing the default model. Existing custom picker entries are preserved.
+After upgrading an existing setup, run `orchestra claude-setup models` (also
+available in the setup menu), then restart Claude. Managed model restrictions
+still apply. Select the model explicitly with `/model deepseek-v4.1-flash-1017`
+if your custom picker slot is already in use.
