@@ -987,7 +987,7 @@ record_install_source() {
 # no usable release yet; deprecated versions are the name-reservation
 # placeholders, never a real CLI.
 install_from_npm_registry() {
-  local version deprecated
+  local version deprecated download_dir package_tarball
   version="$(npm view "$PACKAGE_NAME@$INSTALL_VERSION" version 2>>"$LOG_FILE" | tail -1)" || version=""
   if [ -z "$version" ]; then
     log "npm has no $PACKAGE_NAME@$INSTALL_VERSION"
@@ -1015,10 +1015,22 @@ install_from_npm_registry() {
     return 1
   fi
   say "Installing $PACKAGE_NAME@$version from npm."
-  remove_previous_global_package
-  if ! run_logged "Install the orchestra command" npm install -g --ignore-scripts "$PACKAGE_NAME@$version"; then
+  download_dir="$(mktemp -d "$STATE_DIR/npm-download.XXXXXX")"
+  package_tarball="$download_dir/orchestraai-agent-tools-$version.tgz"
+  if ! run_logged "Download the orchestra package" npm pack "$PACKAGE_NAME@$version" --ignore-scripts --pack-destination "$download_dir"; then
+    rm -rf "$download_dir"
     return 1
   fi
+  if [ ! -s "$package_tarball" ]; then
+    rm -rf "$download_dir"
+    return 1
+  fi
+  remove_previous_global_package
+  if ! run_logged "Install the orchestra command" npm install -g --ignore-scripts "$package_tarball"; then
+    rm -rf "$download_dir"
+    return 1
+  fi
+  rm -rf "$download_dir"
   printf '%s\n' "$version" >"$STATE_DIR/package-version"
 }
 
@@ -1094,7 +1106,7 @@ install_understudy_package() {
   fi
   private_mkdir "$STATE_DIR"
   printf '%s\n' "$package_commit" >"$STATE_DIR/package-commit"
-  run_logged "Install runtime dependencies" npm ci --prefix "$INSTALL_SOURCE_DIR" --omit=dev --ignore-scripts
+  (cd "$INSTALL_SOURCE_DIR" && run_logged "Install runtime dependencies" npm ci --omit=dev --ignore-scripts)
   run_logged "Build the CLI" npx --yes --package typescript@5.7.3 tsc \
     -p "$INSTALL_SOURCE_DIR/tsconfig.install.json"
   run_logged "Prepare the CLI" node "$INSTALL_SOURCE_DIR/scripts/ensure-bin-mode.mjs"

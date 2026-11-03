@@ -21,7 +21,7 @@ describe("install.sh", () => {
     assert.match(script, /git clone --depth 1 --filter=blob:none --sparse/);
     assert.match(script, /sparse-checkout set/);
     assert.doesNotMatch(script, /sparse-checkout set[^\n]*apps\/homescreen/);
-    assert.match(script, /npm ci --prefix "\$INSTALL_SOURCE_DIR" --omit=dev --ignore-scripts/);
+    assert.match(script, /cd "\$INSTALL_SOURCE_DIR" && run_logged "Install runtime dependencies" npm ci --omit=dev --ignore-scripts/);
     assert.match(script, /tsconfig\.install\.json/);
     assert.match(script, /npm pkg delete scripts\.prepare --prefix "\$INSTALL_SOURCE_DIR"/);
     assert.match(script, /npm pack \. --ignore-scripts/);
@@ -1375,7 +1375,7 @@ describe("install.sh", () => {
   // Stubs for the commands the new install flow shells out to. The PATH holds
   // only these stubs and node, so a real npm, git, uv, or brew on the machine
   // can never be reached.
-  function flowStubs({ npmView = {}, uname = ["Darwin", "arm64"], uv = true } = {}) {
+  function flowStubs({ npmView = {}, packFails = false, uname = ["Darwin", "arm64"], uv = true } = {}) {
     const bin = join(root, "bin");
     const nodeBin = join(root, "node-bin");
     const calls = join(root, "calls.txt");
@@ -1387,7 +1387,7 @@ describe("install.sh", () => {
       .map(([args, out]) => `  "view ${args}") printf '%s\\n' '${out}' ;;\n`)
       .join("");
     const stubs = {
-      npm: `#!/bin/bash\nprintf 'npm %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "root -g") printf '%s\\n' "${join(prefix, "lib", "node_modules")}" ;;\n  "prefix -g") printf '%s\\n' "${prefix}" ;;\n${views}  view*) exit 1 ;;\nesac\nexit 0\n`,
+      npm: `#!/bin/bash\nprintf 'npm %s\\n' "$*" >> "${calls}"\ncase "$*" in\n  "root -g") printf '%s\\n' "${join(prefix, "lib", "node_modules")}" ;;\n  "prefix -g") printf '%s\\n' "${prefix}" ;;\n${views}  pack*) ${packFails ? 'exit 1' : 'printf tarball > "$5/orchestraai-agent-tools-0.7.0.tgz"'} ;;\n  view*) exit 1 ;;\nesac\nexit 0\n`,
       git: `#!/bin/bash\nprintf 'git %s\\n' "$*" >> "${calls}"\nexit 1\n`,
       orchestra: `#!/bin/bash\nprintf 'orchestra %s\\n' "$*" >> "${calls}"\nexit 0\n`,
       uname: `#!/bin/bash\ncase "$1" in\n  -s) echo ${uname[0]} ;;\n  -m) echo ${uname[1]} ;;\n  *) /usr/bin/uname "$@" ;;\nesac\n`,
@@ -1436,9 +1436,29 @@ describe("install.sh", () => {
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /Installing @orchestraai\/agent-tools@0\.7\.0 from npm/);
     const callsText = readFileSync(stubs.calls, "utf8");
-    assert.match(callsText, /npm install -g --ignore-scripts @orchestraai\/agent-tools@0\.7\.0/);
+    assert.match(callsText, /npm pack @orchestraai\/agent-tools@0\.7\.0 --ignore-scripts --pack-destination/);
+    assert.match(callsText, /npm install -g --ignore-scripts .*orchestraai-agent-tools-0\.7\.0\.tgz/);
+    assert.ok(callsText.indexOf('npm pack ') < callsText.indexOf('npm install -g'));
     assert.doesNotMatch(callsText, /git clone/);
     assert.equal(readFileSync(join(root, "lab", "install-state", "package-version"), "utf8"), "0.7.0\n");
+  });
+
+  it("preserves the installed CLI when a published tarball cannot be downloaded", () => {
+    mkdirSync(join(root, "home"), { recursive: true });
+    const installed = join(root, "prefix", "lib", "node_modules", "@orchestraai", "agent-tools");
+    mkdirSync(installed, { recursive: true });
+    writeFileSync(join(installed, "package.json"), '{"version":"0.6.0"}');
+    const stubs = flowStubs({ packFails: true, npmView: {
+      "@orchestraai/agent-tools@latest version": "0.7.0",
+      "@orchestraai/agent-tools@0.7.0 deprecated": "",
+      "@orchestraai/agent-tools@0.7.0 bin --json": '{"orchestra":"dist/bin.js"}',
+    }});
+    const result = runFlow(["--non-interactive", "--only-step", "1"], stubs);
+    assert.notEqual(result.status, 0);
+    assert.equal(JSON.parse(readFileSync(join(installed, "package.json"))).version, "0.6.0");
+    const callsText = readFileSync(stubs.calls, "utf8");
+    assert.match(callsText, /npm pack/);
+    assert.doesNotMatch(callsText, /npm uninstall|npm install -g/);
   });
 
   it("builds from source when npm has no usable release", () => {
