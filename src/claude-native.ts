@@ -344,7 +344,9 @@ export function removeNativeClaude() {
 
 export function nativeClaudeEnvironment(id: string, cwd = process.cwd()) {
   z.string().uuid().parse(id);
-  const { config } = readNativeState();
+  const saved = readNativeState().config;
+  // Only the child session launched by setup is test traffic; the saved default stays unchanged.
+  const config = process.env.UNDERSTUDY_CLAUDE_SETUP_TEST_SESSION === id ? { ...saved, environment: "test" as const } : saved;
   const token = storedNativeCredential(config);
   const git = (...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 5000 }).trim();
   let root = resolve(cwd), repository: string | null = null, branch: string | null = null, base_commit: string | null = null;
