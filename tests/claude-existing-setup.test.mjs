@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existingClaudeSetup } from '../dist/commands/claude-setup.js';
 function fixture(action='keep', approved=true) {
-  let removals=0; let confirmations=0;
-  return { get removals(){return removals;},get confirmations(){return confirmations;},deps:{
+  let removals=0; let confirmations=0; let repairs=0;
+  return { get repairs(){return repairs;},get removals(){return removals;},get confirmations(){return confirmations;},deps:{
     exists:()=>true, read:()=>({config:{org:'org_example',project:'coding',workload:'claude-code',environment:'test'}}),
     interactive:true, select:async()=>action, confirm:async()=>{confirmations++;return approved;},
+    repair:()=>{repairs++;return {repaired:true};},
     remove:()=>{removals++;return {next:'Restart Claude.',preserved_user_edits:[]};},write:()=>{},
   }};
 }
@@ -20,4 +21,10 @@ test('reconfiguration removes only after explicit confirmation and then continue
 test('removal exits setup, noninteractive runs cannot silently replace configuration',async()=>{
   const f=fixture('remove');assert.equal(await existingClaudeSetup(f.deps),false);assert.equal(f.removals,1);
   const g=fixture();g.deps.interactive=false;await assert.rejects(existingClaudeSetup(g.deps),/nothing changed/);assert.equal(g.removals,0);
+});
+
+test('repair refreshes in place without entering removal or scope selection',async()=>{
+  const f=fixture('repair');
+  assert.equal(await existingClaudeSetup(f.deps),false);
+  assert.equal(f.repairs,1);assert.equal(f.removals,0);assert.equal(f.confirmations,0);
 });

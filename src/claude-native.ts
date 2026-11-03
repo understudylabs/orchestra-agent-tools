@@ -178,6 +178,56 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
 
+export function nativeClaudeHookStatus(): "current" | "missing" | "outdated_or_modified" {
+  const path = join(globalConfigDir(), "claude-native-mod", "hooks", "register.js");
+  if (!existsSync(path)) return "missing";
+  if (lstatSync(path).isSymbolicLink()) return "outdated_or_modified";
+  const source = readFileSync(path, "utf8");
+  const match = /^const command = (.+);$/m.exec(source);
+  if (!match) return "outdated_or_modified";
+  try {
+    const command = z.array(z.string()).parse(JSON.parse(match[1]!));
+    return source === nativeModSource(command) ? "current" : "outdated_or_modified";
+  } catch { return "outdated_or_modified"; }
+}
+
+export function repairNativeClaude(cli: string, node = process.execPath) {
+  const state = readNativeState();
+  storedNativeCredential(state.config);
+  checkClaudeVersion();
+  const plugin = join(globalConfigDir(), "claude-native-mod");
+  const profilePath = state.onboarding?.path ?? join(process.env.CLAUDE_CONFIG_DIR || homedir(), ".claude.json");
+  for (const path of [state.settings_path, profilePath, plugin, join(plugin, "hooks"), join(plugin, "hooks", "register.js")]) {
+    if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error("Claude integration contains a symlink. Configure its owner directly.");
+  }
+  if (!existsSync(state.settings_path)) throw new Error("Claude settings are missing. Reconfigure Orchestra to restore routing.");
+  const current = readJson(state.settings_path);
+  const env = object(current.env ?? {});
+  const installed = object(state.installed.env ?? {});
+  const profile = readJson(profilePath);
+  if (profile.hasCompletedOnboarding !== undefined && typeof profile.hasCompletedOnboarding !== "boolean") throw new Error("Claude onboarding state is invalid.");
+  const preserved: string[] = [];
+  for (const [key, value] of Object.entries({ ANTHROPIC_API_KEY: "", ANTHROPIC_AUTH_TOKEN: "orchestra-initialization-required" })) {
+    if (same(env[key], installed[key])) { env[key] = value; installed[key] = value; }
+    else preserved.push(`env.${key}`);
+  }
+  const migrateOnboarding = !state.onboarding;
+  if (migrateOnboarding) state.onboarding = { path: profilePath, before: profile.hasCompletedOnboarding as boolean | undefined };
+  else if (profile.hasCompletedOnboarding !== true) preserved.push("profile.hasCompletedOnboarding");
+  state.installed.env = installed;
+  // Retain the original uninstall snapshot across every repair.
+  writeNativeJson(statePath(), state);
+  writeNativeJson(state.settings_path, { ...current, env });
+  if (migrateOnboarding) writeNativeJson(profilePath, { ...profile, hasCompletedOnboarding: true });
+  mkdirSync(join(plugin, "hooks"), { recursive: true, mode: 0o700 });
+  const temp = mkdtempSync(join(plugin, "hooks", ".orchestra-repair-"));
+  try {
+    writeFileSync(join(temp, "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
+    renameSync(join(temp, "register.js"), join(plugin, "hooks", "register.js"));
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+  return { repaired: true, preserved_user_edits: preserved, next: "Restart Claude to load the updated Orchestra integration. Routing and model choices are unchanged. Run orchestra claude-setup status to inspect configuration; inference and capture still require a smoke test." };
+}
+
 export function removeNativeClaude() {
   const state = readNativeState();
   const current = readJson(state.settings_path);

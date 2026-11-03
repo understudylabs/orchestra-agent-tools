@@ -145,3 +145,49 @@ test('missing git attribution stays absent in flat string tags and capture verif
   verifySessionCapture(capture,session,'request');
   assert.throws(()=>verifySessionCapture({...capture,tags:{...capture.tags,repository:'invented/repo'}},session,'request'),/Unexpected/);
 });
+
+test('repair migrates legacy auth without replacing routing, model, edits, or uninstall backup', () => {
+  const home=mkdtempSync(join(tmpdir(),'orchestra-repair-'));
+  try {
+    mkdirSync(join(home,'.understudy'));
+    mkdirSync(join(home,'bin'));
+    writeFileSync(join(home,'bin','claude'),'#!/bin/sh\necho "2.1.309 (Claude Code)"\n',{mode:0o700});
+    writeFileSync(join(home,'.understudy','credentials.json'),JSON.stringify({orgs:{org_example:{api_key:'synthetic-key',gateway_url:'https://gateway.example.com'}}}));
+    const script=`
+      import assert from 'node:assert/strict';
+      import {readFileSync,writeFileSync} from 'node:fs';
+      import {join} from 'node:path';
+      import {enableNativeClaude,repairNativeClaude,nativeClaudeHookStatus,readNativeState,removeNativeClaude,claudeSettingsPath} from ${JSON.stringify(moduleUrl)};
+      const config={version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com'};
+      enableNativeClaude(config,'old-cli');
+      assert.equal(nativeClaudeHookStatus(),'current');
+      writeFileSync(join(process.env.HOME,'.understudy','claude-native-mod','hooks','register.js'),'old hook');
+      assert.equal(nativeClaudeHookStatus(),'outdated_or_modified');
+      const statePath=join(process.env.HOME,'.understudy','claude-native.json');
+      const state=readNativeState();
+      const current=JSON.parse(readFileSync(claudeSettingsPath()));
+      state.installed.env.ANTHROPIC_API_KEY=current.env.ANTHROPIC_API_KEY='orchestra-initialization-required';
+      state.installed.env.ANTHROPIC_AUTH_TOKEN=current.env.ANTHROPIC_AUTH_TOKEN='';
+      current.model='user-selected'; current.theme='light';
+      writeFileSync(statePath,JSON.stringify(state));writeFileSync(claudeSettingsPath(),JSON.stringify(current));
+      repairNativeClaude('new-cli');repairNativeClaude('new-cli');
+      assert.equal(nativeClaudeHookStatus(),'current');
+      const repaired=JSON.parse(readFileSync(claudeSettingsPath()));
+      assert.equal(repaired.env.ANTHROPIC_API_KEY,'');
+      assert.equal(repaired.env.ANTHROPIC_AUTH_TOKEN,'orchestra-initialization-required');
+      assert.equal(repaired.model,'user-selected');assert.equal(repaired.theme,'light');
+      assert.deepEqual(readNativeState().before,state.before);
+      assert.deepEqual(readNativeState().config,config);
+      repaired.env.ANTHROPIC_AUTH_TOKEN='user-override';writeFileSync(claudeSettingsPath(),JSON.stringify(repaired));
+      assert.deepEqual(repairNativeClaude('new-cli').preserved_user_edits,['env.ANTHROPIC_AUTH_TOKEN']);
+      removeNativeClaude();
+      const removed=JSON.parse(readFileSync(claudeSettingsPath()));
+      assert.equal(removed.env.ANTHROPIC_AUTH_TOKEN,'user-override');
+      assert.equal(removed.model,'user-selected');
+    `;
+    const env={...process.env,HOME:home,CLAUDE_CONFIG_DIR:'',PATH:join(home,'bin')+':'+process.env.PATH};
+    for(const key of Object.keys(env)) if(/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(key)) delete env[key];
+    const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,encoding:'utf8',cwd:home});
+    assert.equal(result.status,0,result.stderr);
+  } finally {rmSync(home,{recursive:true,force:true});}
+});
