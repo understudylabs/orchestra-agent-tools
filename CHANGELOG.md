@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.8] — 2026-11-02
+
+### Fixed
+
+- Scope the DeepSeek context hint to its model selection instead of setting a global window for all unknown models. Model refresh migrates unchanged Orchestra-owned settings and preserves explicit user context overrides. Selected DeepSeek defaults keep the same underlying model; removal restores the previous setting unless edited afterward.
+
 ## [0.10.7] — 2026-11-02
 
 ### Added
