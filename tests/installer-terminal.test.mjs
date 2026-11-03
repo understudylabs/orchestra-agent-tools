@@ -115,12 +115,15 @@ case "$*" in
   "view @orchestraai/agent-tools@latest version") echo 0.8.0 ;;
   "view @orchestraai/agent-tools@0.8.0 deprecated") ;;
   "view @orchestraai/agent-tools@0.8.0 bin --json") echo '{"orchestra":"dist/bin.js"}' ;;
-  "install -g --ignore-scripts @orchestraai/agent-tools@0.8.0")
+  "pack @orchestraai/agent-tools@0.8.0 --ignore-scripts --pack-destination "*)
+    printf tarball > "$5/orchestraai-agent-tools-0.8.0.tgz" ;;
+  "install -g --ignore-scripts "*"/orchestraai-agent-tools-0.8.0.tgz")
     mkdir -p "${pkg}" "${prefix}/bin"
     cp "${join(bin, "orchestra.stub")}" "${prefix}/bin/orchestra" ;;
   *) exit 1 ;;
 esac
 `);
+    writeExecutable(join(bin, "git"), "#!/bin/bash\nexit 1\n");
     // orchestra: lists an init command, and init records how it got the terminal.
     writeExecutable(join(bin, "orchestra.stub"), `#!/bin/bash
 case "$1" in
