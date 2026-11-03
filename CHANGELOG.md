@@ -15,6 +15,13 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.5] — 2026-11-02
+
+### Fixed
+
+- Keep bearer-token authentication throughout native Claude gateway initialization, fixing the first-prompt “Not logged in” error without requiring an Anthropic login.
+- Existing installations must run `orchestra claude-setup`, choose **Remove current setup and configure again**, and restart Claude after upgrading. Updating the CLI alone does not replace the installed session hook.
+
 ## [0.10.4] — 2026-11-02
 
 ### Fixed

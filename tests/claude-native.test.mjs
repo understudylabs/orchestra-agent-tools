@@ -111,6 +111,10 @@ test('native mod applies credentials only after attribution and blocks failed st
   assert.equal(writes[0][1],'http://127.0.0.1:1');
   assert.equal(writes.at(-1)[1],'https://gateway.example.com');
   assert.equal(next,1);
+  const initialized=Object.fromEntries(writes);
+  assert.equal(initialized.ANTHROPIC_AUTH_TOKEN,'synthetic');
+  assert.equal(initialized.ANTHROPIC_API_KEY,'');
+  assert.equal(initialized.ANTHROPIC_CUSTOM_HEADERS,'session-header');
   succeed=false;
   for await (const value of handlers['turn.step']($,{},async function*(){next++;yield 1;})) assert.fail('failed initialization yielded inference');
   assert.equal(next,1);

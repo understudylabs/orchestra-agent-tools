@@ -86,8 +86,9 @@ async function apply($) {
   if (result.exitCode !== 0) throw new Error('Run orchestra claude-setup status to diagnose or orchestra claude-setup remove to restore your settings.');
   const env = JSON.parse(result.stdout);
   await $.env.set('ANTHROPIC_CUSTOM_HEADERS', env.ANTHROPIC_CUSTOM_HEADERS);
-  await $.env.set('ANTHROPIC_AUTH_TOKEN', '');
-  await $.env.set('ANTHROPIC_API_KEY', env.ANTHROPIC_API_KEY);
+  // Keep the startup bearer-auth mode: switching to API-key auth here can trigger Claude's login gate.
+  await $.env.set('ANTHROPIC_AUTH_TOKEN', env.ANTHROPIC_API_KEY);
+  await $.env.set('ANTHROPIC_API_KEY', '');
   await $.env.set('ANTHROPIC_BASE_URL', env.ANTHROPIC_BASE_URL);
 }
 export function register(on) {
