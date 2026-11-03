@@ -34,6 +34,7 @@ export function writeNativeJson(path: string, value: unknown): void {
 const StateSchema = z.object({
   config: ClaudeNativeConfigSchema, settings_path: z.string(),
   onboarding: z.object({ path: z.string(), before: z.boolean().optional() }).optional(),
+  modelMigration: z.object({ before: z.string(), installed: z.string() }).optional(),
   before: z.record(z.string(), z.unknown()), installed: z.record(z.string(), z.unknown()),
 });
 export const hasNativeClaudeSetup = () => existsSync(statePath());
@@ -140,6 +141,13 @@ export function refreshNativeClaudeModels() {
   const env = object(current.env ?? {});
   const owned = object(state.installed.env ?? {});
   let migrated = false;
+  if (current.model === deepSeekModel) {
+    const scoped = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+    if (state.installed.model === current.model) state.installed.model = scoped;
+    else state.modelMigration = { before: deepSeekModel, installed: scoped };
+    current.model = scoped;
+    migrated = true;
+  }
   if (env.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel && owned.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel) {
     env.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
     owned.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
@@ -159,7 +167,7 @@ export function refreshNativeClaudeModels() {
   if (Object.keys(modelDefaults).length) state.installed.modelSettings = mergeModelSettings(state.installed.modelSettings, modelDefaults);
   writeNativeJson(statePath(), state);
   writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions }, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(current.modelSettings, modelDefaults) } : {}) });
-  return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your default model is unchanged. Managed model restrictions still apply." };
+  return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your selected model is preserved; DeepSeek uses its scoped context hint. Managed model restrictions still apply." };
 }
 
 export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node = process.execPath) {
@@ -194,7 +202,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       CLAUDE_CODE_PLUGIN_DIRS: plugins + plugin,
     },
-    ...(config.model ? { model: config.model } : {}),
+    ...(config.model ? { model: config.model === deepSeekModel ? codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION : config.model } : before.model === deepSeekModel ? { model: codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION } : {}),
   };
   writeNativeJson(join(plugin, ".claude-plugin", "plugin.json"), { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" });
   writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });
@@ -290,6 +298,7 @@ export function removeNativeClaude() {
       if (Object.hasOwn(state.before, key)) current[key] = state.before[key]; else delete current[key];
     } else preserved.push(key);
   }
+  if (state.modelMigration && current.model === state.modelMigration.installed) current.model = state.modelMigration.before;
   if (state.onboarding) {
     const path = state.onboarding.path;
     if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error("Claude profile is a symlink. Configure its owner directly.");

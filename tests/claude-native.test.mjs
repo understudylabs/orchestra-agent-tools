@@ -223,6 +223,25 @@ test('compaction preset preserves explicit windows and later model settings edit
         removeNativeClaude();
         assert.deepEqual(JSON.parse(readFileSync(path)),before);
       }
+      for (const laterChoice of [undefined, 'another-model']) {
+        writeFileSync(path,'{}'); enableNativeClaude(config,'example-cli');
+        const selected=JSON.parse(readFileSync(path)); selected.model=model;
+        writeFileSync(path,JSON.stringify(selected));
+        assert.equal(refreshNativeClaudeModels().changed,true);
+        assert.equal(JSON.parse(readFileSync(path)).model,model+'[1m]');
+        assert.equal(refreshNativeClaudeModels().changed,false);
+        if(laterChoice) {
+          const changed=JSON.parse(readFileSync(path)); changed.model=laterChoice;
+          writeFileSync(path,JSON.stringify(changed));
+        }
+        removeNativeClaude();
+        assert.equal(JSON.parse(readFileSync(path)).model,laterChoice ?? model);
+      }
+      writeFileSync(path,JSON.stringify({model}));
+      enableNativeClaude(config,'example-cli');
+      assert.equal(JSON.parse(readFileSync(path)).model,model+'[1m]');
+      removeNativeClaude();
+      assert.equal(JSON.parse(readFileSync(path)).model,model);
       writeFileSync(path,'{}'); enableNativeClaude(config,'example-cli');
       const edited=JSON.parse(readFileSync(path));
       edited.modelSettings[model]={autoCompactWindow:400000,effortLevel:'high'};
