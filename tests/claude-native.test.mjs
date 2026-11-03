@@ -28,8 +28,11 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       assert.equal(enabled.env.ANTHROPIC_API_KEY,'');
       assert.equal(enabled.env.ANTHROPIC_AUTH_TOKEN,'orchestra-initialization-required');
       assert.equal(enabled.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,undefined);
+      assert.equal(enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME,'Orchestra Flash');
       const upgradeStatePath=join(process.env.HOME,'.understudy','claude-native.json');
       const upgradeState=JSON.parse(readFileSync(upgradeStatePath));
+      enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME=upgradeState.installed.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME='DeepSeek V4.1 Flash 1017';
+      enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION=upgradeState.installed.env.ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION='Through Orchestra';
       enabled.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS='1048576';
       upgradeState.installed.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS='1048576';
       enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION=upgradeState.installed.env.ANTHROPIC_CUSTOM_MODEL_OPTION='deepseek-v4.1-flash-1017';
@@ -37,6 +40,9 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       writeFileSync(upgradeStatePath,JSON.stringify(upgradeState));
       assert.equal(refreshNativeClaudeModels().changed,true);
       assert.equal(JSON.parse(readFileSync(settings)).env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,undefined);
+      assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME,'Orchestra Flash');
+      enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME='Orchestra Flash';
+      enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION='Fast coding through Orchestra';
       delete enabled.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS;
       enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION='deepseek-v4.1-flash-1017[1m]';
       assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION);
@@ -100,6 +106,10 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       writeFileSync(settings,JSON.stringify(withWindow));
       assert.equal(refreshNativeClaudeModels().changed,false);
       assert.equal(JSON.parse(readFileSync(settings)).env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,'262144');
+      withWindow.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME='My preferred label';
+      writeFileSync(settings,JSON.stringify(withWindow));
+      assert.equal(refreshNativeClaudeModels().changed,false);
+      assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME,'My preferred label');
       const statePath=join(process.env.HOME,'.understudy','claude-native.json');
       const legacy=JSON.parse(readFileSync(statePath));
       const legacySettings=JSON.parse(readFileSync(settings));

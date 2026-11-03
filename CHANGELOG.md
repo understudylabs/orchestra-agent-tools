@@ -15,6 +15,10 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Changed
+
+- Label the managed Claude custom model option Orchestra Flash. Refresh updates unchanged managed labels and preserves user customization; requests still use the existing versioned model ID.
+
 ### Fixed
 
 - Download the npm replacement before removing an installed CLI, preserving it if a just-published tarball is unavailable. Run source fallback dependency installation from its checkout to avoid npm prefix/lockfile resolution errors.
