@@ -13,7 +13,11 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
-## [Unreleased]
+## [0.10.11] — 2026-11-03
+
+### Added
+
+- Verify Claude setup through the installed integration with a disclosed small billable request, isolated from repository files and tools and labeled as test traffic. Readiness requires a successful response; capture remains explicitly unverified. Recover with retry, sign-in, scope changes, or restoration.
 
 ### Changed
 
