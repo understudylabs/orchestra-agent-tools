@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { z } from "zod";
 import { globalConfigDir } from "../config/paths.js";
@@ -71,6 +72,36 @@ export function resolveClaudePullRequest(session: z.infer<typeof ClaudeSessionSc
 
 export function registerClaudeSessionCommand(program: Command): void {
   const command = program.command("claude-session").description("Inspect and link Orchestra-managed Claude sessions.");
+  command.command("install-pr-workflow")
+    .description("Write an opt-in GitHub workflow and helper for review; does not commit or enable them")
+    .action(async function (this: Command) {
+      await runAction(this, async () => {
+        const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+        const assets = resolve(dirname(fileURLToPath(import.meta.url)), "../../runtime-assets/pr-capture");
+        const files = [["orchestra-pr-capture.yml", ".github/workflows/orchestra-pr-capture.yml"], ["capture.mjs", ".github/orchestra/capture.mjs"]] as const;
+        for (const [, target] of files) if (existsSync(join(root, target))) throw new Error(`Refusing to overwrite ${target}`);
+        for (const [source, target] of files) {
+          mkdirSync(dirname(join(root, target)), { recursive: true });
+          writeFileSync(join(root, target), readFileSync(join(assets, source)), { flag: "wx" });
+        }
+        process.stdout.write("Workflow files written for review. Commit and merge them to your default branch to enable PR event reports. No session data has been uploaded.\n");
+      });
+    });
+  command.command("register-pr <session-id>")
+    .description("Upload session identity and Git metadata to this repository's opt-in Actions workflow")
+    .option("--yes", "Consent to repository-visible session/Git metadata retained as Actions artifacts")
+    .action(async function (this: Command, id: string, opts: { yes?: boolean }) {
+      await runAction(this, async () => {
+        if (!opts.yes) throw new Error("Registration sends session ID, repository, branch, starting commit and creation time to GitHub Actions (up to 90 days, subject to repository policy). It sends no credentials, local paths, prompts or completions. Rerun with --yes to register.");
+        const session = readSession(id);
+        if (!session.repository || !session.branch || !session.base_commit) throw new Error("Session needs complete GitHub repository, branch and starting commit metadata.");
+        const registration = { version: 1, session_id: session.session_id, repository: session.repository, branch: session.branch, base_commit: session.base_commit, created_at: session.created_at };
+        execFileSync("gh", ["workflow", "run", "orchestra-pr-capture.yml", "--repo", session.repository, "--json"], {
+          input: JSON.stringify({ session: JSON.stringify(registration) }), encoding: "utf8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        });
+        process.stdout.write("Registration submitted, not yet confirmed. Check the Orchestra PR capture workflow in GitHub Actions. Once it succeeds, subsequent PR events reconcile it; for an existing PR, run the workflow manually with its pr number.\n");
+      });
+    });
   command.command("show <session-id>").action(async function (this: Command, id: string) {
     await runAction(this, async () => {
       process.stdout.write(JSON.stringify(readSession(id), null, 2) + "\n");

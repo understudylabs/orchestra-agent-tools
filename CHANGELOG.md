@@ -15,6 +15,10 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in GitHub Actions PR reports with explicit session registration, branch/ancestry validation, merge/close state, and review/check summaries. Cost and capture reconciliation remain unavailable in this initial report.
+
 ## [0.10.3] — 2026-11-02
 
 ### Added
