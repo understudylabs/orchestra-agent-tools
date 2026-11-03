@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.4] — 2026-11-02
+
+### Fixed
+
+- Complete Claude's first-run profile state during Orchestra gateway setup so reconfiguration opens Claude without account onboarding or approval of the inert startup credential. Workspace trust and tool permissions remain unchanged. Removal restores the previous onboarding flag and preserves other profile fields.
+
 ## [0.10.3] — 2026-11-02
 
 ### Added
