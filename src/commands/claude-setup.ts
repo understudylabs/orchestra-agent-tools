@@ -1,4 +1,5 @@
-import { confirm, select } from "@inquirer/prompts";
+import { checkClaudeSetup, ClaudeSetupCheckError } from "../claude-setup-check.js";
+import { confirm, input, select } from "@inquirer/prompts";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -16,7 +17,7 @@ import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
 import { nativeClaudeHookStatus, repairNativeClaude, refreshNativeClaudeModels, claudeUpdateCommand, hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
 
-interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean }
+interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean; verify?: boolean }
 async function choose(message: string, supplied: string | undefined, choices: { name: string; value: string }[]) {
   if (supplied) {
     if (!choices.some(choice => choice.value === supplied)) throw new Error(`${message}: selection is not available.`);
@@ -84,34 +85,70 @@ export async function organizationChoices(credentials: Credentials, lookup = asy
   }));
 }
 
+async function signInForClaudeSetup(org: string) {
+    const credentials = readCredentials();
+    const email = (await input({ message: "Email for your Orchestra account (leave blank to cancel):", default: credentials?.email })).trim();
+    if (!email) return false;
+    const gateway = credentials?.orgs[org]?.gateway_url;
+    return new Promise<boolean>(resolve => {
+      const child = spawn(process.execPath, [fileURLToPath(new URL("../bin.js", import.meta.url)), "login", "--email", email, ...(gateway ? ["--gateway-url", gateway] : [])], { stdio: "inherit" });
+      child.on("error", () => resolve(false));
+      child.on("close", code => resolve(code === 0));
+    });
+  }
+
 export async function accessibleOrganization(choices: { name: string; value: string }[], supplied?: string, deps = {
   interactive: Boolean(process.stdin.isTTY),
   pick: (available: { name: string; value: string }[]) => select({ message: "Organization", choices: available }),
   load: (org: string) => listProjects(resolveAuth(org)),
   recover: (another: boolean) => select({ message: "Organization access needs attention", choices: [
+    { name: "Sign in again and continue setup (recommended)", value: "login" },
     ...(another ? [{ name: "Choose another organization", value: "another" }] : []),
-    { name: "Stop and sign in again", value: "login" },
     { name: "Skip gateway setup for now", value: "skip" },
   ] }),
+  login: signInForClaudeSetup,
+  reload: async () => {
+    const credentials = readCredentials();
+    return credentials ? organizationChoices(credentials) : [];
+  },
   write: (message: string) => { process.stderr.write(message + "\n"); },
 }) {
   let available = choices;
   let selected = supplied;
+  let refreshed = false;
   for (;;) {
     if (selected && !available.some(choice => choice.value === selected)) throw new Error("Organization: selection is not available.");
     if (!selected) {
       if (!deps.interactive && available.length !== 1) throw new Error("Supply --org in noninteractive mode.");
       selected = available.length === 1 ? available[0]!.value : await deps.pick(available);
     }
-    try { return { org: selected, projects: await deps.load(selected) }; } catch (error) {
+    try { return { org: selected, name: available.find(choice => choice.value === selected)!.name, projects: await deps.load(selected) }; } catch (error) {
       if (!(error instanceof UnderstudyApiError) || ![401, 403].includes(error.status)) throw error;
       const label = available.find(choice => choice.value === selected)?.name ?? selected;
-      const message = `Cannot access ${label}. Its saved credential may have expired, been revoked, or lack organization access. Run orchestra login to refresh access, then orchestra claude-setup. Request ID: ${error.requestId || "unavailable"}.`;
-      if (!deps.interactive) throw new UnderstudyApiError({ status: error.status, errorType: error.errorType, requestId: error.requestId, message });
+      const reason = refreshed
+        ? "Sign-in completed, but this account still cannot access that organization. Check that you used the invited email, or ask your workspace administrator to confirm access."
+        : "Its saved credential may have expired, been revoked, or lack organization access.";
+      const message = `Cannot access ${label}. ${reason} Request ID: ${error.requestId || "unavailable"}.`;
+      if (!deps.interactive) throw new UnderstudyApiError({ status: error.status, errorType: error.errorType, requestId: error.requestId, message: `${message} In a terminal, run orchestra login --email <email>, then orchestra claude-setup.` });
       deps.write(message);
-      available = available.filter(choice => choice.value !== selected);
-      if (await deps.recover(available.length > 0) !== "another") return;
-      selected = undefined;
+      const remaining = available.filter(choice => choice.value !== selected);
+      const action = await deps.recover(remaining.length > 0);
+      if (action === "login") {
+        if (!await deps.login(selected)) {
+          deps.write("Sign-in did not complete. Setup stopped; run orchestra claude-setup when ready.");
+          return;
+        }
+        refreshed = true;
+        available = await deps.reload();
+        if (!available.length) {
+          deps.write("Sign-in did not provide organization access. Ask your workspace administrator to confirm membership, then run orchestra claude-setup.");
+          return;
+        }
+        selected = supplied;
+      } else if (action === "another") {
+        available = remaining;
+        selected = undefined;
+      } else return;
     }
   }
 }
@@ -152,14 +189,16 @@ export async function setupNativeClaude(opts: Options = {}) {
   if (!await existingClaudeSetup()) return;
   const version = await prepareClaudeVersion();
   if (!version) return;
-  const credentials = readCredentials();
+  let credentials = readCredentials();
   if (!credentials || !Object.keys(credentials.orgs).length) throw new Error("Sign in first with orchestra login, then run orchestra claude-setup.");
   if (process.env.UNDERSTUDY_API_KEY || process.env.UNDERSTUDY_GATEWAY_URL) throw new Error("Unset shell credential/gateway overrides; persistent setup uses your saved organization credential.");
   const organizations = await organizationChoices(credentials);
   const accessible = await accessibleOrganization(organizations, opts.org);
   if (!accessible) return;
   const { org, projects } = accessible;
-  const organizationLabel = organizations.find(choice => choice.value === org)!.name;
+  const organizationLabel = accessible.name;
+  credentials = readCredentials();
+  if (!credentials) throw new Error("Saved sign-in is no longer available. Run orchestra claude-setup again.");
   const auth = resolveAuth(org);
   const project = await chooseCodingProject(org, credentials, projects, opts.project);
   if (!project) return;
@@ -182,14 +221,66 @@ export async function setupNativeClaude(opts: Options = {}) {
   }
   const result = enableNativeClaude({ version: 1, org, project, workload, environment, model, gateway_url: auth.gatewayUrl, harness_version: version }, fileURLToPath(new URL("../bin.js", import.meta.url)));
   process.stdout.write(result.next + "\n");
+  if (!opts.verify) {
+    if (!process.stdin.isTTY || !await confirm({ message: "Verify setup with a small billable Claude request? Uses a fixed prompt, no tools or repository files, and test traffic.", default: true })) {
+      process.stdout.write("Configured, but not verified. Run orchestra claude-setup verify before relying on this setup.\n");
+      return;
+    }
+  }
+  const outcome = await verifyClaudeSetup();
+  if (outcome === "change") {
+    removeNativeClaude();
+    await setupNativeClaude();
+  }
+}
+
+export async function verifyClaudeSetup(deps = {
+  check: checkClaudeSetup,
+  interactive: Boolean(process.stdin.isTTY),
+  recover: () => select({ message: "Claude setup check failed", choices: [
+    { name: "Retry the check", value: "retry" },
+    { name: "Sign in again, then retry", value: "login" },
+    { name: "Change organization, project or workload", value: "change" },
+    { name: "Remove Orchestra and restore previous settings", value: "restore" },
+    { name: "Keep configuration without verification", value: "keep" },
+  ] }),
+  login: () => signInForClaudeSetup(readNativeState().config.org),
+  remove: removeNativeClaude,
+  write: (message: string) => { process.stdout.write(message + "\n"); },
+}) {
+  for (;;) {
+    deps.write("Checking Claude through Orchestra with a small billable test request…");
+    try {
+      const result = await deps.check();
+      deps.write(`Ready: Claude responded through the configured integration. Capture has not been verified. Check session: ${result.session_id}.`);
+      return "verified";
+    } catch (error) {
+      if (error instanceof ClaudeSetupCheckError) deps.write(error.message);
+      deps.write("Claude did not complete the setup check. Configuration is not verified. Check access, model availability and connection before retrying.");
+      if (!deps.interactive) throw new Error("Claude setup check failed; run orchestra claude-setup verify interactively for recovery.");
+    }
+    const action = await deps.recover();
+    if (action === "retry") continue;
+    if (action === "login") { if (await deps.login()) continue; return "unverified"; }
+    if (action === "restore") { deps.write(deps.remove().next); return "restored"; }
+    if (action === "change") return "change";
+    return "unverified";
+  }
 }
 
 export function registerClaudeSetupCommand(program: Command) {
   const command = program.command("claude-setup").description("Configure normal Claude Code launches through Orchestra; reversible user-level setup.")
     .option("--org <id>").option("--project <slug>").option("--workload <name>")
     .option("--environment <environment>", "test or production").option("--model <id>", "Optional starting Claude model; /model remains available")
+    .option("--verify", "Run a small billable Claude setup check after configuration")
     .option("--yes", "Confirm persistent routing and capture scope")
     .action(async function (this: Command, opts: Options) { await runAction(this, () => setupNativeClaude(opts)); });
+  command.command("verify").description("Send a small billable test request through the installed Claude integration").action(async function (this: Command) {
+    await runAction(this, async () => {
+      const outcome = await verifyClaudeSetup();
+      if (outcome === "change") { removeNativeClaude(); await setupNativeClaude(); }
+    });
+  });
   command.command("repair").description("Update the installed integration while preserving routing and user settings").action(async function (this: Command) {
     await runAction(this, async () => { process.stdout.write(JSON.stringify(repairNativeClaude(fileURLToPath(new URL("../bin.js", import.meta.url))), null, 2) + "\n"); });
   });

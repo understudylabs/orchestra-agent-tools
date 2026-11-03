@@ -108,8 +108,8 @@ export function register(on) {
 const deepSeekModel = "deepseek-v4.1-flash-1017";
 const codingModelOption = {
   ANTHROPIC_CUSTOM_MODEL_OPTION: `${deepSeekModel}[1m]`,
-  ANTHROPIC_CUSTOM_MODEL_OPTION_NAME: "DeepSeek V4.1 Flash 1017",
-  ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION: "Through Orchestra",
+  ANTHROPIC_CUSTOM_MODEL_OPTION_NAME: "Orchestra Flash",
+  ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION: "Fast coding through Orchestra",
 };
 
 function scopedDeepSeek(env: Document): string {
@@ -164,6 +164,16 @@ export function refreshNativeClaudeModels() {
     owned.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
     migrated = true;
   }
+  const optionKey = "ANTHROPIC_CUSTOM_MODEL_OPTION";
+  if ([deepSeekModel, `${deepSeekModel}[1m]`].includes(String(env[optionKey])) && same(env[optionKey], owned[optionKey])) {
+    for (const key of ["ANTHROPIC_CUSTOM_MODEL_OPTION_NAME", "ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION"] as const) {
+      if (Object.hasOwn(owned, key) && same(env[key], owned[key]) && env[key] !== codingModelOption[key]) {
+        env[key] = codingModelOption[key];
+        owned[key] = codingModelOption[key];
+        migrated = true;
+      }
+    }
+  }
   const additions = pickerDefaults(env);
   const modelDefaults = compactionDefaults(current);
   if (!migrated && !Object.keys(additions).length && !Object.keys(modelDefaults).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017[1m]." };
@@ -171,7 +181,7 @@ export function refreshNativeClaudeModels() {
   if (Object.keys(modelDefaults).length) state.installed.modelSettings = mergeModelSettings(state.installed.modelSettings, modelDefaults);
   writeNativeJson(statePath(), state);
   writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions }, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(current.modelSettings, modelDefaults) } : {}) });
-  return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your selected model is preserved; DeepSeek uses its scoped context hint. Managed model restrictions still apply." };
+  return { changed: true, next: "Restart Claude, then select Orchestra Flash in /model. Your selected model is preserved; DeepSeek uses its scoped context hint. Managed model restrictions still apply." };
 }
 
 export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node = process.execPath) {
@@ -334,7 +344,9 @@ export function removeNativeClaude() {
 
 export function nativeClaudeEnvironment(id: string, cwd = process.cwd()) {
   z.string().uuid().parse(id);
-  const { config } = readNativeState();
+  const saved = readNativeState().config;
+  // Only the child session launched by setup is test traffic; the saved default stays unchanged.
+  const config = process.env.UNDERSTUDY_CLAUDE_SETUP_TEST_SESSION === id ? { ...saved, environment: "test" as const } : saved;
   const token = storedNativeCredential(config);
   const git = (...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 5000 }).trim();
   let root = resolve(cwd), repository: string | null = null, branch: string | null = null, base_commit: string | null = null;

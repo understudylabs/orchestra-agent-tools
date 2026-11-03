@@ -496,9 +496,17 @@ Run Claude Code with persistent session and Git attribution using
 ### Use Claude Code through Orchestra by default
 
 Run `orchestra claude-setup` once to choose an organization, project, workload,
-traffic environment, and Claude model. The wizard explains gateway traffic and
-capture before you enable it. Then use `claude` and `claude --resume` normally;
+traffic environment, and capture preferences. Your current model choice is preserved.
+The wizard offers a small billable request through Claude before reporting Ready.
+The check uses a fixed prompt with no tools or repository files and labels the
+traffic as test without changing your saved environment. Capture remains unverified.
+Then use `claude` and `claude --resume` normally;
 repository configuration is not required. Requires Claude Code 2.1.309 or later.
+
+To check an existing setup, run `orchestra claude-setup verify` (billable).
+Noninteractive setup runs the check only with `--verify`; otherwise it reports
+configuration as unverified. Failed checks offer retry, sign-in, scope changes,
+or removal and restoration.
 
 `orchestra start` offers optional launch, resume, setup status, and session
 reports. `orchestra claude-setup remove` restores the settings Orchestra changed
@@ -508,8 +516,10 @@ shell overrides can prevent it. Setup does not change those policies. Repository
 or branch changes within a session require a new session to keep attribution
 consistent. Captures and prices can arrive later; reports expose those gaps.
 
-Gateway setup adds **DeepSeek V4.1 Flash 1017** to Claude's `/model` picker
-without changing the default model. Existing custom picker entries are preserved.
+Gateway setup adds **Orchestra Flash** to Claude's `/model` picker
+without changing the default model. It currently uses the exact
+`deepseek-v4.1-flash-1017` model ID; this is a friendly label, not a gateway alias.
+Existing custom picker entries are preserved.
 After upgrading an existing setup, run `orchestra claude-setup models` (also
 available in the setup menu), then restart Claude. Managed model restrictions
 still apply. Select the model explicitly with `/model deepseek-v4.1-flash-1017`

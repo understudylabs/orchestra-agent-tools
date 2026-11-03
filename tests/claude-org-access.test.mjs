@@ -68,3 +68,44 @@ test('installer init renders asynchronous failures without a Node stack trace', 
     assert.equal(result.status,0,result.stderr);
   } finally { rmSync(home,{recursive:true,force:true}); }
 });
+
+test('inline sign-in reloads organizations and continues with refreshed access', async () => {
+  let signedIn = false;
+  const loaded = [];
+  const result = await accessibleOrganization([choices[0]], undefined, {
+    interactive: true,
+    load: async org => { loaded.push(org); if (!signedIn) throw denied(); return [{slug:'coding'}]; },
+    recover: async another => { assert.equal(another, false); return 'login'; },
+    login: async org => { assert.equal(org, 'org_a'); signedIn = true; return true; },
+    reload: async () => [choices[1]],
+    pick: async () => { throw new Error('single org needs no prompt'); },
+    write: () => {},
+  });
+  assert.deepEqual(result, {org:'org_b',name:'Example B',projects:[{slug:'coding'}]});
+  assert.deepEqual(loaded, ['org_a','org_b']);
+});
+test('cancelled sign-in stops without reloading or assuming access', async () => {
+  let attempts = 0;
+  const result = await accessibleOrganization([choices[0]], undefined, {
+    interactive:true, load:async()=>{attempts++;throw denied();},recover:async()=> 'login',
+    login:async()=>false,reload:async()=>{throw new Error('must not reload');},write:()=>{},
+  });
+  assert.equal(result,undefined); assert.equal(attempts,1);
+});
+test('successful sign-in must still pass organization authorization', async () => {
+  let recoveries = 0;
+  const messages = [];
+  const result = await accessibleOrganization([choices[0]], 'org_a', {
+    interactive:true, load:async()=>{throw denied();},
+    recover:async()=> ++recoveries === 1 ? 'login' : 'skip',
+    login:async()=>true,reload:async()=>[choices[0]],write:message=>messages.push(message),
+  });
+  assert.equal(result,undefined);assert.equal(recoveries,2);
+  assert.match(messages[1], /Sign-in completed.*still cannot access/);
+});
+test('sign-in does not silently replace an explicit organization', async () => {
+  await assert.rejects(accessibleOrganization([choices[0]], 'org_a', {
+    interactive:true,load:async()=>{throw denied();},recover:async()=> 'login',
+    login:async()=>true,reload:async()=>[choices[1]],write:()=>{},
+  }),/selection is not available/);
+});

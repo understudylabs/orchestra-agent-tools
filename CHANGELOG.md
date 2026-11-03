@@ -13,9 +13,19 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
-## [Unreleased]
+## [0.10.11] — 2026-11-03
+
+### Added
+
+- Verify Claude setup through the installed integration with a disclosed small billable request, isolated from repository files and tools and labeled as test traffic. Readiness requires a successful response; capture remains explicitly unverified. Recover with retry, sign-in, scope changes, or restoration.
+
+### Changed
+
+- Label the managed Claude custom model option Orchestra Flash. Refresh updates unchanged managed labels and preserves user customization; requests still use the existing versioned model ID.
 
 ### Fixed
+
+- Recover denied organization access inside Claude setup: sign in again, reload organizations and continue without rerunning the installer. Saved credentials are no longer presented as verified sign-in.
 
 - Download the npm replacement before removing an installed CLI, preserving it if a just-published tarball is unavailable. Run source fallback dependency installation from its checkout to avoid npm prefix/lockfile resolution errors.
 
