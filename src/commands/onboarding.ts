@@ -153,7 +153,7 @@ export function registerOnboardingCommands(program: Command): void {
         }
         const outcome = await runInit(opts, systemInitPrompts, readCliVersion());
         printAttention(outcome.attention);
-        if (outcome.choice === "gateway") { await setupNativeClaude(); return; }
+        if (outcome.choice === "gateway") { await setupNativeClaude({ start: opts.start }); return; }
         if (outcome.choice === "cli" || !opts.start) {
           process.stdout.write(`\n  Run ${kleur.cyan("orchestra start")} when you're ready to start onboarding in a coding agent.\n`);
           return;

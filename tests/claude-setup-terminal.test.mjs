@@ -50,7 +50,7 @@ for (const scenario of ['fresh', 'stale', 'wrong-code', 'still-denied', 'inferen
     const cert = join(root, 'cert.pem'); const key = join(root, 'key.pem');
     const generated = spawnSync('openssl', ['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=IP:127.0.0.1'], {encoding:'utf8'});
     assert.equal(generated.status, 0, generated.stderr);
-    writeFileSync(join(root,'bin','claude'), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2.1.309 (Claude Code)"; else exec "$CLAUDE_TEST_BINARY" "$@"; fi\n', {mode:0o755});
+    writeFileSync(join(root,'bin','claude'), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2.1.309 (Claude Code)"; elif [ "$#" -eq 0 ]; then node -e \'console.log("INTERACTIVE_TTY="+[process.stdin.isTTY,process.stdout.isTTY,process.stderr.isTTY].join(","))\'; else exec "$CLAUDE_TEST_BINARY" "$@"; fi\n', {mode:0o755});
     writeFileSync(join(home,'.claude','CLAUDE.md'),'Synthetic memory sentinel: MEMORY_MUST_NOT_ENTER_SETUP_CHECK.');
     const settingsPath = join(home,'.claude','settings.json');
     writeFileSync(settingsPath, JSON.stringify({theme:'dark',env:{USER_SETTING:'keep'}}));
@@ -83,6 +83,7 @@ for (const scenario of ['fresh', 'stale', 'wrong-code', 'still-denied', 'inferen
     Object.assign(env,{HOME:home,UNDERSTUDY_HOME:config,CLAUDE_CONFIG_DIR:join(home,'.claude'),UNDERSTUDY_TELEMETRY:'0',NODE_EXTRA_CA_CERTS:cert,PATH:join(root,'bin')+':'+process.env.PATH,TERM:'xterm-256color',CLAUDE_TEST_BINARY:process.env.CLAUDE_TEST_BINARY||''});
     const steps = ['fresh','inference-denied'].includes(scenario) ? [] : [['Organization access needs attention','\r'],['Email for your Orchestra account','tester@example.com\r'],['One-time code:','synthetic-code\r']];
     if (['fresh','stale','inference-denied'].includes(scenario)) steps.push(['Verify setup with a small billable Claude request?',process.env.CLAUDE_TEST_BINARY?'y\r':'n\r']);
+    if (['fresh','stale'].includes(scenario) && process.env.CLAUDE_TEST_BINARY) steps.push(['What would you like to do next?',scenario==='fresh'?'\r':'\x1b[B\x1b[B\r']);
     if (scenario==='inference-denied') steps.push(['Claude setup check failed','\x1b[B\x1b[B\x1b[B\r']);
     if (scenario==='still-denied') steps.push(['Organization access needs attention','\x1b[B\r']);
     try {
@@ -91,6 +92,10 @@ for (const scenario of ['fresh', 'stale', 'wrong-code', 'still-denied', 'inferen
       const installed=existsSync(join(config,'claude-native.json'));
       if (scenario==='fresh'||scenario==='stale') {
         assert.equal(installed,true,stdout);
+        if (process.env.CLAUDE_TEST_BINARY) {
+          assert.match(stdout,/You are back in your terminal/);
+          if(scenario==='fresh') assert.match(stdout,/INTERACTIVE_TTY=true,true,true/);
+        }
         const state=JSON.parse(readFileSync(join(config,'claude-native.json')));
         assert.equal(state.config.org,'org_example');assert.equal(state.config.project,'coding');assert.equal(state.config.environment,'production');
         const settings=JSON.parse(readFileSync(settingsPath));

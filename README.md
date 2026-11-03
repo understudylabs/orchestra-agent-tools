@@ -500,7 +500,10 @@ traffic environment, and capture preferences. Your current model choice is prese
 The wizard offers a small billable request through Claude before reporting Ready.
 The check uses a fixed prompt with no tools or repository files and labels the
 traffic as test without changing your saved environment. Capture remains unverified.
-Then use `claude` and `claude --resume` normally;
+After verification, choose **Open Claude Code here**, select a project folder,
+or finish with instructions for starting later. Type your request inside Claude,
+not at the shell prompt. Use `--no-start` to show instructions without a launch
+prompt. Then use `claude` and `claude --resume` normally;
 repository configuration is not required. Requires Claude Code 2.1.309 or later.
 
 To check an existing setup, run `orchestra claude-setup verify` (billable).
