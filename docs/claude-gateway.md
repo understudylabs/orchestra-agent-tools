@@ -157,3 +157,18 @@ metadata is labeled invalid and its values are not used. The command preserves
 exact model IDs and does not change model choices, context windows, or compaction
 settings. Catalog metadata and wire-format support do not establish tested Claude
 compatibility. `models list` keeps its existing admin catalog output format.
+
+
+## Main model versus auxiliary calls
+
+Selecting a model with `/model` does not guarantee that every request in the
+session uses that model. Claude's auto permission mode can make separate safety
+classifier requests; its [documented default classifier](https://code.claude.com/docs/en/permission-modes#default-classifier-model)
+is Sonnet 5, subject to overrides and fallback rules. Other auxiliary requests
+may also be absent from the visible conversation transcript.
+
+Use `claude-session account` for the trace inventory and treat transcript
+reconciliation as a subset. Compare total session cost when measuring savings.
+Orchestra setup preserves permission policy and does not automatically replace
+the classifier with the selected coding model. Classifier compatibility and
+safety behavior need separate validation from coding and tool-call compatibility.
