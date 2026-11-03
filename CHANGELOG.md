@@ -15,6 +15,10 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+### Changed
+
+- Label the managed Claude custom model option Orchestra Flash. Refresh updates unchanged managed labels and preserves user customization; requests still use the existing versioned model ID.
+
 ### Fixed
 
 - Recover denied organization access inside Claude setup: sign in again, reload organizations and continue without rerunning the installer. Saved credentials are no longer presented as verified sign-in.
