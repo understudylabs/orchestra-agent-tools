@@ -17,6 +17,8 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ### Fixed
 
+- Recover denied organization access inside Claude setup: sign in again, reload organizations and continue without rerunning the installer. Saved credentials are no longer presented as verified sign-in.
+
 - Download the npm replacement before removing an installed CLI, preserving it if a just-published tarball is unavailable. Run source fallback dependency installation from its checkout to avoid npm prefix/lockfile resolution errors.
 
 ## [0.10.10] — 2026-11-02

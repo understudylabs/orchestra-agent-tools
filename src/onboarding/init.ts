@@ -141,7 +141,7 @@ export async function runInit(options: InitOptions, prompts: InitPrompts, versio
   let signedIn = Boolean(credentials);
   if (!options.skipLogin) {
     if (credentials) {
-      list.done("signin", credentials.email ? `Signed in as ${credentials.email}` : "Signed in to Orchestra");
+      list.done("signin", credentials.email ? `Saved sign-in for ${credentials.email}` : "Saved Orchestra sign-in found");
     } else {
       list.start("signin", "Sign in to Orchestra");
       list.pause();

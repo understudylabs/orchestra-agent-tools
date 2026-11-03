@@ -1,4 +1,4 @@
-import { confirm, select } from "@inquirer/prompts";
+import { confirm, input, select } from "@inquirer/prompts";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -89,29 +89,63 @@ export async function accessibleOrganization(choices: { name: string; value: str
   pick: (available: { name: string; value: string }[]) => select({ message: "Organization", choices: available }),
   load: (org: string) => listProjects(resolveAuth(org)),
   recover: (another: boolean) => select({ message: "Organization access needs attention", choices: [
+    { name: "Sign in again and continue setup (recommended)", value: "login" },
     ...(another ? [{ name: "Choose another organization", value: "another" }] : []),
-    { name: "Stop and sign in again", value: "login" },
     { name: "Skip gateway setup for now", value: "skip" },
   ] }),
+  login: async (org: string) => {
+    const credentials = readCredentials();
+    const email = (await input({ message: "Email for your Orchestra account (leave blank to cancel):", default: credentials?.email })).trim();
+    if (!email) return false;
+    const gateway = credentials?.orgs[org]?.gateway_url;
+    return new Promise<boolean>(resolve => {
+      const child = spawn(process.execPath, [fileURLToPath(new URL("../bin.js", import.meta.url)), "login", "--email", email, ...(gateway ? ["--gateway-url", gateway] : [])], { stdio: "inherit" });
+      child.on("error", () => resolve(false));
+      child.on("close", code => resolve(code === 0));
+    });
+  },
+  reload: async () => {
+    const credentials = readCredentials();
+    return credentials ? organizationChoices(credentials) : [];
+  },
   write: (message: string) => { process.stderr.write(message + "\n"); },
 }) {
   let available = choices;
   let selected = supplied;
+  let refreshed = false;
   for (;;) {
     if (selected && !available.some(choice => choice.value === selected)) throw new Error("Organization: selection is not available.");
     if (!selected) {
       if (!deps.interactive && available.length !== 1) throw new Error("Supply --org in noninteractive mode.");
       selected = available.length === 1 ? available[0]!.value : await deps.pick(available);
     }
-    try { return { org: selected, projects: await deps.load(selected) }; } catch (error) {
+    try { return { org: selected, name: available.find(choice => choice.value === selected)!.name, projects: await deps.load(selected) }; } catch (error) {
       if (!(error instanceof UnderstudyApiError) || ![401, 403].includes(error.status)) throw error;
       const label = available.find(choice => choice.value === selected)?.name ?? selected;
-      const message = `Cannot access ${label}. Its saved credential may have expired, been revoked, or lack organization access. Run orchestra login to refresh access, then orchestra claude-setup. Request ID: ${error.requestId || "unavailable"}.`;
-      if (!deps.interactive) throw new UnderstudyApiError({ status: error.status, errorType: error.errorType, requestId: error.requestId, message });
+      const reason = refreshed
+        ? "Sign-in completed, but this account still cannot access that organization. Check that you used the invited email, or ask your workspace administrator to confirm access."
+        : "Its saved credential may have expired, been revoked, or lack organization access.";
+      const message = `Cannot access ${label}. ${reason} Request ID: ${error.requestId || "unavailable"}.`;
+      if (!deps.interactive) throw new UnderstudyApiError({ status: error.status, errorType: error.errorType, requestId: error.requestId, message: `${message} In a terminal, run orchestra login --email <email>, then orchestra claude-setup.` });
       deps.write(message);
-      available = available.filter(choice => choice.value !== selected);
-      if (await deps.recover(available.length > 0) !== "another") return;
-      selected = undefined;
+      const remaining = available.filter(choice => choice.value !== selected);
+      const action = await deps.recover(remaining.length > 0);
+      if (action === "login") {
+        if (!await deps.login(selected)) {
+          deps.write("Sign-in did not complete. Setup stopped; run orchestra claude-setup when ready.");
+          return;
+        }
+        refreshed = true;
+        available = await deps.reload();
+        if (!available.length) {
+          deps.write("Sign-in did not provide organization access. Ask your workspace administrator to confirm membership, then run orchestra claude-setup.");
+          return;
+        }
+        selected = supplied;
+      } else if (action === "another") {
+        available = remaining;
+        selected = undefined;
+      } else return;
     }
   }
 }
@@ -152,14 +186,16 @@ export async function setupNativeClaude(opts: Options = {}) {
   if (!await existingClaudeSetup()) return;
   const version = await prepareClaudeVersion();
   if (!version) return;
-  const credentials = readCredentials();
+  let credentials = readCredentials();
   if (!credentials || !Object.keys(credentials.orgs).length) throw new Error("Sign in first with orchestra login, then run orchestra claude-setup.");
   if (process.env.UNDERSTUDY_API_KEY || process.env.UNDERSTUDY_GATEWAY_URL) throw new Error("Unset shell credential/gateway overrides; persistent setup uses your saved organization credential.");
   const organizations = await organizationChoices(credentials);
   const accessible = await accessibleOrganization(organizations, opts.org);
   if (!accessible) return;
   const { org, projects } = accessible;
-  const organizationLabel = organizations.find(choice => choice.value === org)!.name;
+  const organizationLabel = accessible.name;
+  credentials = readCredentials();
+  if (!credentials) throw new Error("Saved sign-in is no longer available. Run orchestra claude-setup again.");
   const auth = resolveAuth(org);
   const project = await chooseCodingProject(org, credentials, projects, opts.project);
   if (!project) return;
