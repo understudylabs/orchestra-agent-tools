@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.10] — 2026-11-02
+
+### Added
+
+- Inspect gateway-reported limits and features with `orchestra models capabilities [model]`. Missing metadata stays unknown, invalid metadata is identified without hiding the model, and existing harness settings remain unchanged.
+
 ## [0.10.9] — 2026-11-02
 
 ### Added

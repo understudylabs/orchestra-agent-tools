@@ -141,3 +141,19 @@ or merge a PR. This is explicit branch attribution, not proof that Claude
 produced every change, that every session was included, or that the PR belongs
 to only one session. PR and reconciliation records remain separate private
 artifacts keyed by session ID.
+
+
+## Inspect gateway model capabilities
+
+```sh
+orchestra models capabilities <exact-model-id> --org <org-id>
+orchestra models capabilities --org <org-id> --json
+```
+
+This reads `/v1/models` and reports context/output limits, tool support, parallel
+tools, and vision when the gateway supplies them. Servers without capability
+metadata remain compatible: omitted fields are unknown, not unsupported. Invalid
+metadata is labeled invalid and its values are not used. The command preserves
+exact model IDs and does not change model choices, context windows, or compaction
+settings. Catalog metadata and wire-format support do not establish tested Claude
+compatibility. `models list` keeps its existing admin catalog output format.
