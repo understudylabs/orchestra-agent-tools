@@ -160,7 +160,7 @@ test('repair migrates legacy auth without replacing routing, model, edits, or un
     writeFileSync(join(home,'.understudy','credentials.json'),JSON.stringify({orgs:{org_example:{api_key:'synthetic-key',gateway_url:'https://gateway.example.com'}}}));
     const script=`
       import assert from 'node:assert/strict';
-      import {readFileSync,writeFileSync} from 'node:fs';
+      import {readFileSync,writeFileSync,rmSync} from 'node:fs';
       import {join} from 'node:path';
       import {enableNativeClaude,repairNativeClaude,nativeClaudeHookStatus,readNativeState,removeNativeClaude,claudeSettingsPath} from ${JSON.stringify(moduleUrl)};
       const config={version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com'};
@@ -177,6 +177,17 @@ test('repair migrates legacy auth without replacing routing, model, edits, or un
       writeFileSync(statePath,JSON.stringify(state));writeFileSync(claudeSettingsPath(),JSON.stringify(current));
       repairNativeClaude('new-cli');repairNativeClaude('new-cli');
       assert.equal(nativeClaudeHookStatus(),'current');
+      for (const file of ['hooks/hooks.json','.claude-plugin/plugin.json']) {
+        const path=join(process.env.HOME,'.understudy','claude-native-mod',file);
+        rmSync(path);
+        assert.equal(nativeClaudeHookStatus(),'missing');
+        repairNativeClaude('new-cli');
+        assert.equal(nativeClaudeHookStatus(),'current');
+        writeFileSync(path,'invalid json');
+        assert.equal(nativeClaudeHookStatus(),'outdated_or_modified');
+        repairNativeClaude('new-cli');
+        assert.equal(nativeClaudeHookStatus(),'current');
+      }
       const repaired=JSON.parse(readFileSync(claudeSettingsPath()));
       assert.equal(repaired.env.ANTHROPIC_API_KEY,'');
       assert.equal(repaired.env.ANTHROPIC_AUTH_TOKEN,'orchestra-initialization-required');
