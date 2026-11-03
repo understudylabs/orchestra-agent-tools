@@ -112,10 +112,14 @@ const codingModelOption = {
   ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION: "Through Orchestra",
 };
 
+function scopedDeepSeek(env: Document): string {
+  return Object.hasOwn(env, "CLAUDE_CODE_MAX_CONTEXT_TOKENS") ? deepSeekModel : codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+}
+
 function pickerDefaults(env: Document): Document {
   // Claude has one custom-option slot; never take over a user's existing entry.
   const existing = Object.keys(codingModelOption).some(key => Object.hasOwn(env, key));
-  return !existing ? codingModelOption : {};
+  return !existing ? { ...codingModelOption, ANTHROPIC_CUSTOM_MODEL_OPTION: scopedDeepSeek(env) } : {};
 }
 
 function compactionDefaults(settings: Document): Document {
@@ -141,23 +145,23 @@ export function refreshNativeClaudeModels() {
   const env = object(current.env ?? {});
   const owned = object(state.installed.env ?? {});
   let migrated = false;
-  if (current.model === deepSeekModel) {
+  const contextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS";
+  if (Object.hasOwn(owned, contextKey) && same(env[contextKey], owned[contextKey])) {
+    const before = object(state.before.env ?? {});
+    if (Object.hasOwn(before, contextKey)) env[contextKey] = before[contextKey]; else delete env[contextKey];
+    delete owned[contextKey];
+    migrated = true;
+  }
+  if (current.model === deepSeekModel && scopedDeepSeek(env) !== deepSeekModel) {
     const scoped = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
     if (state.installed.model === current.model) state.installed.model = scoped;
     else state.modelMigration = { before: deepSeekModel, installed: scoped };
     current.model = scoped;
     migrated = true;
   }
-  if (env.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel && owned.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel) {
+  if (scopedDeepSeek(env) !== deepSeekModel && env.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel && owned.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel) {
     env.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
     owned.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
-    migrated = true;
-  }
-  const contextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS";
-  if (Object.hasOwn(owned, contextKey) && same(env[contextKey], owned[contextKey])) {
-    const before = object(state.before.env ?? {});
-    if (Object.hasOwn(before, contextKey)) env[contextKey] = before[contextKey]; else delete env[contextKey];
-    delete owned[contextKey];
     migrated = true;
   }
   const additions = pickerDefaults(env);
@@ -202,7 +206,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       CLAUDE_CODE_PLUGIN_DIRS: plugins + plugin,
     },
-    ...(config.model ? { model: config.model === deepSeekModel ? codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION : config.model } : before.model === deepSeekModel ? { model: codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION } : {}),
+    ...(config.model ? { model: config.model === deepSeekModel ? scopedDeepSeek(env) : config.model } : before.model === deepSeekModel ? { model: scopedDeepSeek(env) } : {}),
   };
   writeNativeJson(join(plugin, ".claude-plugin", "plugin.json"), { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" });
   writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });

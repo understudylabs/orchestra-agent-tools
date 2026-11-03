@@ -223,6 +223,12 @@ test('compaction preset preserves explicit windows and later model settings edit
         removeNativeClaude();
         assert.deepEqual(JSON.parse(readFileSync(path)),before);
       }
+      const explicit={model,env:{CLAUDE_CODE_MAX_CONTEXT_TOKENS:'262144'}};
+      writeFileSync(path,JSON.stringify(explicit));
+      enableNativeClaude(config,'example-cli'); refreshNativeClaudeModels();
+      assert.equal(JSON.parse(readFileSync(path)).model,model);
+      assert.equal(JSON.parse(readFileSync(path)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,model);
+      removeNativeClaude(); assert.deepEqual(JSON.parse(readFileSync(path)),explicit);
       for (const laterChoice of [undefined, 'another-model']) {
         writeFileSync(path,'{}'); enableNativeClaude(config,'example-cli');
         const selected=JSON.parse(readFileSync(path)); selected.model=model;
