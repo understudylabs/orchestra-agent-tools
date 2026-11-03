@@ -104,8 +104,9 @@ export function register(on) {
 `;
 }
 
+const deepSeekModel = "deepseek-v4.1-flash-1017";
 const codingModelOption = {
-  ANTHROPIC_CUSTOM_MODEL_OPTION: "deepseek-v4.1-flash-1017",
+  ANTHROPIC_CUSTOM_MODEL_OPTION: `${deepSeekModel}[1m]`,
   ANTHROPIC_CUSTOM_MODEL_OPTION_NAME: "DeepSeek V4.1 Flash 1017",
   ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION: "Through Orchestra",
 };
@@ -113,23 +114,16 @@ const codingModelOption = {
 function pickerDefaults(env: Document): Document {
   // Claude has one custom-option slot; never take over a user's existing entry.
   const existing = Object.keys(codingModelOption).some(key => Object.hasOwn(env, key));
-  const ownsDeepSeek = !existing || env.ANTHROPIC_CUSTOM_MODEL_OPTION === codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
-  return {
-    ...(!existing ? codingModelOption : {}),
-    // DeepSeek-V4.1-Flash-1017 config.json declares max_position_embeddings=1048576.
-    // This override applies to unrecognized custom IDs; recognized Claude IDs retain their native limits.
-    ...(ownsDeepSeek && !Object.hasOwn(env, "CLAUDE_CODE_MAX_CONTEXT_TOKENS")
-      ? { CLAUDE_CODE_MAX_CONTEXT_TOKENS: "1048576" } : {}),
-  };
+  return !existing ? codingModelOption : {};
 }
 
 function compactionDefaults(settings: Document): Document {
   if (Object.hasOwn(settings, "autoCompactWindow") || Object.hasOwn(object(settings.env ?? {}), "CLAUDE_CODE_AUTO_COMPACT_WINDOW")) return {};
   const models = object(settings.modelSettings ?? {});
-  const model = object(models[codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION] ?? {});
+  const model = object(models[deepSeekModel] ?? {});
   // Per-model settings avoid imposing DeepSeek's policy on Claude models.
   return Object.hasOwn(model, "autoCompactWindow") ? {} : {
-    [codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION]: { autoCompactWindow: 786432 },
+    [deepSeekModel]: { autoCompactWindow: 786432 },
   };
 }
 
@@ -144,10 +138,24 @@ export function refreshNativeClaudeModels() {
   if (lstatSync(state.settings_path).isSymbolicLink()) throw new Error("Claude settings is a symlink. Configure its owner directly.");
   const current = readJson(state.settings_path);
   const env = object(current.env ?? {});
+  const owned = object(state.installed.env ?? {});
+  let migrated = false;
+  if (env.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel && owned.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel) {
+    env.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+    owned.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+    migrated = true;
+  }
+  const contextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS";
+  if (Object.hasOwn(owned, contextKey) && same(env[contextKey], owned[contextKey])) {
+    const before = object(state.before.env ?? {});
+    if (Object.hasOwn(before, contextKey)) env[contextKey] = before[contextKey]; else delete env[contextKey];
+    delete owned[contextKey];
+    migrated = true;
+  }
   const additions = pickerDefaults(env);
   const modelDefaults = compactionDefaults(current);
-  if (!Object.keys(additions).length && !Object.keys(modelDefaults).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017." };
-  state.installed.env = { ...object(state.installed.env ?? {}), ...additions };
+  if (!migrated && !Object.keys(additions).length && !Object.keys(modelDefaults).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017[1m]." };
+  state.installed.env = { ...owned, ...additions };
   if (Object.keys(modelDefaults).length) state.installed.modelSettings = mergeModelSettings(state.installed.modelSettings, modelDefaults);
   writeNativeJson(statePath(), state);
   writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions }, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(current.modelSettings, modelDefaults) } : {}) });
