@@ -112,7 +112,15 @@ const codingModelOption = {
 
 function pickerDefaults(env: Document): Document {
   // Claude has one custom-option slot; never take over a user's existing entry.
-  return Object.keys(codingModelOption).some(key => Object.hasOwn(env, key)) ? {} : codingModelOption;
+  const existing = Object.keys(codingModelOption).some(key => Object.hasOwn(env, key));
+  const ownsDeepSeek = !existing || env.ANTHROPIC_CUSTOM_MODEL_OPTION === codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+  return {
+    ...(!existing ? codingModelOption : {}),
+    // DeepSeek-V4.1-Flash-1017 config.json declares max_position_embeddings=1048576.
+    // This override applies to unrecognized custom IDs; recognized Claude IDs retain their native limits.
+    ...(ownsDeepSeek && !Object.hasOwn(env, "CLAUDE_CODE_MAX_CONTEXT_TOKENS")
+      ? { CLAUDE_CODE_MAX_CONTEXT_TOKENS: "1048576" } : {}),
+  };
 }
 
 export function refreshNativeClaudeModels() {

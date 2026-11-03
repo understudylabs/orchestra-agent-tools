@@ -15,6 +15,12 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.6] — 2026-11-02
+
+### Fixed
+
+- Declare the DeepSeek V4.1 Flash 1017 context window during setup and `claude-setup models`, removing Claude’s unknown-model warning. Preserve explicit context-window overrides and existing custom picker entries. The setting also applies to other unrecognized custom model IDs; configure their window before switching.
+
 ## [0.10.5] — 2026-11-02
 
 ### Fixed

@@ -26,6 +26,16 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       assert.equal(enabled.env.ANTHROPIC_BASE_URL,BLOCKED_GATEWAY);
       assert.equal(enabled.env.ANTHROPIC_API_KEY,'');
       assert.equal(enabled.env.ANTHROPIC_AUTH_TOKEN,'orchestra-initialization-required');
+      assert.equal(enabled.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,'1048576');
+      const upgradeStatePath=join(process.env.HOME,'.understudy','claude-native.json');
+      const upgradeState=JSON.parse(readFileSync(upgradeStatePath));
+      delete enabled.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS;
+      delete upgradeState.installed.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS;
+      writeFileSync(settings,JSON.stringify(enabled));
+      writeFileSync(upgradeStatePath,JSON.stringify(upgradeState));
+      assert.equal(refreshNativeClaudeModels().changed,true);
+      assert.equal(JSON.parse(readFileSync(settings)).env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,'1048576');
+      enabled.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS='1048576';
       const profilePath=join(process.env.HOME,'.claude.json');
       const profile=JSON.parse(readFileSync(profilePath));
       assert.equal(profile.hasCompletedOnboarding,true);
@@ -52,6 +62,7 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       assert.equal(JSON.parse(readFileSync(profilePath)).theme,'light');
       assert.equal(after.env.ANTHROPIC_BASE_URL,undefined);
       assert.equal(after.env.ANTHROPIC_CUSTOM_MODEL_OPTION,undefined);
+      assert.equal(after.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,undefined);
       assert.equal(after.model,'user-choice'); assert.equal(after.theme,'light');
       assert.equal(after.env.KEEP,'changed'); assert.equal(after.env.CLAUDE_CODE_PLUGIN_DIRS,'/tmp/another-plugin');
       assert.deepEqual(removed.preserved_user_edits,['model']);
@@ -71,6 +82,7 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       writeFileSync(settings,JSON.stringify(custom));
       enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
       assert.equal(refreshNativeClaudeModels().changed,false);
+      assert.equal(JSON.parse(readFileSync(settings)).env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,undefined);
       assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,'user-model');
       removeNativeClaude();
       assert.equal(JSON.parse(readFileSync(settings)).env.ANTHROPIC_CUSTOM_MODEL_OPTION,'user-model');
@@ -78,6 +90,11 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       delete custom.env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME;
       writeFileSync(settings,JSON.stringify(custom));
       enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
+      const withWindow=JSON.parse(readFileSync(settings));
+      withWindow.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS='262144';
+      writeFileSync(settings,JSON.stringify(withWindow));
+      assert.equal(refreshNativeClaudeModels().changed,false);
+      assert.equal(JSON.parse(readFileSync(settings)).env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,'262144');
       const statePath=join(process.env.HOME,'.understudy','claude-native.json');
       const legacy=JSON.parse(readFileSync(statePath));
       const legacySettings=JSON.parse(readFileSync(settings));
