@@ -15,6 +15,16 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.9] — 2026-11-02
+
+### Added
+
+- Reconcile native interactive Claude transcripts with `claude-session reconcile --transcript-format native`, counting each completed response once across content blocks and resumed snapshots. Conflicting usage, incomplete responses, and mixed-session or subagent evidence fail explicitly.
+
+### Fixed
+
+- Keep unknown capture state separate from explicitly disabled capture in session accounting reports.
+
 ## [0.10.8] — 2026-11-02
 
 ### Fixed

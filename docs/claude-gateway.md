@@ -53,7 +53,9 @@ ingestion/pricing catches up. No platform changes are required. Resuming a
 session preserves its trace ID, so resumed invocations are accounted together.
 
 The report separates priced cost from unpriced request IDs and uncaptured
-request IDs. A total stays null if any request is unpriced or the inventory is
+request IDs, with unknown capture states listed separately as
+`capture_unknown_request_ids`. Unknown does not establish that capture was disabled.
+A total stays null if any request is unpriced or the inventory is
 empty. Coverage warnings are preserved: requests without the session trace ID, early
 rejections without a record, and later arrivals cannot be inferred from the
 snapshot. Missing-ID and shared-ID ambiguity is unknown, never a fabricated zero.
@@ -102,7 +104,22 @@ Output contains cost and verification metadata, never capture bodies. Retry
 when ingestion or pricing is still pending. Duplicate results, mixed sessions,
 missing payloads or token discrepancies fail reconciliation.
 
-Coverage is the successful requests represented in the supplied completed
+For a native interactive session, use its local Claude transcript explicitly:
+
+```sh
+orchestra claude-session reconcile <session-id> \
+  --transcript-format native --transcript <private-transcript.jsonl> \
+  --out <private-capture-directory> --include-payload --yes
+```
+
+Native files repeat a response across content blocks. Reconciliation counts its
+usage once by response ID, including overlapping resumed snapshots. It rejects
+conflicting usage, incomplete assistant records, mixed sessions, and subagent
+transcripts that need separate attribution. Local history records are not API
+usage. A compaction boundary does not prove that every compaction or background
+request is present in the transcript.
+
+Coverage includes only requests with completed usage evidence in the supplied
 transcripts. This does not enumerate omitted invocations, failed requests or
 background traffic. Compare a gateway session inventory before describing the
 report as the cost of an entire session. Keep exports outside version control.
