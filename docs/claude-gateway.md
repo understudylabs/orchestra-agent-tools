@@ -53,7 +53,9 @@ ingestion/pricing catches up. No platform changes are required. Resuming a
 session preserves its trace ID, so resumed invocations are accounted together.
 
 The report separates priced cost from unpriced request IDs and uncaptured
-request IDs. A total stays null if any request is unpriced or the inventory is
+request IDs, with unknown capture states listed separately as
+`capture_unknown_request_ids`. Unknown does not establish that capture was disabled.
+A total stays null if any request is unpriced or the inventory is
 empty. Coverage warnings are preserved: requests without the session trace ID, early
 rejections without a record, and later arrivals cannot be inferred from the
 snapshot. Missing-ID and shared-ID ambiguity is unknown, never a fabricated zero.
@@ -102,7 +104,22 @@ Output contains cost and verification metadata, never capture bodies. Retry
 when ingestion or pricing is still pending. Duplicate results, mixed sessions,
 missing payloads or token discrepancies fail reconciliation.
 
-Coverage is the successful requests represented in the supplied completed
+For a native interactive session, use its local Claude transcript explicitly:
+
+```sh
+orchestra claude-session reconcile <session-id> \
+  --transcript-format native --transcript <private-transcript.jsonl> \
+  --out <private-capture-directory> --include-payload --yes
+```
+
+Native files repeat a response across content blocks. Reconciliation counts its
+usage once by response ID, including overlapping resumed snapshots. It rejects
+conflicting usage, incomplete assistant records, mixed sessions, and subagent
+transcripts that need separate attribution. Local history records are not API
+usage. A compaction boundary does not prove that every compaction or background
+request is present in the transcript.
+
+Coverage includes only requests with completed usage evidence in the supplied
 transcripts. This does not enumerate omitted invocations, failed requests or
 background traffic. Compare a gateway session inventory before describing the
 report as the cost of an entire session. Keep exports outside version control.
@@ -124,3 +141,34 @@ or merge a PR. This is explicit branch attribution, not proof that Claude
 produced every change, that every session was included, or that the PR belongs
 to only one session. PR and reconciliation records remain separate private
 artifacts keyed by session ID.
+
+
+## Inspect gateway model capabilities
+
+```sh
+orchestra models capabilities <exact-model-id> --org <org-id>
+orchestra models capabilities --org <org-id> --json
+```
+
+This reads `/v1/models` and reports context/output limits, tool support, parallel
+tools, and vision when the gateway supplies them. Servers without capability
+metadata remain compatible: omitted fields are unknown, not unsupported. Invalid
+metadata is labeled invalid and its values are not used. The command preserves
+exact model IDs and does not change model choices, context windows, or compaction
+settings. Catalog metadata and wire-format support do not establish tested Claude
+compatibility. `models list` keeps its existing admin catalog output format.
+
+
+## Main model versus auxiliary calls
+
+Selecting a model with `/model` does not guarantee that every request in the
+session uses that model. Claude's auto permission mode can make separate safety
+classifier requests; its [documented default classifier](https://code.claude.com/docs/en/permission-modes#default-classifier-model)
+is Sonnet 5, subject to overrides and fallback rules. Other auxiliary requests
+may also be absent from the visible conversation transcript.
+
+Use `claude-session account` for the trace inventory and treat transcript
+reconciliation as a subset. Compare total session cost when measuring savings.
+Orchestra setup preserves permission policy and does not automatically replace
+the classifier with the selected coding model. Classifier compatibility and
+safety behavior need separate validation from coding and tool-call compatibility.

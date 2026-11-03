@@ -3,6 +3,7 @@ import kleur from "kleur";
 import { join } from "node:path";
 import { z } from "zod";
 
+import { fetchGatewayModelCapabilities } from "../internal/model-capabilities.js";
 import { request, resolveAuth } from "../internal/http.js";
 import { isJsonMode, runAction } from "../internal/output.js";
 import { trackControlPlaneAction } from "../internal/telemetry.js";
@@ -59,6 +60,33 @@ export function registerModelsCommand(program: Command): void {
     .option("--org <id>", "Org id to use (default: only org in credentials).")
     .action(async function (this: Command, opts: OrgOpt) {
       await runAction(this, () => runList(this, opts));
+    });
+
+  models
+    .command("capabilities [model]")
+    .description("Inspect gateway-reported model limits and features without changing settings.")
+    .option("--org <id>", "Organization credential to use")
+    .option("--json", "Output JSON")
+    .action(async function (this: Command, model: string | undefined, opts: OrgOpt & { json?: boolean }) {
+      await runAction(this, async () => {
+        const auth = resolveAuth(opts.org);
+        const catalog = await fetchGatewayModelCapabilities(auth.orgId);
+        const selected = model ? catalog.filter(entry => entry.id === model) : catalog;
+        if (model && !selected.length) throw new Error("Exact model ID is not present in the gateway catalog.");
+        const note = "Reported capabilities are catalog metadata, not a Claude compatibility test. Missing fields are unknown; settings have not changed.";
+        if (opts.json || isJsonMode(this)) {
+          process.stdout.write(JSON.stringify({ models: selected, note }) + "\n");
+          return;
+        }
+        for (const entry of selected) {
+          process.stdout.write(`${entry.id} — ${entry.capability_status}\n`);
+          process.stdout.write(`  wire shapes: ${entry.wire_shapes.join(", ") || "unknown"}\n`);
+          for (const key of ["context_window_tokens", "max_output_tokens", "tool_calls", "parallel_tool_calls", "vision"] as const) {
+            process.stdout.write(`  ${key}: ${entry.capabilities?.[key] ?? "unknown"}\n`);
+          }
+        }
+        process.stdout.write(note + "\n");
+      });
     });
 
   models

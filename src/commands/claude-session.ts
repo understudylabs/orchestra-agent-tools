@@ -98,15 +98,17 @@ export function registerClaudeSessionCommand(program: Command): void {
       });
     });
   command.command("reconcile <session-id>")
-    .requiredOption("--transcript <files...>", "Completed Claude stream-json outputs, including resume invocations")
+    .requiredOption("--transcript <files...>", "Claude transcript files, including resume invocations")
+    .option("--transcript-format <format>", "stream-json or native", "stream-json")
     .requiredOption("--out <directory>", "Private capture export directory")
     .option("--include-payload", "Download request/response payloads for verification")
     .option("--yes", "Confirm local payload export")
-    .action(async function (this: Command, id: string, opts: { transcript: string[]; out: string; includePayload?: boolean; yes?: boolean }) {
+    .action(async function (this: Command, id: string, opts: { transcript: string[]; transcriptFormat: string; out: string; includePayload?: boolean; yes?: boolean }) {
       await runAction(this, async () => {
         if (!opts.includePayload || !opts.yes) throw new Error("Capture verification requires --include-payload --yes.");
         const session = readSession(id);
-        const report = await reconcileClaudeSession(session, opts.transcript, opts.out);
+        const format = z.enum(["stream-json", "native"]).parse(opts.transcriptFormat);
+        const report = await reconcileClaudeSession(session, opts.transcript, opts.out, format);
         writePrivateText(join(globalConfigDir(), "claude-sessions", `${id}.reconciliation.json`), JSON.stringify(report, null, 2) + "\n");
         process.stdout.write(JSON.stringify(report, null, 2) + "\n");
       });

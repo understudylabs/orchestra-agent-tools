@@ -14,7 +14,7 @@ import { chooseCodingWorkload } from "../onboarding/coding-workload.js";
 import { listWorkloads } from "../internal/workloads.js";
 import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
-import { refreshNativeClaudeModels, claudeUpdateCommand, hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
+import { nativeClaudeHookStatus, repairNativeClaude, refreshNativeClaudeModels, claudeUpdateCommand, hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
 
 interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean }
 async function choose(message: string, supplied: string | undefined, choices: { name: string; value: string }[]) {
@@ -121,7 +121,8 @@ export async function existingClaudeSetup(deps = {
   read: readNativeState,
   interactive: Boolean(process.stdin.isTTY),
   select: () => select({ message: "Claude Code already uses Orchestra", choices: [
-    { name: "Keep current setup (recommended)", value: "keep" },
+    { name: "Update integration, keep current setup (recommended)", value: "repair" },
+    { name: "Keep current setup without updating", value: "keep" },
     { name: "Add DeepSeek to the model picker", value: "models" },
     { name: "Remove current setup and configure again", value: "reconfigure" },
     { name: "Remove Orchestra from Claude Code", value: "remove" },
@@ -129,6 +130,7 @@ export async function existingClaudeSetup(deps = {
   confirm: (reconfigure: boolean) => confirm({ message: reconfigure
     ? "Restore previous Claude settings before configuring again? If you cancel the new setup, Orchestra stays disabled."
     : "Remove Orchestra and restore previous Claude settings?", default: false }),
+  repair: () => repairNativeClaude(fileURLToPath(new URL("../bin.js", import.meta.url))),
   remove: removeNativeClaude,
   write: (message: string) => { process.stdout.write(message + "\n"); },
 }): Promise<boolean> {
@@ -137,6 +139,7 @@ export async function existingClaudeSetup(deps = {
   deps.write(`Orchestra is already configured: ${state.config.org} / ${state.config.project} / ${state.config.workload} (${state.config.environment}).\nRun claude normally. Check health: orchestra claude-setup status. Remove: orchestra claude-setup remove.`);
   if (!deps.interactive) throw new Error("Setup is already configured; nothing changed. Run orchestra claude-setup interactively to keep, remove, or reconfigure it.");
   const action = await deps.select();
+  if (action === "repair") { deps.write(JSON.stringify(deps.repair(), null, 2)); return false; }
   if (action === "models") { deps.write(refreshNativeClaudeModels().next); return false; }
   if (action === "keep" || !await deps.confirm(action === "reconfigure")) return false;
   const removed = deps.remove();
@@ -187,6 +190,9 @@ export function registerClaudeSetupCommand(program: Command) {
     .option("--environment <environment>", "test or production").option("--model <id>", "Optional starting Claude model; /model remains available")
     .option("--yes", "Confirm persistent routing and capture scope")
     .action(async function (this: Command, opts: Options) { await runAction(this, () => setupNativeClaude(opts)); });
+  command.command("repair").description("Update the installed integration while preserving routing and user settings").action(async function (this: Command) {
+    await runAction(this, async () => { process.stdout.write(JSON.stringify(repairNativeClaude(fileURLToPath(new URL("../bin.js", import.meta.url))), null, 2) + "\n"); });
+  });
   command.command("models").description("Add the DeepSeek picker option without changing routing or the default model").action(async function (this: Command) {
     await runAction(this, async () => { process.stdout.write(JSON.stringify(refreshNativeClaudeModels(), null, 2) + "\n"); });
   });
@@ -200,9 +206,14 @@ export function registerClaudeSetupCommand(program: Command) {
         if (key === "model") continue;
         if (key === "env") {
           for (const [name, expected] of Object.entries(value as Record<string, unknown>)) if (current.env?.[name] !== expected) drift.push(`env.${name}`);
+        } else if (key === "modelSettings") {
+          // Users can tune compaction and effort without invalidating gateway routing.
+          continue;
         } else if (current[key] !== value) drift.push(key);
       }
-      process.stdout.write(JSON.stringify({ enabled: true, claude: checkClaudeVersion(), defaults: state.config, settings_drift: drift, limits: "Local terminal integration. Project/managed settings, shell overrides, --bare/--safe-mode, or disabled mods can prevent it. Run a smoke session to verify routing.", remove: "orchestra claude-setup remove" }, null, 2) + "\n");
+      const hook = nativeClaudeHookStatus();
+      if (hook !== "current") drift.push("native_hook");
+      process.stdout.write(JSON.stringify({ enabled: true, hook, verification: { configuration: drift.length ? "needs_attention" : "configured", inference: "not_checked", capture: "not_checked" }, repair: "orchestra claude-setup repair", claude: checkClaudeVersion(), defaults: state.config, settings_drift: drift, limits: "Local terminal integration. Project/managed settings, shell overrides, --bare/--safe-mode, or disabled mods can prevent it. Run a smoke session to verify routing.", remove: "orchestra claude-setup remove" }, null, 2) + "\n");
       if (drift.length) process.exitCode = 1;
     });
   });

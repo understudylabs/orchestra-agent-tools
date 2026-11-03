@@ -34,6 +34,7 @@ export function writeNativeJson(path: string, value: unknown): void {
 const StateSchema = z.object({
   config: ClaudeNativeConfigSchema, settings_path: z.string(),
   onboarding: z.object({ path: z.string(), before: z.boolean().optional() }).optional(),
+  modelMigration: z.object({ before: z.string(), installed: z.string() }).optional(),
   before: z.record(z.string(), z.unknown()), installed: z.record(z.string(), z.unknown()),
 });
 export const hasNativeClaudeSetup = () => existsSync(statePath());
@@ -104,15 +105,37 @@ export function register(on) {
 `;
 }
 
+const deepSeekModel = "deepseek-v4.1-flash-1017";
 const codingModelOption = {
-  ANTHROPIC_CUSTOM_MODEL_OPTION: "deepseek-v4.1-flash-1017",
+  ANTHROPIC_CUSTOM_MODEL_OPTION: `${deepSeekModel}[1m]`,
   ANTHROPIC_CUSTOM_MODEL_OPTION_NAME: "DeepSeek V4.1 Flash 1017",
   ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION: "Through Orchestra",
 };
 
+function scopedDeepSeek(env: Document): string {
+  return Object.hasOwn(env, "CLAUDE_CODE_MAX_CONTEXT_TOKENS") ? deepSeekModel : codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+}
+
 function pickerDefaults(env: Document): Document {
   // Claude has one custom-option slot; never take over a user's existing entry.
-  return Object.keys(codingModelOption).some(key => Object.hasOwn(env, key)) ? {} : codingModelOption;
+  const existing = Object.keys(codingModelOption).some(key => Object.hasOwn(env, key));
+  return !existing ? { ...codingModelOption, ANTHROPIC_CUSTOM_MODEL_OPTION: scopedDeepSeek(env) } : {};
+}
+
+function compactionDefaults(settings: Document): Document {
+  if (Object.hasOwn(settings, "autoCompactWindow") || Object.hasOwn(object(settings.env ?? {}), "CLAUDE_CODE_AUTO_COMPACT_WINDOW")) return {};
+  const models = object(settings.modelSettings ?? {});
+  const model = object(models[deepSeekModel] ?? {});
+  // Per-model settings avoid imposing DeepSeek's policy on Claude models.
+  return Object.hasOwn(model, "autoCompactWindow") ? {} : {
+    [deepSeekModel]: { autoCompactWindow: 786432 },
+  };
+}
+
+function mergeModelSettings(current: unknown, additions: Document): Document {
+  const models = { ...object(current ?? {}) };
+  for (const [id, values] of Object.entries(additions)) models[id] = { ...object(models[id] ?? {}), ...object(values) };
+  return models;
 }
 
 export function refreshNativeClaudeModels() {
@@ -120,12 +143,35 @@ export function refreshNativeClaudeModels() {
   if (lstatSync(state.settings_path).isSymbolicLink()) throw new Error("Claude settings is a symlink. Configure its owner directly.");
   const current = readJson(state.settings_path);
   const env = object(current.env ?? {});
+  const owned = object(state.installed.env ?? {});
+  let migrated = false;
+  const contextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS";
+  if (Object.hasOwn(owned, contextKey) && same(env[contextKey], owned[contextKey])) {
+    const before = object(state.before.env ?? {});
+    if (Object.hasOwn(before, contextKey)) env[contextKey] = before[contextKey]; else delete env[contextKey];
+    delete owned[contextKey];
+    migrated = true;
+  }
+  if (current.model === deepSeekModel && scopedDeepSeek(env) !== deepSeekModel) {
+    const scoped = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+    if (state.installed.model === current.model) state.installed.model = scoped;
+    else state.modelMigration = { before: deepSeekModel, installed: scoped };
+    current.model = scoped;
+    migrated = true;
+  }
+  if (scopedDeepSeek(env) !== deepSeekModel && env.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel && owned.ANTHROPIC_CUSTOM_MODEL_OPTION === deepSeekModel) {
+    env.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+    owned.ANTHROPIC_CUSTOM_MODEL_OPTION = codingModelOption.ANTHROPIC_CUSTOM_MODEL_OPTION;
+    migrated = true;
+  }
   const additions = pickerDefaults(env);
-  if (!Object.keys(additions).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017." };
-  state.installed.env = { ...object(state.installed.env ?? {}), ...additions };
+  const modelDefaults = compactionDefaults(current);
+  if (!migrated && !Object.keys(additions).length && !Object.keys(modelDefaults).length) return { changed: false, next: "Existing custom model option preserved. Select DeepSeek explicitly with /model deepseek-v4.1-flash-1017[1m]." };
+  state.installed.env = { ...owned, ...additions };
+  if (Object.keys(modelDefaults).length) state.installed.modelSettings = mergeModelSettings(state.installed.modelSettings, modelDefaults);
   writeNativeJson(statePath(), state);
-  writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions } });
-  return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your default model is unchanged. Managed model restrictions still apply." };
+  writeNativeJson(state.settings_path, { ...current, env: { ...env, ...additions }, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(current.modelSettings, modelDefaults) } : {}) });
+  return { changed: true, next: "Restart Claude, then select DeepSeek V4.1 Flash 1017 in /model. Your selected model is preserved; DeepSeek uses its scoped context hint. Managed model restrictions still apply." };
 }
 
 export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node = process.execPath) {
@@ -148,7 +194,9 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   for (const key of Object.keys(env)) if (key.startsWith("CLAUDE_CODE_USE_") && env[key] && env[key] !== "0") throw new Error(`Remove conflicting provider setting env.${key} before setup.`);
   const plugin = join(globalConfigDir(), "claude-native-mod");
   const plugins = typeof env.CLAUDE_CODE_PLUGIN_DIRS === "string" && env.CLAUDE_CODE_PLUGIN_DIRS ? env.CLAUDE_CODE_PLUGIN_DIRS + (process.platform === "win32" ? ";" : ":") : "";
+  const modelDefaults = compactionDefaults(before);
   const installed = {
+    ...(Object.keys(modelDefaults).length ? { modelSettings: modelDefaults } : {}),
     env: {
       ...pickerDefaults(env),
       ANTHROPIC_BASE_URL: BLOCKED_GATEWAY,
@@ -158,16 +206,79 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       CLAUDE_CODE_PLUGIN_DIRS: plugins + plugin,
     },
-    ...(config.model ? { model: config.model } : {}),
+    ...(config.model ? { model: config.model === deepSeekModel ? scopedDeepSeek(env) : config.model } : before.model === deepSeekModel ? { model: scopedDeepSeek(env) } : {}),
   };
-  writeNativeJson(join(plugin, ".claude-plugin", "plugin.json"), { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" });
-  writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });
+  for (const [file, value] of Object.entries(nativePluginManifests)) writeNativeJson(join(plugin, file), value);
   writeFileSync(join(plugin, "hooks", "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
   // Save recovery state first: interruption before settings write remains safely removable.
   writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed, onboarding: { path: onboardingPath, before: profile.hasCompletedOnboarding } });
-  writeNativeJson(settingsPath, { ...before, ...installed, env: { ...env, ...installed.env } });
+  writeNativeJson(settingsPath, { ...before, ...installed, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(before.modelSettings, modelDefaults) } : {}), env: { ...env, ...installed.env } });
   writeNativeJson(onboardingPath, { ...profile, hasCompletedOnboarding: true });
   return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
+}
+
+const nativePluginManifests = {
+  ".claude-plugin/plugin.json": { name: "orchestra-gateway", version: "0.1.0", author: { name: "Orchestra" }, license: "MIT", description: "Persistent Orchestra gateway and session attribution" },
+  "hooks/hooks.json": { modules: ["./register.js"] },
+};
+
+export function nativeClaudeHookStatus(): "current" | "missing" | "outdated_or_modified" {
+  const plugin = join(globalConfigDir(), "claude-native-mod");
+  for (const [file, expected] of Object.entries(nativePluginManifests)) {
+    const manifest = join(plugin, file);
+    if (!existsSync(manifest)) return "missing";
+    if (lstatSync(manifest).isSymbolicLink()) return "outdated_or_modified";
+    try { if (!same(readJson(manifest), expected)) return "outdated_or_modified"; }
+    catch { return "outdated_or_modified"; }
+  }
+  const path = join(plugin, "hooks", "register.js");
+  if (!existsSync(path)) return "missing";
+  if (lstatSync(path).isSymbolicLink()) return "outdated_or_modified";
+  const source = readFileSync(path, "utf8");
+  const match = /^const command = (.+);$/m.exec(source);
+  if (!match) return "outdated_or_modified";
+  try {
+    const command = z.array(z.string()).parse(JSON.parse(match[1]!));
+    return source === nativeModSource(command) ? "current" : "outdated_or_modified";
+  } catch { return "outdated_or_modified"; }
+}
+
+export function repairNativeClaude(cli: string, node = process.execPath) {
+  const state = readNativeState();
+  storedNativeCredential(state.config);
+  checkClaudeVersion();
+  const plugin = join(globalConfigDir(), "claude-native-mod");
+  const profilePath = state.onboarding?.path ?? join(process.env.CLAUDE_CONFIG_DIR || homedir(), ".claude.json");
+  for (const path of [state.settings_path, profilePath, plugin, join(plugin, ".claude-plugin"), ...Object.keys(nativePluginManifests).map(file => join(plugin, file)), join(plugin, "hooks"), join(plugin, "hooks", "register.js")]) {
+    if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error("Claude integration contains a symlink. Configure its owner directly.");
+  }
+  if (!existsSync(state.settings_path)) throw new Error("Claude settings are missing. Reconfigure Orchestra to restore routing.");
+  const current = readJson(state.settings_path);
+  const env = object(current.env ?? {});
+  const installed = object(state.installed.env ?? {});
+  const profile = readJson(profilePath);
+  if (profile.hasCompletedOnboarding !== undefined && typeof profile.hasCompletedOnboarding !== "boolean") throw new Error("Claude onboarding state is invalid.");
+  const preserved: string[] = [];
+  for (const [key, value] of Object.entries({ ANTHROPIC_API_KEY: "", ANTHROPIC_AUTH_TOKEN: "orchestra-initialization-required" })) {
+    if (same(env[key], installed[key])) { env[key] = value; installed[key] = value; }
+    else preserved.push(`env.${key}`);
+  }
+  const migrateOnboarding = !state.onboarding;
+  if (migrateOnboarding) state.onboarding = { path: profilePath, before: profile.hasCompletedOnboarding as boolean | undefined };
+  else if (profile.hasCompletedOnboarding !== true) preserved.push("profile.hasCompletedOnboarding");
+  state.installed.env = installed;
+  // Retain the original uninstall snapshot across every repair.
+  writeNativeJson(statePath(), state);
+  writeNativeJson(state.settings_path, { ...current, env });
+  if (migrateOnboarding) writeNativeJson(profilePath, { ...profile, hasCompletedOnboarding: true });
+  mkdirSync(join(plugin, "hooks"), { recursive: true, mode: 0o700 });
+  for (const [file, value] of Object.entries(nativePluginManifests)) writeNativeJson(join(plugin, file), value);
+  const temp = mkdtempSync(join(plugin, "hooks", ".orchestra-repair-"));
+  try {
+    writeFileSync(join(temp, "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
+    renameSync(join(temp, "register.js"), join(plugin, "hooks", "register.js"));
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+  return { repaired: true, preserved_user_edits: preserved, next: "Restart Claude to load the updated Orchestra integration. Routing and model choices are unchanged. Run orchestra claude-setup status to inspect configuration; inference and capture still require a smoke test." };
 }
 
 export function removeNativeClaude() {
@@ -186,10 +297,25 @@ export function removeNativeClaude() {
         } else preserved.push(`env.${name}`);
       }
       if (Object.keys(env).length || Object.hasOwn(state.before, "env")) current.env = env; else delete current.env;
+    } else if (key === "modelSettings") {
+      const models = object(current.modelSettings ?? {});
+      const original = object(state.before.modelSettings ?? {});
+      for (const [id, values] of Object.entries(object(installed))) {
+        const row = object(models[id] ?? {});
+        const before = object(original[id] ?? {});
+        for (const [field, expected] of Object.entries(object(values))) {
+          if (same(row[field], expected)) {
+            if (Object.hasOwn(before, field)) row[field] = before[field]; else delete row[field];
+          } else preserved.push(`modelSettings.${id}.${field}`);
+        }
+        if (Object.keys(row).length || Object.hasOwn(original, id)) models[id] = row; else delete models[id];
+      }
+      if (Object.keys(models).length || Object.hasOwn(state.before, "modelSettings")) current.modelSettings = models; else delete current.modelSettings;
     } else if (same(current[key], installed)) {
       if (Object.hasOwn(state.before, key)) current[key] = state.before[key]; else delete current[key];
     } else preserved.push(key);
   }
+  if (state.modelMigration && current.model === state.modelMigration.installed) current.model = state.modelMigration.before;
   if (state.onboarding) {
     const path = state.onboarding.path;
     if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error("Claude profile is a symlink. Configure its owner directly.");

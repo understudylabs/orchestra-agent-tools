@@ -15,6 +15,20 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 ## [Unreleased]
 
+## [0.10.10] — 2026-11-02
+
+### Added
+
+- Repair existing Claude integrations in place, including missing or corrupted generated plugin manifests, while preserving routing, model choices, user edits, and the original uninstall backup. Status separates configuration from unverified inference and capture.
+- Add a DeepSeek V4.1 Flash 1017-specific compaction window, preserving explicit user settings and restoring owned settings on removal.
+- Reconcile native interactive Claude transcripts with `claude-session reconcile --transcript-format native`, counting completed responses once across content blocks and resumed snapshots. Conflicting usage, incomplete responses, and mixed-session or subagent evidence fail explicitly.
+- Inspect gateway-reported limits and features with `orchestra models capabilities [model]`. Missing metadata stays unknown, invalid metadata is identified without hiding the model, and existing harness settings remain unchanged.
+
+### Fixed
+
+- Scope the DeepSeek context hint to its model selection rather than setting a global window for every unknown model. Refresh migrates unchanged Orchestra-owned settings and preserves explicit user context overrides.
+- Keep unknown capture state separate from explicitly disabled capture in session accounting reports.
+
 ## [0.10.5] — 2026-11-02
 
 ### Fixed

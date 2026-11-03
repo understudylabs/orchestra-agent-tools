@@ -42,6 +42,40 @@ export function readClaudeEvidence(files: string[], sessionId: string) {
   return { messageIds: [...messageIds], usage, results: results.size };
 }
 
+export function readNativeClaudeEvidence(files: string[], sessionId: string) {
+  const messages = new Map<string, ReturnType<typeof UsageSchema.parse>>();
+  for (const file of files) {
+    for (const line of readFileSync(file, "utf8").split("\n").filter(line => line.trim())) {
+      let row;
+      try { row = JSON.parse(line); } catch { throw new Error("Invalid transcript JSON; raw content omitted."); }
+      if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("Invalid transcript record; raw content omitted.");
+      for (const key of ["sessionId", "session_id"]) {
+        if (row[key] !== undefined && row[key] !== sessionId) throw new Error("Transcript contains a different session ID.");
+      }
+      // Native files also contain local UI/history records without session IDs or usage.
+      if (row.type !== "assistant") continue;
+      if (row.sessionId !== sessionId) throw new Error("Native assistant record is missing its session ID.");
+      if (row.isSidechain === true) throw new Error("Reconcile subagent transcripts separately; parent attribution is not sufficient.");
+      const message = z.object({
+        id: z.string().min(1).max(256),
+        stop_reason: z.string().min(1),
+        usage: UsageSchema,
+      }).safeParse(row.message);
+      if (!message.success || row.isApiErrorMessage) throw new Error("Native assistant record lacks completed usage evidence; raw content omitted.");
+      const { id, usage } = message.data;
+      const previous = messages.get(id);
+      if (previous && tokenKeys.some(key => previous[key] !== usage[key])) throw new Error("Conflicting usage for a repeated assistant message; reconciliation is ambiguous.");
+      messages.set(id, usage);
+    }
+  }
+  if (!messages.size) throw new Error("No assistant message IDs to reconcile.");
+  const usage = emptyUsage();
+  for (const message of messages.values()) {
+    for (const key of tokenKeys) usage[key]! += message[key]!;
+  }
+  return { messageIds: [...messages.keys()], usage };
+}
+
 export function verifySessionCapture(value: unknown, session: Session, requestId: string): void {
   const capture = z.object({ request_id: z.string(), request_environment: z.string(), tags: z.record(z.string(), z.string()), customer_request_body: z.unknown(), response_body: z.unknown() }).parse(value);
   if (capture.request_id !== requestId || capture.request_environment !== session.environment) throw new Error("Capture identity or environment mismatch.");
@@ -55,8 +89,8 @@ export function verifySessionCapture(value: unknown, session: Session, requestId
   if (!capture.customer_request_body || !capture.response_body) throw new Error("Capture is missing request or response content.");
 }
 
-export async function reconcileClaudeSession(session: Session, transcripts: string[], out: string) {
-  const evidence = readClaudeEvidence(transcripts, session.session_id);
+export async function reconcileClaudeSession(session: Session, transcripts: string[], out: string, format: "stream-json" | "native" = "stream-json") {
+  const evidence = format === "native" ? readNativeClaudeEvidence(transcripts, session.session_id) : readClaudeEvidence(transcripts, session.session_id);
   const project = await resolveProject({ org: session.org, project: session.project });
   if (project.auth.gatewayUrl !== session.gateway_url) throw new Error("Gateway changed since session launch.");
   const workload = await resolveWorkload(project, session.workload);
@@ -85,5 +119,5 @@ export async function reconcileClaudeSession(session: Session, transcripts: stri
     catch { throw new Error("Cannot read exported capture JSON; raw content omitted."); }
     verifySessionCapture(capture, session, id);
   }
-  return { session_id: session.session_id, verified_at: new Date().toISOString(), requests: seen.size, verified_captures: seen.size, tokens: usage, customer_cost_usd: costs.reduce((sum, row) => sum + row.customer_cost_usd, 0), costs, scope: "successful requests represented in the supplied completed Claude stream-json transcripts", limitation: "Does not enumerate background traffic, failures, or omitted invocations; compare gateway session inventory before claiming full-session coverage." };
+  return { session_id: session.session_id, verified_at: new Date().toISOString(), requests: seen.size, verified_captures: seen.size, tokens: usage, customer_cost_usd: costs.reduce((sum, row) => sum + row.customer_cost_usd, 0), costs, transcript_format: format, scope: "requests represented by completed usage evidence in the supplied Claude transcripts", limitation: "Does not enumerate background traffic, failures, or omitted invocations; compare gateway session inventory before claiming full-session coverage." };
 }
