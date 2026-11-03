@@ -24,6 +24,12 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       enableNativeClaude(config,${JSON.stringify(resolve('dist/bin.js'))});
       const enabled=JSON.parse(readFileSync(settings));
       assert.equal(enabled.env.ANTHROPIC_BASE_URL,BLOCKED_GATEWAY);
+      assert.equal(enabled.env.ANTHROPIC_API_KEY,'');
+      assert.equal(enabled.env.ANTHROPIC_AUTH_TOKEN,'orchestra-initialization-required');
+      const profilePath=join(process.env.HOME,'.claude.json');
+      const profile=JSON.parse(readFileSync(profilePath));
+      assert.equal(profile.hasCompletedOnboarding,true);
+      profile.theme='light';writeFileSync(profilePath,JSON.stringify(profile));
       assert.equal(enabled.env.ANTHROPIC_CUSTOM_MODEL_OPTION,'deepseek-v4.1-flash-1017');
       assert.equal(refreshNativeClaudeModels().changed,false);
       for (const key of ['ANTHROPIC_MODEL','ANTHROPIC_DEFAULT_OPUS_MODEL','ANTHROPIC_DEFAULT_SONNET_MODEL','ANTHROPIC_DEFAULT_HAIKU_MODEL']) assert.equal(enabled.env[key],undefined);
@@ -42,6 +48,8 @@ test('persistent setup, native session/resume, unknown git, and ownership-aware 
       const removed=removeNativeClaude();
       const after=JSON.parse(readFileSync(settings));
       assert.equal(after.env.ANTHROPIC_API_KEY,'previous-key');
+      assert.equal(JSON.parse(readFileSync(profilePath)).hasCompletedOnboarding,undefined);
+      assert.equal(JSON.parse(readFileSync(profilePath)).theme,'light');
       assert.equal(after.env.ANTHROPIC_BASE_URL,undefined);
       assert.equal(after.env.ANTHROPIC_CUSTOM_MODEL_OPTION,undefined);
       assert.equal(after.model,'user-choice'); assert.equal(after.theme,'light');

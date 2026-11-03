@@ -33,6 +33,7 @@ export function writeNativeJson(path: string, value: unknown): void {
 
 const StateSchema = z.object({
   config: ClaudeNativeConfigSchema, settings_path: z.string(),
+  onboarding: z.object({ path: z.string(), before: z.boolean().optional() }).optional(),
   before: z.record(z.string(), z.unknown()), installed: z.record(z.string(), z.unknown()),
 });
 export const hasNativeClaudeSetup = () => existsSync(statePath());
@@ -135,6 +136,10 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   const settingsPath = claudeSettingsPath();
   if (existsSync(settingsPath) && lstatSync(settingsPath).isSymbolicLink()) throw new Error("Claude settings is a symlink. Configure its owner directly before enabling Orchestra.");
   const before = readJson(settingsPath);
+  const onboardingPath = join(process.env.CLAUDE_CONFIG_DIR || homedir(), ".claude.json");
+  if (existsSync(onboardingPath) && lstatSync(onboardingPath).isSymbolicLink()) throw new Error("Claude profile is a symlink. Configure its owner directly.");
+  const profile = readJson(onboardingPath);
+  if (profile.hasCompletedOnboarding !== undefined && typeof profile.hasCompletedOnboarding !== "boolean") throw new Error("Claude onboarding state is invalid.");
   if (before.disableAllHooks === true) throw new Error("Claude hooks/mods are disabled. Enable them before configuring Orchestra.");
   const env = object(before.env ?? {});
   const conflicts = Object.keys(process.env).filter(key => /^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(key) && process.env[key]);
@@ -146,8 +151,8 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
     env: {
       ...pickerDefaults(env),
       ANTHROPIC_BASE_URL: BLOCKED_GATEWAY,
-      ANTHROPIC_API_KEY: "orchestra-initialization-required",
-      ANTHROPIC_AUTH_TOKEN: "",
+      ANTHROPIC_API_KEY: "",
+      ANTHROPIC_AUTH_TOKEN: "orchestra-initialization-required",
       ANTHROPIC_CUSTOM_HEADERS: "",
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       CLAUDE_CODE_PLUGIN_DIRS: plugins + plugin,
@@ -158,8 +163,9 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   writeNativeJson(join(plugin, "hooks", "hooks.json"), { modules: ["./register.js"] });
   writeFileSync(join(plugin, "hooks", "register.js"), nativeModSource([node, resolve(cli), "claude-native-env"]), { mode: 0o600 });
   // Save recovery state first: interruption before settings write remains safely removable.
-  writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed });
+  writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed, onboarding: { path: onboardingPath, before: profile.hasCompletedOnboarding } });
   writeNativeJson(settingsPath, { ...before, ...installed, env: { ...env, ...installed.env } });
+  writeNativeJson(onboardingPath, { ...profile, hasCompletedOnboarding: true });
   return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
 
@@ -182,6 +188,16 @@ export function removeNativeClaude() {
     } else if (same(current[key], installed)) {
       if (Object.hasOwn(state.before, key)) current[key] = state.before[key]; else delete current[key];
     } else preserved.push(key);
+  }
+  if (state.onboarding) {
+    const path = state.onboarding.path;
+    if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new Error("Claude profile is a symlink. Configure its owner directly.");
+    const profile = readJson(path);
+    if (profile.hasCompletedOnboarding === true) {
+      if (state.onboarding.before === undefined) delete profile.hasCompletedOnboarding;
+      else profile.hasCompletedOnboarding = state.onboarding.before;
+      writeNativeJson(path, profile);
+    }
   }
   writeNativeJson(state.settings_path, current);
   rmSync(statePath());
