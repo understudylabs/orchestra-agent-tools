@@ -36,12 +36,12 @@ test('capabilities command reads the gateway catalog with scoped credentials and
   let output='';
   try {
     process.env.HOME=root;
-    process.env.UNDERSTUDY_API_KEY='synthetic-capabilities-key';
+    process.env.UNDERSTUDY_API_KEY='fixture-key';
     process.env.UNDERSTUDY_GATEWAY_URL='https://synthetic.example.test';
     globalThis.fetch=async (url, init)=>{
       assert.equal(String(url),'https://synthetic.example.test/v1/models');
       assert.equal(init.method,'GET');
-      assert.equal(init.headers.Authorization,'Bearer synthetic-capabilities-key');
+      assert.equal(init.headers.Authorization,'Bearer fixture-key');
       assert.equal(init.body,undefined);
       return new Response(JSON.stringify(catalog([{id:'exact-model',capabilities:{tool_calls:false}},{id:'other'}])),{headers:{'content-type':'application/json'}});
     };
