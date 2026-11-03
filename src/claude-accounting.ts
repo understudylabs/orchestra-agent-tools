@@ -22,6 +22,14 @@ const SessionPageSchema = z.object({
   next_cursor: z.string().nullable(), coverage: CoverageSchema,
 });
 type Session = z.infer<typeof ClaudeSessionSchema>;
+
+function captureVerificationStatus(state: z.infer<typeof SessionRequestSchema>["capture_state"], requested: boolean): string {
+  if (!requested) return "not_requested";
+  if (state === "disabled") return "not_captured";
+  if (state === "unknown") return "unknown";
+  return "pending";
+}
+
 interface Scope { org: string; projectId: string; workloadId: string; traceId: string; environment: string }
 
 export async function collectSessionRequests(scope: Scope, pageRequest: (cursor: string | null) => Promise<unknown>) {
@@ -92,14 +100,14 @@ export async function accountClaudeSession(session: Session, captureDirectory?: 
     } catch (error) {
       if (!(error instanceof UnderstudyApiError) || error.status !== 404) throw error;
     }
-    records.push({ ...call, pricing_status: pricingStatus, customer_cost_usd: customerCost, capture_verification: captureDirectory && call.capture_state !== "expected" ? "not_captured" : "not_requested" });
+    records.push({ ...call, pricing_status: pricingStatus, customer_cost_usd: customerCost, capture_verification: captureVerificationStatus(call.capture_state, Boolean(captureDirectory)) });
   }
   if (captureDirectory && records.length) {
     const expected = records.filter(row => row.capture_state === "expected").map(row => row.request_id);
     if (expected.length) {
       const batch = await exportCapturesByRequestIds({ requestIds: expected, outputDirectory: captureDirectory, includePayload: true, concurrency: 4, retries: 2, resume: false, orgId: session.org, projectId: project.projectId, workloadId: workload.id });
       for (const row of records) {
-        if (row.capture_state !== "expected") { row.capture_verification = "not_captured"; continue; }
+        if (row.capture_state !== "expected") continue;
         if (batch.failed_request_ids.includes(row.request_id)) { row.capture_verification = "missing"; continue; }
         let capture;
         try { capture = JSON.parse(readFileSync(join(captureDirectory, `${encodeURIComponent(row.request_id)}.payload.json`), "utf8")); }
@@ -115,7 +123,8 @@ export async function accountClaudeSession(session: Session, captureDirectory?: 
     session_id: session.session_id, trace_id: traceId, snapshot: inventory.snapshot, requests: records.length,
     failed_requests: records.filter(row => row.status_code >= 400 || row.outcome === "error").length,
     priced_cost_usd: pricedCost, customer_cost_usd: unpriced.length || !records.length ? null : pricedCost,
-    unpriced_request_ids: unpriced, uncaptured_request_ids: records.filter(row => row.capture_state !== "expected").map(row => row.request_id),
+    unpriced_request_ids: unpriced, uncaptured_request_ids: records.filter(row => row.capture_state === "disabled").map(row => row.request_id),
+    capture_unknown_request_ids: records.filter(row => row.capture_state === "unknown").map(row => row.request_id),
     known_gaps: [...new Set([...inventory.known_gaps, "Snapshot covers ingested requests carrying this session trace ID, including background calls; later arrivals and traffic without the ID require a fresh inventory or separate investigation."])],
     unmatched_requests: null, ambiguous_requests: null,
     attribution_note: "Session membership is explicit. Requests missing this session trace ID and shared/reused IDs cannot be quantified from this filtered inventory alone.",

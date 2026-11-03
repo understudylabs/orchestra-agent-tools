@@ -45,7 +45,7 @@ test('customer API accounting preserves failed calls and unknown prices and reje
         assert.equal(url.searchParams.has('session_id'),false);
         assert.equal(url.searchParams.get('request_environment'),'test');
         assert.equal(url.searchParams.get('include_rejection_details'),'true');
-        body = page(mode === 'empty' ? [] : [row(1,400),row(2)]);
+        body = page(mode === 'empty' ? [] : [row(1,400),{...row(2), ...(mode === 'unknown' ? {capture_state:'unknown'} : {})}]);
       } else if (url.pathname.endsWith(`/${row(2).request_id}/cost`)) body = {...cost(row(2)),...(mode === 'foreign' ? {org_id:'another'} : {})};
       else if (url.pathname.endsWith(`/${row(1).request_id}/cost`)) {
         if (mode === 'missing') { status = 404; body = {error:'Not found'}; }
@@ -65,6 +65,14 @@ test('customer API accounting preserves failed calls and unknown prices and reje
       assert.ok(result.known_gaps.includes('late arrivals possible'));
       assert.equal(result.records[0].provider,undefined);
     }
+    mode = 'unknown';
+    const captures = await accountClaudeSession(session, join(root, 'captures'));
+    assert.deepEqual(captures.uncaptured_request_ids, [row(1).request_id]);
+    assert.deepEqual(captures.capture_unknown_request_ids, [row(2).request_id]);
+    assert.equal(captures.records[0].capture_verification, 'not_captured');
+    assert.equal(captures.records[1].capture_verification, 'unknown');
+    const notRequested = await accountClaudeSession(session);
+    assert.ok(notRequested.records.every(record => record.capture_verification === 'not_requested'));
     mode = 'foreign';
     await assert.rejects(accountClaudeSession(session),/Cost record scope mismatch/);
     mode = 'empty';
