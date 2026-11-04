@@ -488,6 +488,35 @@ command outputs that do not contain private payloads.
 
 MIT.
 
+### Claude Desktop gateway pilot (macOS)
+
+Claude Desktop uses its own third-party inference profile. Initialize that
+screen once (Help → Troubleshooting → Enable Developer Mode, then Developer →
+Configure Third-Party Inference), and quit Desktop before setup:
+
+```sh
+orchestra claude-desktop setup --org org_example --project coding --workload desktop --model claude-sonnet-5 --environment test --yes
+orchestra claude-desktop status
+```
+
+Use an existing project/workload and a Claude model available to your organization.
+The profile reads your saved Orchestra sign-in through a credential helper;
+it does not embed the API key. Future Desktop inference goes through that scope,
+including request/response capture when enabled by its policy. Terminal routing
+stays separate. Setup repairs an existing Orchestra terminal hook to prevent it
+from overriding Desktop's credentials or attribution.
+
+Open Desktop's Code tab in a test folder and send a small request, then verify
+its scope and capture in Orchestra. Configuration alone is **not** verification.
+This pilot has no automatic Desktop smoke test and does not claim Cowork,
+non-Claude models, or long-session compatibility. Do not run the internal
+`credential` subcommand yourself: its stdout is a credential protocol for Desktop.
+
+To restore the previous profile, quit Desktop, run
+`orchestra claude-desktop remove`, and restart Desktop. Re-run setup to change
+scope or models; externally edited Orchestra profiles are preserved and require
+manual reconciliation. Other profiles are left intact.
+
 ### Claude Code gateway attribution
 
 Run Claude Code with persistent session and Git attribution using

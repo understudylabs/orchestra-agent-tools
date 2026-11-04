@@ -49,6 +49,7 @@ import { registerReportingCommand } from "./commands/reporting.js";
 import { registerBillingCommand } from "./commands/billing.js";
 import { registerRoutesCommand } from "./commands/routes.js";
 import { registerClaudeSessionCommand } from "./commands/claude-session.js";
+import { registerClaudeDesktopCommand } from "./commands/claude-desktop.js";
 import { registerClaudeSetupCommand } from "./commands/claude-setup.js";
 import { registerClaudeCommand } from "./commands/claude.js";
 import { registerRunCommand } from "./commands/run.js";
@@ -971,6 +972,7 @@ export function buildProgram(): Command {
   registerRunCommand(program);
   registerClaudeCommand(program);
   registerClaudeSetupCommand(program);
+  registerClaudeDesktopCommand(program);
   registerClaudeSessionCommand(program);
   registerRunsCommand(program);
   registerBenchmarksCommand(program);

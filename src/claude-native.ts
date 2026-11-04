@@ -78,6 +78,8 @@ export function checkClaudeVersion(): string {
 export function nativeModSource(command: string[]): string {
   return `const command = ${JSON.stringify(command)};
 async function apply($) {
+  // Desktop third-party profiles own their credentials and attribution.
+  if (await $.env.get('CLAUDE_CODE_ENTRYPOINT') === 'claude-desktop-3p') return;
   // Refuse network inference until both credentials and attribution are initialized.
   await $.env.set('ANTHROPIC_BASE_URL', '${BLOCKED_GATEWAY}');
   await $.env.set('ANTHROPIC_API_KEY', 'orchestra-initialization-required');
