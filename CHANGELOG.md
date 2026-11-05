@@ -13,7 +13,7 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
-## [0.10.14] — 2026-11-04
+## [0.10.15] — 2026-11-04
 
 - Add an isolated `orchestra codex` gateway launcher with explicit scope/model selection, session resume, and Git attribution, without changing normal Codex settings.
 
