@@ -80,7 +80,7 @@ export function suggestedEmail(): string {
   return /@(users\.)?noreply\.github\.com$|^noreply@github\.com$/i.test(email) ? "" : email;
 }
 
-export type SetupChoice = "plugin" | "lab" | "choose" | "cli" | "gateway";
+export type SetupChoice = "plugin" | "lab" | "choose" | "cli" | "gateway" | "desktop";
 
 export interface InitOptions {
   agents?: string;
@@ -132,7 +132,7 @@ export async function runInit(options: InitOptions, prompts: InitPrompts, versio
   const steps = [
     { id: "cli", label: `Orchestra CLI ${version}` },
     ...(options.skipLogin ? [] : [{ id: "signin", label: "Sign in to Orchestra" }]),
-    ...(choice === "gateway" ? [] : [{ id: "plugin", label: "Plugin for your coding agents" }]),
+    ...((choice === "gateway" || choice === "desktop") ? [] : [{ id: "plugin", label: "Plugin for your coding agents" }]),
     ...(wantLab ? [{ id: "lab", label: "Local model lab (Orchestra 2B, about 3.6 GB)" }] : []),
   ];
   const list = new Checklist(steps);
@@ -157,7 +157,7 @@ export async function runInit(options: InitOptions, prompts: InitPrompts, versio
     }
   }
 
-  if (choice === "gateway") return { choice, signedIn, labStarted: false, attention, installed: [] };
+  if (choice === "gateway" || choice === "desktop") return { choice, signedIn, labStarted: false, attention, installed: [] };
 
   list.start("plugin", "Adding the plugin to your coding agents");
   const stateDir = installStateDir();

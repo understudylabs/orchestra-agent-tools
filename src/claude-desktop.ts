@@ -52,7 +52,11 @@ export function desktopStatus(paths = desktopPaths()) {
   const state = State.parse(read(paths.state));
   const meta = Metadata.parse(read(paths.metadata));
   const file = join(paths.library, `${state.id}.json`);
-  return { configured: true, verified: false, active: meta.appliedId === state.id,
+  let credentialAvailable = false;
+  try { storedNativeCredential(state.config); credentialAvailable = true; } catch { /* Status reports recovery without exposing credential errors. */ }
+  const helperAvailable = typeof state.profile.inferenceCredentialHelper === "string" && existsSync(state.profile.inferenceCredentialHelper)
+    && Array.isArray(state.profile.inferenceCredentialHelperArgs) && typeof state.profile.inferenceCredentialHelperArgs[0] === "string" && existsSync(state.profile.inferenceCredentialHelperArgs[0]);
+  return { configured: true, verified: false, credentialAvailable, helperAvailable, active: meta.appliedId === state.id,
     drift: !existsSync(file) || !same(read(file), state.profile), config: state.config };
 }
 export function installDesktop(config: ClaudeNativeConfig, models: string[], cli: string, paths = desktopPaths()) {

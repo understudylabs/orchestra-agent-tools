@@ -492,7 +492,10 @@ MIT.
 
 Claude Desktop uses its own third-party inference profile. Initialize that
 screen once (Help → Troubleshooting → Enable Developer Mode, then Developer →
-Configure Third-Party Inference), and quit Desktop before setup:
+Configure Third-Party Inference), and quit Desktop before setup. Run `orchestra claude-desktop` for the setup,
+reconfigure and removal menu; it is also available in `orchestra init` and
+`orchestra start`. Guided setup validates your selected scope and offers to open
+Desktop when done. For scripted setup:
 
 ```sh
 orchestra claude-desktop setup --org org_example --project coding --workload desktop --model claude-sonnet-5 --environment test --yes

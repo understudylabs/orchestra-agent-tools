@@ -41,3 +41,24 @@ test('Desktop rejects unsupported models and insecure credential destinations',(
  assert.throws(()=>desktopProfile({...config,gateway_url:'http://gateway.example.com'},['claude-sonnet-5'],'/cli'),/HTTPS/);
  assert.throws(()=>desktopProfile({...config,gateway_url:'https://user:pass@gateway.example.com'},['claude-sonnet-5'],'/cli'),/credentials/);
 });
+
+import { desktopStatusText } from '../dist/commands/claude-desktop.js';
+test('Desktop status gives recovery without claiming inference verification',()=>{
+ assert.match(desktopStatusText({configured:false,verified:false}),/setup/);
+ const healthy={configured:true,verified:false,active:true,drift:false,credentialAvailable:true,helperAvailable:true,config};
+ assert.match(desktopStatusText(healthy),/do not verify inference/);
+ assert.match(desktopStatusText({...healthy,credentialAvailable:false}),/orchestra login/);
+ assert.match(desktopStatusText({...healthy,helperAvailable:false}),/helper is missing/);
+ assert.match(desktopStatusText({...healthy,drift:true}),/preserve any profile edits/);
+});
+
+import { spawnSync } from 'node:child_process';
+test('installer Desktop choice hands off without installing coding-agent plugins',()=>{
+ const home=mkdtempSync(join(tmpdir(),'desktop-init-'));
+ try {
+  const moduleUrl=new URL('../dist/onboarding/init.js',import.meta.url).href;
+  const script=`import {runInit} from ${JSON.stringify(moduleUrl)}; const result=await runInit({skipLogin:true},{setup:async()=> 'desktop'},'0.0.0'); if(result.choice!=='desktop'||result.installed.length||result.labStarted)process.exitCode=1;`;
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{encoding:'utf8',env:{...process.env,HOME:home},cwd:home});
+  assert.equal(result.status,0,result.stderr);
+ } finally {rmSync(home,{recursive:true,force:true});}
+});

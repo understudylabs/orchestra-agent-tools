@@ -1,3 +1,4 @@
+import { manageClaudeDesktop } from "./claude-desktop.js";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -75,6 +76,7 @@ const systemInitPrompts: InitPrompts = {
   setup: (localModelsDefault, labAvailable) => {
     const choices: { value: SetupChoice; name: string; description: string }[] = [
       { value: "gateway", name: "Use Claude Code through Orchestra", description: "Set up normal claude launches once; reversible" },
+      ...(process.platform === "darwin" ? [{ value: "desktop" as const, name: "Use Claude Desktop through Orchestra (pilot)", description: "Configure the Desktop app; reversible" }] : []),
       { value: "plugin", name: "Account + coding-agent plugin", description: "Recommended · about a minute" },
       { value: "choose", name: "Choose coding agents…", description: "Pick which agents get the plugin" },
       { value: "cli", name: "Just the CLI", description: "Already installed; skip the rest" },
@@ -153,6 +155,7 @@ export function registerOnboardingCommands(program: Command): void {
         }
         const outcome = await runInit(opts, systemInitPrompts, readCliVersion());
         printAttention(outcome.attention);
+        if (outcome.choice === "desktop") { await manageClaudeDesktop(); return; }
         if (outcome.choice === "gateway") { await setupNativeClaude(); return; }
         if (outcome.choice === "cli" || !opts.start) {
           process.stdout.write(`\n  Run ${kleur.cyan("orchestra start")} when you're ready to start onboarding in a coding agent.\n`);
@@ -186,10 +189,12 @@ export function registerOnboardingCommands(program: Command): void {
             { value: "report", name: "View a session cost and capture report" },
             { value: "remove", name: "Remove Claude gateway default" },
           ] : [{ value: "setup", name: "Set up Claude Code through Orchestra" }]),
+          ...(process.platform === "darwin" ? [{ value: "desktop", name: "Set up or manage Claude Desktop" }] : []),
           { value: "plugin", name: "Start plugin onboarding in a coding agent" },
           { value: "exit", name: "Exit" },
         ] });
         if (action === "exit") return;
+        if (action === "desktop") { await manageClaudeDesktop(); return; }
         if (action === "setup") { await setupNativeClaude(); return; }
         if (action === "launch" || action === "resume") {
           process.exitCode = await runInTerminal("claude", action === "resume" ? ["--resume"] : [], process.cwd()); return;
