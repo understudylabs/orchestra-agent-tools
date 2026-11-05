@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, accessSync, constants, realpathSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
 import { homedir } from "node:os";
@@ -7,6 +7,8 @@ import { z } from "zod";
 import { globalConfigDir, samePath } from "./config/paths.js";
 import { readCredentials } from "./config/credentials.js";
 import { ClaudeSessionSchema, claudeEnvironment, repositoryFromRemote } from "./commands/claude.js";
+
+import { configureClaudeShell, removeClaudeShell, validateClaudeShell } from "./claude-terminal.js";
 
 export const BLOCKED_GATEWAY = "http://127.0.0.1:1";
 const Header = z.string().min(1).max(256).regex(/^[\x20-\x7e]+$/);
@@ -18,7 +20,7 @@ export type ClaudeNativeConfig = z.infer<typeof ClaudeNativeConfigSchema>;
 type Document = Record<string, unknown>;
 const object = (value: unknown): Document => z.record(z.string(), z.unknown()).parse(value);
 const statePath = () => join(globalConfigDir(), "claude-native.json");
-export const claudeSettingsPath = () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "settings.json");
+export const claudeSettingsPath = () => join(globalConfigDir(), "claude-terminal-settings.json");
 const readJson = (path: string): Document => existsSync(path) ? object(JSON.parse(readFileSync(path, "utf8"))) : {};
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -78,8 +80,8 @@ export function checkClaudeVersion(): string {
 export function nativeModSource(command: string[]): string {
   return `const command = ${JSON.stringify(command)};
 async function apply($) {
-  // Desktop third-party profiles own their credentials and attribution.
-  if (await $.env.get('CLAUDE_CODE_ENTRYPOINT') === 'claude-desktop-3p') return;
+  // Desktop owns its account or third-party credentials and attribution.
+  if ((await $.env.get('CLAUDE_CODE_ENTRYPOINT') || '').startsWith('claude-desktop')) return;
   // Refuse network inference until both credentials and attribution are initialized.
   await $.env.set('ANTHROPIC_BASE_URL', '${BLOCKED_GATEWAY}');
   await $.env.set('ANTHROPIC_API_KEY', 'orchestra-initialization-required');
@@ -191,6 +193,7 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   const url = new URL(config.gateway_url);
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("Persistent gateway must be HTTPS without embedded credentials, query, or fragment.");
   storedNativeCredential(config);
+  validateClaudeShell();
   if (existsSync(statePath())) throw new Error("Claude integration is already enabled. Remove it before changing the default scope.");
   const settingsPath = claudeSettingsPath();
   if (existsSync(settingsPath) && lstatSync(settingsPath).isSymbolicLink()) throw new Error("Claude settings is a symlink. Configure its owner directly before enabling Orchestra.");
@@ -226,7 +229,8 @@ export function enableNativeClaude(value: ClaudeNativeConfig, cli: string, node 
   writeNativeJson(statePath(), { config, settings_path: settingsPath, before, installed, onboarding: { path: onboardingPath, before: profile.hasCompletedOnboarding } });
   writeNativeJson(settingsPath, { ...before, ...installed, ...(Object.keys(modelDefaults).length ? { modelSettings: mergeModelSettings(before.modelSettings, modelDefaults) } : {}), env: { ...env, ...installed.env } });
   writeNativeJson(onboardingPath, { ...profile, hasCompletedOnboarding: true });
-  return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Run claude normally in any repository. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
+  configureClaudeShell(resolve(cli), node);
+  return { enabled: true, settings_path: settingsPath, next: "Orchestra is enabled for future Claude Code sessions. Open a new terminal, then run claude normally in any repository. In this terminal, run orchestra claude-native-launch. To restore previous settings: orchestra claude-setup remove, then restart Claude." };
 }
 
 const nativePluginManifests = {
@@ -256,9 +260,34 @@ export function nativeClaudeHookStatus(): "current" | "missing" | "outdated_or_m
 }
 
 export function repairNativeClaude(cli: string, node = process.execPath) {
+  if (!samePath(readNativeState().settings_path, claudeSettingsPath())) {
+    const legacy = readNativeState();
+    storedNativeCredential(legacy.config);
+    checkClaudeVersion();
+    validateClaudeShell();
+    const current = readJson(legacy.settings_path);
+    const backup = mkdtempSync(join(globalConfigDir(), "claude-shared-migration-"));
+    writeNativeJson(join(backup, "settings.json"), current);
+    writeNativeJson(join(backup, "state.json"), legacy);
+    removeNativeClaude();
+    const shared = readJson(legacy.settings_path);
+    const sharedEnv = object(shared.env ?? {});
+    const terminalEnv: Document = {};
+    for (const key of Object.keys(sharedEnv)) {
+      if (key.startsWith("ANTHROPIC_") || key.startsWith("CLAUDE_CODE_USE_")) {
+        terminalEnv[key] = sharedEnv[key]; delete sharedEnv[key];
+      }
+    }
+    writeNativeJson(claudeSettingsPath(), { env: terminalEnv, ...(shared.model ? { model: shared.model } : {}) });
+    delete shared.model;
+    writeNativeJson(legacy.settings_path, { ...shared, env: sharedEnv });
+    const result = enableNativeClaude(legacy.config, cli, node);
+    return { repaired: true, preserved_user_edits: [], next: result.next };
+  }
   const state = readNativeState();
   storedNativeCredential(state.config);
   checkClaudeVersion();
+  configureClaudeShell(resolve(cli), node);
   const plugin = join(globalConfigDir(), "claude-native-mod");
   const profilePath = state.onboarding?.path ?? join(process.env.CLAUDE_CONFIG_DIR || homedir(), ".claude.json");
   for (const path of [state.settings_path, profilePath, plugin, join(plugin, ".claude-plugin"), ...Object.keys(nativePluginManifests).map(file => join(plugin, file)), join(plugin, "hooks"), join(plugin, "hooks", "register.js")]) {
@@ -338,6 +367,7 @@ export function removeNativeClaude() {
       writeNativeJson(path, profile);
     }
   }
+  removeClaudeShell();
   writeNativeJson(state.settings_path, current);
   rmSync(statePath());
   // Keep the inert mod files for running sessions; new sessions no longer load them.
@@ -368,4 +398,19 @@ export function nativeClaudeEnvironment(id: string, cwd = process.cwd()) {
     writeFileSync(path, JSON.stringify(session, null, 2) + "\n", { mode: 0o600, flag: "wx" });
   }
   return claudeEnvironment({}, session, token);
+}
+
+export async function launchNativeClaude(args: string[]) {
+  if (!hasNativeClaudeSetup()) {
+    const child = spawn("claude", args, { stdio: "inherit" });
+    process.exitCode = await new Promise<number>((resolve, reject) => { child.once("error", reject); child.once("close", code => resolve(code ?? 1)); });
+    return;
+  }
+  const state = readNativeState();
+  if (!samePath(state.settings_path, claudeSettingsPath())) throw new Error("Run orchestra claude-setup repair to isolate terminal settings from Desktop.");
+  if (!existsSync(state.settings_path)) throw new Error("Orchestra terminal settings are missing. Run orchestra claude-setup repair before launching.");
+  const settings = readJson(state.settings_path);
+  const env = { ...process.env, ...object(settings.env ?? {}) } as NodeJS.ProcessEnv;
+  const child = spawn("claude", ["--settings", state.settings_path, ...args], { env, stdio: "inherit" });
+  process.exitCode = await new Promise<number>((resolve, reject) => { child.once("error", reject); child.once("close", code => resolve(code ?? 1)); });
 }

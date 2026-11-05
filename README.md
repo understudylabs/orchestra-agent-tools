@@ -535,8 +535,15 @@ traffic as test without changing your saved environment. Capture remains unverif
 After verification, choose **Open Claude Code here**, select a project folder,
 or finish with instructions for starting later. Type your request inside Claude,
 not at the shell prompt. Use `--no-start` to show instructions without a launch
-prompt. Then use `claude` and `claude --resume` normally;
+prompt. Open a new bash/zsh terminal, then use `claude` and `claude --resume` normally;
 repository configuration is not required. Requires Claude Code 2.1.309 or later.
+
+Gateway settings live in Orchestra’s private terminal settings file. A managed
+bash/zsh function applies them only to terminal launches; Claude Desktop keeps
+its own account or gateway authentication. Existing installs should run
+`orchestra claude-setup repair` to migrate shared settings (backed up privately).
+In an already-open terminal, use `orchestra claude-native-launch` until you open
+a new shell. Scripts that bypass shell functions must use that command too.
 
 To check an existing setup, run `orchestra claude-setup verify` (billable).
 Noninteractive setup runs the check only with `--verify`; otherwise it reports

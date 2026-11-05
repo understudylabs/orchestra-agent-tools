@@ -13,6 +13,11 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
+## [0.10.14] — 2026-11-04
+
+- Isolate terminal Claude gateway settings from Claude Desktop account authentication. Setup installs a reversible bash/zsh launcher; repair migrates earlier shared settings with private backups.
+- Keep setup verification and post-setup launches on the isolated terminal configuration.
+
 ## [0.10.13] — 2026-11-04
 
 - Initialize Claude Desktop’s gateway profile on first setup, removing the manual Developer Mode and configuration-screen prerequisite. Preserve existing profiles and stop if their metadata is missing or invalid.
