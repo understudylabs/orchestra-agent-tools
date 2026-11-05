@@ -13,6 +13,10 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
+## [0.10.14] — 2026-11-04
+
+- Add an isolated `orchestra codex` gateway launcher with explicit scope/model selection, session resume, and Git attribution, without changing normal Codex settings.
+
 ## [0.10.13] — 2026-11-04
 
 - Initialize Claude Desktop’s gateway profile on first setup, removing the manual Developer Mode and configuration-screen prerequisite. Preserve existing profiles and stop if their metadata is missing or invalid.
