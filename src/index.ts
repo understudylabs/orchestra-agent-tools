@@ -51,6 +51,7 @@ import { registerRoutesCommand } from "./commands/routes.js";
 import { registerClaudeSessionCommand } from "./commands/claude-session.js";
 import { registerClaudeDesktopCommand } from "./commands/claude-desktop.js";
 import { registerClaudeSetupCommand } from "./commands/claude-setup.js";
+import { registerCodexCommand } from "./commands/codex.js";
 import { registerClaudeCommand } from "./commands/claude.js";
 import { registerRunCommand } from "./commands/run.js";
 import { registerRunsCommand } from "./commands/runs.js";
@@ -971,6 +972,7 @@ export function buildProgram(): Command {
   registerSetupCodeCommand(program);
   registerRunCommand(program);
   registerClaudeCommand(program);
+  registerCodexCommand(program);
   registerClaudeSetupCommand(program);
   registerClaudeDesktopCommand(program);
   registerClaudeSessionCommand(program);

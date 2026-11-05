@@ -566,3 +566,28 @@ After upgrading an existing setup, run `orchestra claude-setup models` (also
 available in the setup menu), then restart Claude. Managed model restrictions
 still apply. Select the model explicitly with `/model deepseek-v4.1-flash-1017`
 if your custom picker slot is already in use.
+
+### Codex gateway pilot
+
+Run Codex CLI through Orchestra’s native OpenAI Responses route in a separate
+Codex home. Your normal Codex configuration, sign-in, and desktop sessions stay
+unchanged. Sign in with `orchestra login` first, then choose your scope and a
+native OpenAI model:
+
+```sh
+orchestra codex --org org_example --project coding --workload codex --environment test --model <openai-model-id>
+```
+
+For automation, append `-- exec --json "your task"`. The launcher prints an
+Orchestra session ID; resume from the same directory and branch with
+`orchestra codex --resume <session-id>` (or append `-- exec "follow-up"`).
+Credentials are passed through the child environment, not saved in Codex’s
+configuration. Requests carry scope, session, and available Git attribution.
+Request compression is disabled to preserve request capture.
+
+This pilot does not install a global default or copy your existing plugins,
+MCP configuration, or conversations. Launch `codex` normally to use your prior
+setup. Native Responses does not translate requests to open models. Codex may
+warn about missing model metadata or its optional plugin catalog when running
+without a ChatGPT login; a successful gateway response does not validate those
+features. Capture and pricing must be verified separately.
