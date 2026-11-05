@@ -38,6 +38,10 @@ function openUrl(url: string): boolean {
 
 function runInTerminal(command: string, args: string[], cwd: string): Promise<number> {
   return new Promise((done) => {
+    if (command === "claude" && existsSync(join(globalConfigDir(), "claude-native.json"))) {
+      args = [process.argv[1]!, "claude-native-launch", ...args];
+      command = process.execPath;
+    }
     const child = spawn(command, args, { cwd, stdio: "inherit" });
     child.on("close", (code) => done(code ?? 1));
     child.on("error", () => done(1));

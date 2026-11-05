@@ -17,6 +17,11 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 - Add an isolated `orchestra codex` gateway launcher with explicit scope/model selection, session resume, and Git attribution, without changing normal Codex settings.
 
+## [0.10.14] — 2026-11-04
+
+- Isolate terminal Claude gateway settings from Claude Desktop account authentication. Setup installs a reversible bash/zsh launcher; repair migrates earlier shared settings with private backups.
+- Keep setup verification and post-setup launches on the isolated terminal configuration.
+
 ## [0.10.13] — 2026-11-04
 
 - Initialize Claude Desktop’s gateway profile on first setup, removing the manual Developer Mode and configuration-screen prerequisite. Preserve existing profiles and stop if their metadata is missing or invalid.
