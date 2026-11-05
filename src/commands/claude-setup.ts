@@ -1,3 +1,4 @@
+import { finishClaudeSetup } from "../onboarding/claude-handoff.js";
 import { checkClaudeSetup, ClaudeSetupCheckError } from "../claude-setup-check.js";
 import { confirm, input, select } from "@inquirer/prompts";
 import { spawn } from "node:child_process";
@@ -17,7 +18,7 @@ import { request, resolveAuth, UnderstudyApiError } from "../internal/http.js";
 import { runAction } from "../internal/output.js";
 import { nativeClaudeHookStatus, repairNativeClaude, refreshNativeClaudeModels, claudeUpdateCommand, hasNativeClaudeSetup, checkClaudeVersion, enableNativeClaude, readNativeState, removeNativeClaude, storedNativeCredential } from "../claude-native.js";
 
-interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean; verify?: boolean }
+interface Options { org?: string; project?: string; workload?: string; environment?: string; model?: string; yes?: boolean; verify?: boolean; start?: boolean }
 async function choose(message: string, supplied: string | undefined, choices: { name: string; value: string }[]) {
   if (supplied) {
     if (!choices.some(choice => choice.value === supplied)) throw new Error(`${message}: selection is not available.`);
@@ -186,7 +187,10 @@ export async function existingClaudeSetup(deps = {
 }
 
 export async function setupNativeClaude(opts: Options = {}) {
-  if (!await existingClaudeSetup()) return;
+  if (!await existingClaudeSetup()) {
+    if (hasNativeClaudeSetup()) await finishClaudeSetup(opts.start !== false);
+    return;
+  }
   const version = await prepareClaudeVersion();
   if (!version) return;
   let credentials = readCredentials();
@@ -228,9 +232,10 @@ export async function setupNativeClaude(opts: Options = {}) {
     }
   }
   const outcome = await verifyClaudeSetup();
+  if (outcome === "verified") await finishClaudeSetup(opts.start !== false);
   if (outcome === "change") {
     removeNativeClaude();
-    await setupNativeClaude();
+    await setupNativeClaude({ start: opts.start });
   }
 }
 
@@ -261,9 +266,14 @@ export async function verifyClaudeSetup(deps = {
     }
     const action = await deps.recover();
     if (action === "retry") continue;
-    if (action === "login") { if (await deps.login()) continue; return "unverified"; }
+    if (action === "login") {
+      if (await deps.login()) continue;
+      deps.write("Sign-in stopped. Back in your terminal, run orchestra claude-setup verify when ready to retry.");
+      return "unverified";
+    }
     if (action === "restore") { deps.write(deps.remove().next); return "restored"; }
     if (action === "change") return "change";
+    deps.write("Setup is not verified. You are returning to your terminal. Run orchestra claude-setup verify when ready to retry, or orchestra claude-setup remove to restore your previous settings.");
     return "unverified";
   }
 }
@@ -272,13 +282,16 @@ export function registerClaudeSetupCommand(program: Command) {
   const command = program.command("claude-setup").description("Configure normal Claude Code launches through Orchestra; reversible user-level setup.")
     .option("--org <id>").option("--project <slug>").option("--workload <name>")
     .option("--environment <environment>", "test or production").option("--model <id>", "Optional starting Claude model; /model remains available")
+    .option("--no-start", "Show next steps without opening Claude after verification")
     .option("--verify", "Run a small billable Claude setup check after configuration")
     .option("--yes", "Confirm persistent routing and capture scope")
     .action(async function (this: Command, opts: Options) { await runAction(this, () => setupNativeClaude(opts)); });
-  command.command("verify").description("Send a small billable test request through the installed Claude integration").action(async function (this: Command) {
+  command.command("verify").description("Send a small billable test request through the installed Claude integration").option("--no-start", "Show next steps without opening Claude").action(async function (this: Command, opts: { start?: boolean }) {
+    const start = opts.start !== false && command.opts().start !== false;
     await runAction(this, async () => {
       const outcome = await verifyClaudeSetup();
-      if (outcome === "change") { removeNativeClaude(); await setupNativeClaude(); }
+      if (outcome === "verified") await finishClaudeSetup(start);
+      if (outcome === "change") { removeNativeClaude(); await setupNativeClaude({ start }); }
     });
   });
   command.command("repair").description("Update the installed integration while preserving routing and user settings").action(async function (this: Command) {
