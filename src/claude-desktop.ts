@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -62,8 +62,11 @@ export function desktopStatus(paths = desktopPaths()) {
 export function installDesktop(config: ClaudeNativeConfig, models: string[], cli: string, paths = desktopPaths()) {
   const profile = desktopProfile(config, models, cli);
   return locked(paths, () => {
-    if (!existsSync(paths.metadata)) throw new Error("Open Claude Desktop, enable Developer Mode, and open Configure Third-Party Inference once. Quit Claude, then retry.");
-    const meta = Metadata.parse(read(paths.metadata));
+    const hasMetadata = existsSync(paths.metadata);
+    if (!hasMetadata && (existsSync(paths.state) || (existsSync(paths.library) && readdirSync(paths.library).length > 0))) {
+      throw new Error("Desktop profile metadata is missing from an existing setup. Restore it before retrying; existing profiles were not changed.");
+    }
+    const meta = Metadata.parse(hasMetadata ? read(paths.metadata) : { entries: [] });
     const old = existsSync(paths.state) ? State.parse(read(paths.state)) : undefined;
     const id = old?.id ?? randomUUID();
     const file = join(paths.library, `${id}.json`); regular(file);

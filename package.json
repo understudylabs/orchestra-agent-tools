@@ -1,6 +1,6 @@
 {
   "name": "@orchestraai/agent-tools",
-  "version": "0.10.12",
+  "version": "0.10.13",
   "description": "Orchestra agent tools: the orchestra CLI and coding-agent skill library.",
   "repository": {
     "type": "git",

@@ -62,3 +62,28 @@ test('installer Desktop choice hands off without installing coding-agent plugins
   assert.equal(result.status,0,result.stderr);
  } finally {rmSync(home,{recursive:true,force:true});}
 });
+
+test('Desktop first-run setup creates its library without developer mode and removes cleanly',()=>fixture(paths=>{
+ rmSync(paths.library,{recursive:true});
+ installDesktop(config,['claude-sonnet-5'],'/example/cli.js',paths);
+ assert.equal(desktopStatus(paths).active,true);
+ const state=JSON.parse(readFileSync(paths.state));
+ assert.equal(state.previous,undefined);
+ installDesktop(config,['claude-sonnet-5'],'/example/cli.js',paths);
+ assert.equal(JSON.parse(readFileSync(paths.metadata)).entries.length,1);
+ removeDesktop(paths);
+ assert.deepEqual(JSON.parse(readFileSync(paths.metadata)),{entries:[]});
+ assert.equal(desktopStatus(paths).configured,false);
+ installDesktop(config,['claude-sonnet-5'],'/example/cli.js',paths);
+ assert.equal(desktopStatus(paths).active,true);
+}));
+test('Desktop does not bootstrap over orphaned profiles or corrupt metadata',()=>fixture(paths=>{
+ writeFileSync(paths.metadata,'broken');
+ assert.throws(()=>installDesktop(config,['claude-sonnet-5'],'/example/cli.js',paths));
+ assert.equal(readFileSync(paths.metadata,'utf8'),'broken');
+ rmSync(paths.metadata);
+ const orphan=join(paths.library,previous+'.json');
+ writeFileSync(orphan,'{}');
+ assert.throws(()=>installDesktop(config,['claude-sonnet-5'],'/example/cli.js',paths),/metadata is missing/);
+ assert.equal(readFileSync(orphan,'utf8'),'{}');
+}));
