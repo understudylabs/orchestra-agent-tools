@@ -28,7 +28,15 @@ process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
   emitWarning(warning, ...rest);
 }) as typeof process.emitWarning;
 
-if (process.argv[2] === "claude-native-env") {
+if (process.argv[2] === "claude-desktop" && process.argv[3] === "credential") {
+  try {
+    const { desktopCredential } = await import("./claude-desktop.js");
+    process.stdout.write(JSON.stringify(desktopCredential()) + "\n");
+  } catch {
+    process.stderr.write("Orchestra Desktop credentials unavailable. Run orchestra login, then reconfigure Desktop.\n");
+    process.exitCode = 1;
+  }
+} else if (process.argv[2] === "claude-native-env") {
   try {
     const { nativeClaudeEnvironment } = await import("./claude-native.js");
     const { readFileSync } = await import("node:fs");

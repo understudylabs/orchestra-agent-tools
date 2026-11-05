@@ -137,7 +137,7 @@ test('native mod applies credentials only after attribution and blocks failed st
   const mod=await import('data:text/javascript,'+encodeURIComponent(source));
   const handlers={}; mod.register((name,handler)=>{handlers[name]=handler;});
   const writes=[]; let succeed=true;
-  const $={env:{set:async(k,v)=>writes.push([k,v])},session:{id:async()=> 'id'},process:{run:async()=>({exitCode:succeed?0:1,stdout:JSON.stringify({ANTHROPIC_CUSTOM_HEADERS:'session-header',ANTHROPIC_API_KEY:'synthetic',ANTHROPIC_BASE_URL:'https://gateway.example.com'})})},ui:{log:()=>{}}};
+  const $={env:{get:async()=>undefined,set:async(k,v)=>writes.push([k,v])},session:{id:async()=> 'id'},process:{run:async()=>({exitCode:succeed?0:1,stdout:JSON.stringify({ANTHROPIC_CUSTOM_HEADERS:'session-header',ANTHROPIC_API_KEY:'synthetic',ANTHROPIC_BASE_URL:'https://gateway.example.com'})})},ui:{log:()=>{}}};
   let next=0;
   await handlers['session.start']($,{},async()=>{next++;});
   assert.equal(writes[0][1],'http://127.0.0.1:1');
@@ -282,4 +282,14 @@ test('compaction preset preserves explicit windows and later model settings edit
     const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,encoding:'utf8',cwd:home});
     assert.equal(result.status,0,result.stderr);
   } finally {rmSync(home,{recursive:true,force:true});}
+});
+
+ test('Desktop third-party mode never initializes terminal routing', async () => {
+  const mod=await import('data:text/javascript,'+encodeURIComponent(nativeModSource(['unused'])));
+  const handlers={}; mod.register((name, handler)=>{handlers[name]=handler;});
+  const $={env:{get:async name=>{assert.equal(name,'CLAUDE_CODE_ENTRYPOINT');return 'claude-desktop-3p';},set:()=>assert.fail('overwrote Desktop routing')},process:{run:()=>assert.fail('loaded terminal credentials')}};
+  let next=0;
+  await handlers['session.start']($,{},async()=>{next++;});
+  for await (const value of handlers['turn.step']($,{},async function*(){next++;yield 'ok';})) assert.equal(value,'ok');
+  assert.equal(next,2);
 });
