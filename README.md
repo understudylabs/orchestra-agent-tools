@@ -556,3 +556,24 @@ After upgrading an existing setup, run `orchestra claude-setup models` (also
 available in the setup menu), then restart Claude. Managed model restrictions
 still apply. Select the model explicitly with `/model deepseek-v4.1-flash-1017`
 if your custom picker slot is already in use.
+
+### Opt-in PR event reports
+
+Run `orchestra claude-session install-pr-workflow` in a repository to write a
+workflow and helper for review. Merge those files to the default branch to
+activate reports on PR open, update, reopen, and close. The workflow executes
+only default-branch code and skips fork PRs. It never executes PR code.
+
+Register a local session with `orchestra claude-session register-pr <session-id>
+--yes`. This sends its ID, repository, branch, starting commit and creation time
+to GitHub Actions artifacts, visible to people with artifact access and retained
+for up to 90 days under repository policy. It sends no credentials, local paths,
+prompts, responses or source contents. Check the registration workflow succeeds;
+for an existing PR, manually run **Orchestra PR capture** with its `pr` number.
+Subsequent PR events refresh the report. Manual reruns also refresh late checks.
+
+Reports associate registered sessions by repository, branch and ancestry; this
+is not proof of authorship or exclusive PR membership. Unregistered/expired
+sessions are absent; rebased histories can require review. Reports contain change
+counts, review-event counts and check outcomes, not raw diffs/review bodies.
+Cost stays null: gateway accounting and capture verification are separate.

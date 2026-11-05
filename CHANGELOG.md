@@ -56,6 +56,10 @@ uses semantic-ish versioning (minor = new skill or new capability, patch = fixes
 
 - Complete Claude's first-run profile state during Orchestra gateway setup so reconfiguration opens Claude without account onboarding or approval of the inert startup credential. Workspace trust and tool permissions remain unchanged. Removal restores the previous onboarding flag and preserves other profile fields.
 
+### Added
+
+- Opt-in GitHub Actions PR reports with explicit session registration, branch/ancestry validation, merge/close state, and review/check summaries. Cost and capture reconciliation remain unavailable in this initial report.
+
 ## [0.10.3] — 2026-11-02
 
 ### Added
