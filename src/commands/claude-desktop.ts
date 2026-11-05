@@ -1,13 +1,12 @@
 import { confirm, select, checkbox } from "@inquirer/prompts";
 import { accessibleOrganization, organizationChoices } from "./claude-setup.js";
 import { Command } from "commander";
-import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { readCredentials } from "../config/credentials.js";
 import { ClaudeNativeConfigSchema, hasNativeClaudeSetup, repairNativeClaude } from "../claude-native.js";
-import { desktopCredential, desktopPaths, desktopStatus, installDesktop, removeDesktop } from "../claude-desktop.js";
+import { desktopCredential, desktopStatus, installDesktop, removeDesktop } from "../claude-desktop.js";
 import { resolveProject } from "../internal/projects.js";
 import { listWorkloads } from "../internal/workloads.js";
 import { request } from "../internal/http.js";
@@ -22,7 +21,6 @@ function requireQuit() {
 interface DesktopOptions { org?: string; project?: string; workload?: string; model?: string[]; environment?: string; yes?: boolean }
 export async function setupClaudeDesktop(opts: DesktopOptions = {}) {
   requireQuit();
-  if (!existsSync(desktopPaths().metadata)) throw new Error("Initialize Desktop once: open Claude → Help → Troubleshooting → Enable Developer Mode → Developer → Configure Third-Party Inference. Then quit Claude and run orchestra claude-desktop setup again. No settings were changed.");
   const interactive = Boolean(process.stdin.isTTY);
   if (!interactive && (!opts.org || !opts.project || !opts.workload || !opts.model?.length || !opts.yes)) {
     throw new Error("Noninteractive Desktop setup requires --org, --project, --workload, --model and --yes. Run orchestra claude-desktop setup in a terminal for guided setup.");

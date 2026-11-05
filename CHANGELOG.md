@@ -13,6 +13,10 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
+## [0.10.13] — 2026-11-04
+
+- Initialize Claude Desktop’s gateway profile on first setup, removing the manual Developer Mode and configuration-screen prerequisite. Preserve existing profiles and stop if their metadata is missing or invalid.
+
 ## [0.10.12] — 2026-11-03
 
 ### Fixed

@@ -490,9 +490,9 @@ MIT.
 
 ### Claude Desktop gateway pilot (macOS)
 
-Claude Desktop uses its own third-party inference profile. Initialize that
-screen once (Help → Troubleshooting → Enable Developer Mode, then Developer →
-Configure Third-Party Inference), and quit Desktop before setup. Run `orchestra claude-desktop` for the setup,
+Claude Desktop uses its own third-party inference profile. Quit Desktop before
+setup; Orchestra creates the profile on first use without enabling Developer
+Mode or opening the configuration screen. Run `orchestra claude-desktop` for the setup,
 reconfigure and removal menu; it is also available in `orchestra init` and
 `orchestra start`. Guided setup validates your selected scope and offers to open
 Desktop when done. For scripted setup:
