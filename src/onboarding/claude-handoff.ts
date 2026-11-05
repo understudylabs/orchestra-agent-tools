@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { statSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export async function finishClaudeSetup(start = true, deps = {
   interactive: Boolean(process.stdin.isTTY),
@@ -17,7 +18,7 @@ export async function finishClaudeSetup(start = true, deps = {
     catch { return "Enter an existing folder."; }
   } }),
   launch: (cwd: string) => new Promise<number>(done => {
-    const child = spawn("claude", [], { cwd, stdio: "inherit" });
+    const child = spawn(process.execPath, [fileURLToPath(new URL("../bin.js", import.meta.url)), "claude-native-launch"], { cwd, stdio: "inherit" });
     child.on("error", () => done(1));
     child.on("close", code => done(code ?? 1));
   }),
@@ -31,5 +32,5 @@ export async function finishClaudeSetup(start = true, deps = {
     const code = await deps.launch(cwd);
     if (code !== 0) deps.write("Claude did not exit successfully. Your Orchestra configuration is still installed. Check it with orchestra claude-setup status.");
   }
-  deps.write("\nYou are back in your terminal, not in Claude. To start a conversation, type this command and press Enter:\n\n  claude\n\nThen type your request inside Claude. To work on a project, first change into its folder. To resume a conversation later, run claude --resume.\n");
+  deps.write("\nYou are back in your terminal, not in Claude. To start a conversation, open a new terminal and type this command, or run orchestra claude-native-launch here:\n\n  claude\n\nThen type your request inside Claude. To work on a project, first change into its folder. To resume a conversation later, run claude --resume.\n");
 }

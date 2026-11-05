@@ -28,7 +28,10 @@ process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
   emitWarning(warning, ...rest);
 }) as typeof process.emitWarning;
 
-if (process.argv[2] === "claude-desktop" && process.argv[3] === "credential") {
+if (process.argv[2] === "claude-native-launch") {
+  const { launchNativeClaude } = await import("./claude-native.js");
+  await launchNativeClaude(process.argv.slice(3));
+} else if (process.argv[2] === "claude-desktop" && process.argv[3] === "credential") {
   try {
     const { desktopCredential } = await import("./claude-desktop.js");
     process.stdout.write(JSON.stringify(desktopCredential()) + "\n");

@@ -28,6 +28,7 @@ export async function checkClaudeSetup() {
   const cwd = mkdtempSync(join(tmpdir(), "orchestra-setup-check-"));
   try {
     const { stdout } = await promisify(execFile)("claude", [
+      "--settings", settings_path,
       "-p", "Reply with exactly ORCHESTRA_SETUP_OK.",
       "--system-prompt", "This is a connection check. Reply only with the requested text.",
       "--session-id", sessionId, "--tools", "", "--disable-slash-commands",
@@ -36,7 +37,7 @@ export async function checkClaudeSetup() {
       "--max-turns", "1", "--no-session-persistence", "--output-format", "json",
     ], {
       cwd, timeout: 60_000, maxBuffer: 1024 * 1024,
-      env: { ...process.env,
+      env: { ...process.env, ...settings.env as NodeJS.ProcessEnv,
         UNDERSTUDY_CLAUDE_SETUP_TEST_SESSION: sessionId,
         CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",

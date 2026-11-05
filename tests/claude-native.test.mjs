@@ -284,12 +284,71 @@ test('compaction preset preserves explicit windows and later model settings edit
   } finally {rmSync(home,{recursive:true,force:true});}
 });
 
- test('Desktop third-party mode never initializes terminal routing', async () => {
+ for (const entrypoint of ['claude-desktop','claude-desktop-3p']) test('Desktop '+entrypoint+' never initializes terminal routing', async () => {
   const mod=await import('data:text/javascript,'+encodeURIComponent(nativeModSource(['unused'])));
   const handlers={}; mod.register((name, handler)=>{handlers[name]=handler;});
-  const $={env:{get:async name=>{assert.equal(name,'CLAUDE_CODE_ENTRYPOINT');return 'claude-desktop-3p';},set:()=>assert.fail('overwrote Desktop routing')},process:{run:()=>assert.fail('loaded terminal credentials')}};
+  const $={env:{get:async name=>{assert.equal(name,'CLAUDE_CODE_ENTRYPOINT');return entrypoint;},set:()=>assert.fail('overwrote Desktop routing')},process:{run:()=>assert.fail('loaded terminal credentials')}};
   let next=0;
   await handlers['session.start']($,{},async()=>{next++;});
   for await (const value of handlers['turn.step']($,{},async function*(){next++;yield 'ok';})) assert.equal(value,'ok');
   assert.equal(next,2);
+});
+
+test('terminal setup leaves Desktop settings untouched and migrates legacy shared routing',()=>{
+ const home=mkdtempSync(join(tmpdir(),'orchestra-desktop-isolation-'));
+ try {
+  mkdirSync(join(home,'.understudy'));mkdirSync(join(home,'.claude'));mkdirSync(join(home,'bin'));
+  writeFileSync(join(home,'.understudy','credentials.json'),JSON.stringify({orgs:{org_example:{api_key:'synthetic',gateway_url:'https://gateway.example.com'}}}));
+  writeFileSync(join(home,'bin','claude'),'#!/bin/sh\necho "2.1.312 (Claude Code)"\n',{mode:0o700});
+  const script=`
+   import assert from 'node:assert/strict';
+   import {readFileSync,writeFileSync,renameSync} from 'node:fs';
+   import {join} from 'node:path';
+   import {enableNativeClaude,repairNativeClaude,removeNativeClaude,claudeSettingsPath} from ${JSON.stringify(moduleUrl)};
+   const h=process.env.HOME, shared=join(h,'.claude','settings.json'), statePath=join(h,'.understudy','claude-native.json');
+   const original=JSON.stringify({theme:'dark',env:{KEEP:'yes'}});writeFileSync(shared,original);
+   const config={version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com'};
+   enableNativeClaude(config,'example-cli');
+   assert.equal(readFileSync(shared,'utf8'),original);
+   removeNativeClaude();assert.equal(readFileSync(shared,'utf8'),original);
+   enableNativeClaude(config,'example-cli');
+   const state=JSON.parse(readFileSync(statePath));state.settings_path=shared;state.before={theme:'dark',env:{ANTHROPIC_API_KEY:'old-key',KEEP:'yes'}};
+   renameSync(claudeSettingsPath(),shared);const legacySettings=JSON.parse(readFileSync(shared));legacySettings.theme='dark';legacySettings.env.KEEP='yes';writeFileSync(shared,JSON.stringify(legacySettings));writeFileSync(statePath,JSON.stringify(state));
+   repairNativeClaude('example-cli');
+   const restored=JSON.parse(readFileSync(shared));assert.equal(restored.theme,'dark');assert.equal(restored.env.KEEP,'yes');
+   assert.equal(Object.keys(restored.env).some(k=>k.startsWith('ANTHROPIC_')),false);
+   assert.equal(JSON.parse(readFileSync(statePath)).settings_path,claudeSettingsPath());
+   assert.ok(readFileSync(join(h,'.zshrc'),'utf8').includes('claude-native-launch'));
+   writeFileSync(join(h,'.zshrc'),readFileSync(join(h,'.zshrc'),'utf8')+'\\n# user addition\\n');
+   removeNativeClaude();assert.equal(JSON.parse(readFileSync(shared)).env.ANTHROPIC_API_KEY,undefined);
+   assert.equal(readFileSync(join(h,'.zshrc'),'utf8'),'\\n# user addition\\n');
+  `;
+  const env={...process.env,HOME:home,ZDOTDIR:home,SHELL:'/bin/zsh',PATH:join(home,'bin')+':'+process.env.PATH};
+  for(const k of Object.keys(env))if(/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(k))delete env[k];
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,cwd:home,encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+ }finally{rmSync(home,{recursive:true,force:true});}
+});
+
+test('terminal launcher forwards arguments and fails closed when private settings are missing', () => {
+ const home=mkdtempSync(join(tmpdir(),'orchestra-launch-test-'));
+ try {
+  mkdirSync(join(home,'.understudy'));mkdirSync(join(home,'bin'));
+  writeFileSync(join(home,'.understudy','credentials.json'),JSON.stringify({orgs:{org_example:{api_key:'synthetic',gateway_url:'https://gateway.example.com'}}}),{mode:0o600});
+  writeFileSync(join(home,'bin','claude'),'#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2.1.312 (Claude Code)"; else printf "%s\\n" "$@"; fi\n',{mode:0o700});
+  const script=`
+   import assert from 'node:assert/strict';
+   import {unlinkSync} from 'node:fs';
+   import {enableNativeClaude,launchNativeClaude,claudeSettingsPath} from ${JSON.stringify(moduleUrl)};
+   enableNativeClaude({version:1,org:'org_example',project:'example',workload:'coding',environment:'test',gateway_url:'https://gateway.example.com'},'example-cli');
+   await launchNativeClaude(['--resume','a session']);
+   unlinkSync(claudeSettingsPath());
+   await assert.rejects(()=>launchNativeClaude([]),/settings are missing/);
+  `;
+  const env={...process.env,HOME:home,ZDOTDIR:home,SHELL:'/bin/zsh',PATH:join(home,'bin')+':'+process.env.PATH};
+  for(const k of Object.keys(env))if(/^(ANTHROPIC_|CLAUDE_CODE_USE_|CLAUDE_CODE_PLUGIN_DIRS$)/.test(k))delete env[k];
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,cwd:home,encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+  assert.match(result.stdout,/--settings\n[^\n]+claude-terminal-settings.json\n--resume\na session/);
+ }finally{rmSync(home,{recursive:true,force:true});}
 });
