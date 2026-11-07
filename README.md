@@ -51,6 +51,15 @@ and hands over to `orchestra init`, a short guided setup:
 
 Anything that needs your attention is listed once, at the end.
 
+Codex Desktop does not require the Codex CLI for plugin setup. Without a
+`codex` executable, the installer adds Orchestra to your personal plugin
+marketplace, preserving other entries. Restart Codex Desktop or ChatGPT, open
+Plugins, select your personal marketplace, and install Orchestra; then start a
+new chat. This adds skills, not gateway routing. The `orchestra codex` gateway
+launcher still requires the Codex CLI. To remove the Desktop plugin, uninstall
+it in Plugins and remove only its `orchestra` entry from
+`~/.agents/plugins/marketplace.json`.
+
 The CLI comes from the published npm package `@orchestraai/agent-tools`. If
 npm has no release yet (or with `--from-source`), the installer builds it from
 the GitHub `main` branch instead.

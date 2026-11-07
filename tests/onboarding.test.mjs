@@ -233,6 +233,13 @@ describe("installer results for orchestra init", () => {
     assert.ok(attention.some((item) => /1 OpenCode skills already exist/.test(item.message) && /mkdir -p/.test(item.fix)));
   });
 
+  it("distinguishes Desktop marketplace registration from plugin activation", () => {
+    const line = installedAgentsLine([{ name: "codex", status: "installed", reason: "Desktop marketplace registered; enable in Plugins" }]);
+    assert.match(line, /Plugin setup: Codex Desktop/);
+    assert.match(line, /restart the app, then install Orchestra/);
+    assert.doesNotMatch(line, /Plugin installed/);
+  });
+
   it("treats missing files as no results", () => {
     assert.deepEqual(readAdapterResults(root), []);
     assert.deepEqual(readAttention(root), []);

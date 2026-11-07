@@ -86,6 +86,14 @@ rm -f "$HOME/.cursor/plugins/local/orchestra"
 Codex uses a local marketplace at `.agents/plugins/marketplace.json` and a plugin
 manifest at `.codex-plugin/plugin.json`.
 
+For Desktop-only users, rerun the Orchestra installer with `--agents codex`.
+Without the Codex CLI, it registers the published package in the personal
+marketplace at `~/.agents/plugins/marketplace.json`, preserving existing entries.
+Restart Desktop, select that marketplace in Plugins, install Orchestra, and
+start a new chat. This installs skills; it does not change model routing.
+Uninstall in Plugins, then remove only the Orchestra entry from the personal
+marketplace. The commands below apply when the Codex CLI is installed.
+
 ```bash
 REPO="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" && pwd)"
 ls "$REPO/.codex-plugin/plugin.json" "$REPO/.agents/plugins/marketplace.json" "$REPO/skills/understudy/SKILL.md"

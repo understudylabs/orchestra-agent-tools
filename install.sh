@@ -481,7 +481,9 @@ detect_cursor() {
     [ -d "$HOME/Applications/Cursor.app" ]
 }
 detect_codex() {
-  need codex
+  need codex ||
+    [ -d "/Applications/ChatGPT.app" ] || [ -d "$HOME/Applications/ChatGPT.app" ] ||
+    [ -d "/Applications/Codex.app" ] || [ -d "$HOME/Applications/Codex.app" ]
 }
 detect_opencode() {
   need opencode ||
@@ -1644,12 +1646,6 @@ install_codex_plugin() {
     record_adapter "codex" "skipped" "not selected or not detected"
     return 0
   fi
-  if ! need codex; then
-    say "Codex CLI not found; skipping Codex marketplace registration."
-    say "Later, from a checkout, run: codex plugin marketplace add <repo>"
-    adapter_prereq_missing "codex" "the codex CLI is not on PATH"
-    return 0
-  fi
 
   local repo
   if ! repo="$(resolve_plugin_repo ".codex-plugin")"; then
@@ -1670,6 +1666,44 @@ install_codex_plugin() {
   if ! repo="$(cd "$repo" && pwd -P)"; then
     say "Could not resolve the Codex marketplace source directory."
     adapter_prereq_missing "codex" "the marketplace source could not be resolved"
+    return 0
+  fi
+
+  if ! need codex; then
+    # Desktop reads the documented personal marketplace without the Codex CLI.
+    if node - "$HOME" "$repo" >>"$LOG_FILE" 2>&1 <<'NODE'
+const fs = require("node:fs"), path = require("node:path");
+const [home, repo] = process.argv.slice(2);
+const dir = path.join(home, ".agents", "plugins"), file = path.join(dir, "marketplace.json");
+try {
+  for (const target of [path.join(home, ".agents"), dir, file]) {
+    if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) throw Error("Personal marketplace is symlinked; configure its owner directly.");
+  }
+  const previous = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined;
+  const catalog = previous === undefined ? { name: "personal", plugins: [] } : JSON.parse(previous);
+  if (!catalog || typeof catalog.name !== "string" || !Array.isArray(catalog.plugins)) throw Error("Personal marketplace is invalid; existing content was preserved.");
+  const entry = catalog.plugins.find(p => p.name === "orchestra");
+  if (entry && (entry.source?.source !== "npm" || entry.source?.package !== "@orchestraai/agent-tools")) throw Error("An existing Orchestra entry has a different source; existing content was preserved.");
+  const version = JSON.parse(fs.readFileSync(path.join(repo, "package.json"), "utf8")).version;
+  const plugin = { ...(entry || {}), name: "orchestra", source: { source: "npm", package: "@orchestraai/agent-tools", version }, policy: entry?.policy || { installation: "AVAILABLE", authentication: "ON_INSTALL" }, interface: { ...entry?.interface, displayName: "Orchestra" } };
+  catalog.plugins = catalog.plugins.filter(p => p.name !== "orchestra");
+  catalog.plugins.push(plugin);
+  fs.mkdirSync(dir, { recursive: true });
+  if (previous !== undefined && !fs.existsSync(file + ".orchestra-backup")) fs.writeFileSync(file + ".orchestra-backup", previous, { mode: 0o600, flag: "wx" });
+  const temp = file + ".orchestra-" + process.pid;
+  fs.writeFileSync(temp, JSON.stringify(catalog, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+  fs.renameSync(temp, file);
+} catch (error) { console.error(error.message); process.exitCode = 1; }
+NODE
+    then
+      ok "Orchestra registered in the Codex Desktop personal marketplace (no Codex CLI required)."
+      record_adapter "codex" "installed" "Desktop marketplace registered; enable in Plugins"
+      say "Restart Codex Desktop or ChatGPT, open Plugins, select your personal marketplace, and install or enable Orchestra. Start a new chat."
+      say "This adds Orchestra skills; it does not change Desktop model routing."
+    else
+      record_adapter_failure "codex" "Desktop marketplace registration failed; inspect the install log"
+      warn "Could not register the Desktop plugin. Your existing marketplace was preserved. See $LOG_FILE"
+    fi
     return 0
   fi
 
