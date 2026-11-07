@@ -13,6 +13,10 @@ agent.
 The format follows [Keep a Changelog](https://keepachangelog.com/); this project
 uses semantic-ish versioning (minor = new skill or new capability, patch = fixes).
 
+## [0.10.16] — 2026-11-06
+
+- Register the Orchestra plugin for Codex Desktop without requiring the Codex CLI. Preserve existing personal marketplace entries and explain the remaining Desktop activation step.
+
 ## [0.10.15] — 2026-11-04
 
 - Add an isolated `orchestra codex` gateway launcher with explicit scope/model selection, session resume, and Git attribution, without changing normal Codex settings.

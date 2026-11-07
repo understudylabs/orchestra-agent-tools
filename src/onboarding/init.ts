@@ -63,8 +63,12 @@ export function readAttention(stateDir: string): AttentionItem[] {
 }
 
 export function installedAgentsLine(results: AdapterResult[]): string | null {
-  const names = results.filter((result) => result.status === "installed").map((result) => AGENT_NAMES[result.name] ?? result.name);
-  return names.length ? `Plugin installed: ${names.join(", ")}` : null;
+  const installed = results.filter((result) => result.status === "installed");
+  const desktop = installed.some(result => result.name === "codex" && result.reason.startsWith("Desktop marketplace"));
+  const names = installed.map(result => result.name === "codex" && result.reason.startsWith("Desktop marketplace")
+    ? "Codex Desktop (restart the app, then install Orchestra from your personal marketplace in Plugins)"
+    : AGENT_NAMES[result.name] ?? result.name);
+  return names.length ? `${desktop ? "Plugin setup" : "Plugin installed"}: ${names.join(", ")}` : null;
 }
 
 export function localModelsSupported(platform = process.platform, arch = process.arch): boolean {

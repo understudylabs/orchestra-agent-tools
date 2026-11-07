@@ -1,6 +1,6 @@
 {
   "name": "understudy-opencode-adapter",
-  "version": "0.10.15",
+  "version": "0.10.16",
   "skills": "./skills",
   "commands": "./commands"
 }
