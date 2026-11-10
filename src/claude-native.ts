@@ -102,7 +102,15 @@ export function register(on) {
     return next(e);
   });
   on('turn.step', async function* ($, e, next) {
-    try { await apply($); } catch { $.ui.log('Orchestra could not initialize this session. Run orchestra claude-setup status.'); return; }
+    try { await apply($); } catch {
+      const answer = 'Orchestra could not initialize this session. Run orchestra claude-setup status. If the repository, branch, or scope changed, start a new Claude session.';
+      $.ui.log(answer);
+      // A missing result makes Claude skip the hook and retry the blocked URL.
+      // Answer the step without calling inference, preserving its pinned identity.
+      yield { kind: 'text', index: 0, text: answer };
+      yield { kind: 'stop', stopReason: 'end_turn', usage: null };
+      return { turnId: e.turnId, index: e.index, answer, toolUses: [] };
+    }
     return yield* next(e);
   });
 }

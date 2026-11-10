@@ -148,7 +148,13 @@ test('native mod applies credentials only after attribution and blocks failed st
   assert.equal(initialized.ANTHROPIC_API_KEY,'');
   assert.equal(initialized.ANTHROPIC_CUSTOM_HEADERS,'session-header');
   succeed=false;
-  for await (const value of handlers['turn.step']($,{},async function*(){next++;yield 1;})) assert.fail('failed initialization yielded inference');
+  const blocked=handlers['turn.step']($,{turnId:'synthetic-turn',index:3},async function*(){next++;yield 1;});
+  const text=await blocked.next();
+  assert.equal(text.value.kind,'text');
+  assert.match(text.value.text,/claude-setup status/);
+  assert.match(text.value.text,/start a new Claude session/);
+  assert.deepEqual(await blocked.next(),{done:false,value:{kind:'stop',stopReason:'end_turn',usage:null}});
+  assert.deepEqual(await blocked.next(),{done:true,value:{turnId:'synthetic-turn',index:3,answer:text.value.text,toolUses:[]}});
   assert.equal(next,1);
   assert.deepEqual(writes.at(-1),['ANTHROPIC_API_KEY','orchestra-initialization-required']);
 });
