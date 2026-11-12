@@ -15,7 +15,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { validateBenchmarkManifest } from "./benchmark.js";
 import { readJsonlFile, readRunEvents } from "./benchmark-artifacts.js";
 import {
@@ -640,5 +640,8 @@ export function filterChangedBenchmarkDirs(dirs: string[], baseRef?: string): { 
   } catch {
     return { dirs, base: null };
   }
-  return { dirs: dirs.filter((dir) => changed.some((file) => file.startsWith(`${resolve(dir)}/`) || file === resolve(dir))), base };
+  return { dirs: dirs.filter((dir) => {
+    const absolute = resolve(dir);
+    return changed.some((file) => file === absolute || file.startsWith(`${absolute}${sep}`));
+  }), base };
 }
