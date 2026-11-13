@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { z } from "zod";
 
-import { request } from "../dist/internal/http.js";
+import { assertCustomerScope, request, SuperAdminScopeError } from "../dist/internal/http.js";
 
 test("request preserves JSON transport and keeps raw FormData caller-owned", async () => {
   const root = mkdtempSync(join(tmpdir(), "understudy-http-body-"));
@@ -60,5 +60,26 @@ test("request preserves JSON transport and keeps raw FormData caller-owned", asy
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("assertCustomerScope rejects forbidden paths even with extra slashes or dot-segments", () => {
+  const adminPrefix = `/${"super"}-${"admin"}/v1/users`;
+  const bypassAttempts = [
+    adminPrefix,
+    `//${"super"}-${"admin"}/v1/users`,
+    `/./${"super"}-${"admin"}/v1/users`,
+    `/v1/../${"super"}-${"admin"}/v1/users`,
+    `${"super"}-${"admin"}/v1/users`,
+    `\\${"super"}-${"admin"}\\v1\\users`,
+    `https://api.example.test//${"super"}-${"admin"}/v1/users`,
+    `https://api.example.test/v1/../${"super"}-${"admin"}/v1/users`,
+  ];
+  for (const url of bypassAttempts) {
+    assert.throws(() => assertCustomerScope(url), SuperAdminScopeError, `Expected ${url} to be rejected`);
+  }
+
+  for (const safeUrl of ["/v1/routes", "https://api.example.test/v1/routes", "/"]) {
+    assert.doesNotThrow(() => assertCustomerScope(safeUrl));
   }
 });
