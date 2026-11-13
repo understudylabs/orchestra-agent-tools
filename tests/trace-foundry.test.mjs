@@ -497,6 +497,7 @@ test("scoreContract: each new entry kind flips met/unmet deterministically over 
   assert.equal(contractEntryMet({ type: "response_obligation", kind: "json_parses" }, { calls: [], finalResponse: "not json" }), false);
   assert.equal(contractEntryMet({ type: "response_obligation", kind: "schema_valid", expected_keys: ["missing"] }, { calls: [], finalResponse: '{"party":1}' }), false);
   assert.equal(contractEntryMet({ type: "value_propagation", value: "abc-123", must_reach: { kind: "tool_args", tool: "send-email" } }, { calls: [{ name: "send-email", arguments: { body: "code abc-123" } }] }), true);
+  assert.equal(contractEntryMet({ type: "value_propagation", value: "abc-123", must_reach: { kind: "tool_args", tool: "send-email" } }, { calls: [{ name: "send-email", status: "error", arguments: { body: "code abc-123" } }] }), false);
   assert.equal(contractEntryMet({ type: "value_propagation", value: "abc-123", must_reach: { kind: "tool_args", tool: "send-email" } }, { calls: [{ name: "other-tool", arguments: { body: "code abc-123" } }] }), false);
 });
 
