@@ -1091,14 +1091,14 @@ export function contractEntryMet(rule: Obj, events: ContractEvents): boolean {
   const calls = events.calls ?? [];
   const finalText = String(events.finalResponse ?? "");
   // Validation precedes matching: a call the world rejected (status=error)
-  // can never satisfy a state_effect or read_obligation.
+  // can never satisfy a state_effect, read_obligation, or value_propagation.
   const validCalls = calls.filter((call) => String(asObject(call).status ?? "") !== "error");
   if (type === "state_effect") return validCalls.some((call) => stateEffectMet(rule, call));
   if (type === "read_obligation") return validCalls.some((call) => toolOf(call) === rule.tool && semanticArgumentsMatch(anchorArguments(asObject(rule.arguments_semantic)), asObject(call.arguments)));
   if (type === "value_propagation") {
     const destination = asObject(rule.must_reach);
     if (destination.kind === "final_response") return valueTokensPresent(rule.value, finalText);
-    return calls.some((call) => (!destination.tool || toolOf(call) === destination.tool) && valueTokensPresent(rule.value, callArgumentsHay(call)));
+    return validCalls.some((call) => (!destination.tool || toolOf(call) === destination.tool) && valueTokensPresent(rule.value, callArgumentsHay(call)));
   }
   if (type === "response_obligation") {
     const parsed = parsedJson(finalText);
