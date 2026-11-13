@@ -116,9 +116,16 @@ export function assertCustomerScope(url: string): void {
   try {
     path = new URL(url).pathname;
   } catch {
-    // Relative path — use as-is.
-    path = url;
+    // Relative path — normalize slashes and dot-segments against a dummy origin
+    // without letting leading "//" be parsed as a protocol-relative host.
+    const collapsed = `/${url.replace(/\\/g, "/")}`.replace(/\/+/g, "/");
+    try {
+      path = new URL(collapsed, "https://scope.invalid").pathname;
+    } catch {
+      path = collapsed;
+    }
   }
+  path = path.replace(/\/+/g, "/");
   for (const prefix of FORBIDDEN_PREFIXES) {
     if (path.startsWith(prefix)) {
       throw new SuperAdminScopeError(url);
