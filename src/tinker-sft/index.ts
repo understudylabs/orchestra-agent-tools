@@ -393,27 +393,29 @@ async function runProcess(options: {
     let stderr = "";
     let pending = "";
     let result: unknown;
+    const consumeLine = (line: string) => {
+      if (!line.trim()) return;
+      try {
+        const event = JSON.parse(line) as Record<string, unknown>;
+        if (event.type === "phase" && typeof event.phase === "string" && typeof event.message === "string") {
+          options.onPhase({
+            type: "phase",
+            phase: event.phase,
+            message: event.message,
+            ...(Number.isInteger(event.current) ? { current: event.current as number } : {}),
+            ...(Number.isInteger(event.total) ? { total: event.total as number } : {}),
+          });
+        } else if (event.type === "result") result = event.result;
+      } catch {
+        // uv and provider dependencies may emit setup output; only typed JSON events are accepted.
+      }
+    };
     child.stdout?.on("data", (chunk: Buffer) => {
       stdout = boundedAppend(stdout, chunk);
       pending += chunk.toString("utf8");
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
-      for (const line of lines) {
-        try {
-          const event = JSON.parse(line) as Record<string, unknown>;
-          if (event.type === "phase" && typeof event.phase === "string" && typeof event.message === "string") {
-            options.onPhase({
-              type: "phase",
-              phase: event.phase,
-              message: event.message,
-              ...(Number.isInteger(event.current) ? { current: event.current as number } : {}),
-              ...(Number.isInteger(event.total) ? { total: event.total as number } : {}),
-            });
-          } else if (event.type === "result") result = event.result;
-        } catch {
-          // uv and provider dependencies may emit setup output; only typed JSON events are accepted.
-        }
-      }
+      for (const line of lines) consumeLine(line);
     });
     child.stderr?.on("data", (chunk: Buffer) => { stderr = boundedAppend(stderr, chunk); });
     const timer = setTimeout(() => terminate(child, "SIGKILL"), remaining);
@@ -423,6 +425,10 @@ async function runProcess(options: {
     });
     child.once("close", (code, signal) => {
       clearTimeout(timer);
+      if (pending.length > 0) {
+        consumeLine(pending);
+        pending = "";
+      }
       if (code === 0 && result !== undefined) resolvePromise(result);
       else if (code === 0) rejectPromise(new Error("Tinker SFT completed without a terminal receipt."));
       else rejectPromise(new Error(`Tinker SFT subprocess failed (${signal ?? code ?? "unknown"}): ${redact(stderr).slice(-2_000)}`));

@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { TINKER_PRICE_CATALOG } from "../dist/tinker-sft/catalog.js";
 import {
@@ -203,6 +204,33 @@ describe("portable Tinker SFT backend", () => {
       outputRoot: join(fixture.root, "runs"),
       _runnerOverrideForTests: { command: process.execPath, args: [deterministicRunner] },
     }), /does not support recipe chat_sft_exact_response_v1/);
+  });
+
+  it("consumes a terminal result JSON line even without a trailing newline", async () => {
+    const fixture = portablePlan();
+    const wrapperPath = join(fixture.root, "no-trailing-newline-runner.mjs");
+    writeFileSync(wrapperPath, [
+      `const origWrite = process.stdout.write.bind(process.stdout);`,
+      `process.stdout.write = (chunk, ...rest) => {`,
+      `  const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");`,
+      `  return origWrite(text.includes('"type":"result"') ? text.replace(/\\n+$/, "") : chunk, ...rest);`,
+      `};`,
+      `await import(${JSON.stringify(pathToFileURL(deterministicRunner).href)});`,
+      ``,
+    ].join("\n"));
+
+    const result = await startTinkerSftTraining({
+      planPath: fixture.planPath,
+      runId: "gsm8k-no-trailing-newline",
+      confirmUpload: true,
+      confirmSpend: true,
+      maximumSpendUsd: 0.5,
+      outputRoot: join(fixture.root, "runs"),
+      runtimeRoot: join(fixture.root, "runtime"),
+      _runnerOverrideForTests: { command: process.execPath, args: [wrapperPath] },
+      now: new Date("2026-07-19T12:00:00.000Z"),
+    }).completion;
+    assert.equal(result.promotion.status, "promoted");
   });
 
   it("contains no fake endpoint or fake provider path", () => {
