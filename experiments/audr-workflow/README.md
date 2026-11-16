@@ -151,3 +151,13 @@ and its matching captures. Determine whether operation IDs and request IDs can b
 associated reliably, identify missing tools/parents, and review the declared
 outcome against the captured behavior. That decides whether the next investment
 should be a transport hook, an adapter fix, or evaluation work.
+
+## Synthetic model-choice illustration
+
+The overview includes a separate authored contract-lookup example. Toggle call
+price versus full-workflow cost to see why the cheapest call can be the more
+expensive task. Its invented cohort assumptions are computed in `model-choice.mjs`
+and are not produced by the joiner fixtures, actual model replay or a verifier.
+The example identifies a candidate for investigation and keeps routing disabled
+until correlation, cost coverage, evaluation contracts, held-out quality and
+operational behavior have been validated.

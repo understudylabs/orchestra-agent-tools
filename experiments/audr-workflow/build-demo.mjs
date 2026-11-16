@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { joinAudrWorkflow } from './join.mjs';
+import { syntheticModelChoices } from './model-choice.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const readFixture = name => readFileSync(resolve(root, 'fixtures', `${name}.jsonl`), 'utf8')
@@ -21,7 +22,8 @@ export function demoScenarios() {
 
 export function buildDemo(output) {
   const data = JSON.stringify(demoScenarios()).replaceAll('<', '\\u003c');
-  const html = readFileSync(resolve(root, 'demo.html'), 'utf8').replace('__AUDR_DEMO_DATA__', data);
+  const html = readFileSync(resolve(root, 'demo.html'), 'utf8').replace('__AUDR_DEMO_DATA__', data)
+    .replace('__MODEL_CHOICE_DATA__', JSON.stringify(syntheticModelChoices()).replaceAll('<', '\\u003c'));
   mkdirSync(dirname(output), { recursive: true, mode: 0o700 });
   writeFileSync(output, html, { flag: 'wx', mode: 0o600 });
   return output;

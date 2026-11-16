@@ -21,7 +21,7 @@ test('build creates a standalone private overview with no embedded capture paylo
     const path = join(dir, 'demo.html');
     buildDemo(path);
     const html = readFileSync(path, 'utf8');
-    assert.doesNotMatch(html, /__AUDR_DEMO_DATA__|customer_request_body|response_body|<script[^>]+src=|<link[^>]+href=/);
+    assert.doesNotMatch(html, /__AUDR_DEMO_DATA__|__MODEL_CHOICE_DATA__|customer_request_body|response_body|<script[^>]+src=|<link[^>]+href=/);
     assert.match(html, /Synthetic data/);
     assert.equal(statSync(path).mode & 0o777, 0o600);
     const data = JSON.parse(html.match(/<script type="application\/json" id="demo-data">(.*?)<\/script>/s)[1]);
