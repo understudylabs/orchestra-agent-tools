@@ -47,7 +47,11 @@ local HTML file with no external assets or network calls. The builder accepts an
 optional output path and refuses to overwrite an existing file. It reads only the
 checked-in synthetic fixtures, never arbitrary private reports.
 
-Start with the three-view walkthrough: Orchestra today, additional harness AUDR
+Start with the conversation map: existing model-call evidence and harness AUDR
+context converge at an exact join, followed by a proposed evaluation. It includes
+a three-part talk track and the concrete questions to resolve with Chargebee.
+
+Then use the three-view walkthrough: Orchestra today, additional harness AUDR
 evidence, and the joined view. The same four-step synthetic task shows model
 interactions, external tool execution, and a declared product outcome. It calls
 out overlapping usage/attribution fields and separates optional harness assertions
