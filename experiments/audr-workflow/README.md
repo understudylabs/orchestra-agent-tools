@@ -36,6 +36,30 @@ the failed run costs USD 0.04. The descriptive cohort ratio is USD 0.10 per
 harness-reported resolved run, including the failed run in the numerator.
 These invented numbers demonstrate arithmetic, not savings or model quality.
 
+## Open the interactive overview
+
+```sh
+node experiments/audr-workflow/build-demo.mjs
+```
+
+Open `.understudy/audr-workflow/demo.html` in a browser. It is a self-contained
+local HTML file with no external assets or network calls. The builder accepts an
+optional output path and refuses to overwrite an existing file. It reads only the
+checked-in synthetic fixtures, never arbitrary private reports.
+
+The overview explains five stages: harness AUDR, existing gateway capture, the
+local evidence join, proposed evaluation handoff, and a future routing decision.
+Select stages to see responsibilities and implementation status. Inspect runs and
+operations, then switch between joined evidence, a missing mapping, a missing
+tool cost, and missing outcomes. Each scenario is computed by the actual joiner
+at build time. A withheld ratio reflects its evidence checks, not a UI mock.
+
+Validate the joiner and demo builder with:
+
+```sh
+node --test experiments/audr-workflow/*.test.mjs
+```
+
 ## Input contract
 
 `audr.jsonl` contains harness-emitted AUDR 1.1.x records. The prototype validates
