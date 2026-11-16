@@ -47,7 +47,13 @@ local HTML file with no external assets or network calls. The builder accepts an
 optional output path and refuses to overwrite an existing file. It reads only the
 checked-in synthetic fixtures, never arbitrary private reports.
 
-The overview explains five stages: harness AUDR, existing gateway capture, the
+Start with the three-view walkthrough: Orchestra today, additional harness AUDR
+evidence, and the joined view. The same four-step synthetic task shows model
+interactions, external tool execution, and a declared product outcome. It calls
+out overlapping usage/attribution fields and separates optional harness assertions
+from verified success. A cost example includes tool expense and a failed run.
+
+The expandable technical overview explains five stages: harness AUDR, existing gateway capture, the
 local evidence join, proposed evaluation handoff, and a future routing decision.
 Select stages to see responsibilities and implementation status. Inspect runs and
 operations, then switch between joined evidence, a missing mapping, a missing
